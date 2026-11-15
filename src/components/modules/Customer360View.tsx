@@ -2418,7 +2418,6 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                           value={formName}
                           onChange={(e) => setFormName(e.target.value)}
                           placeholder="Customer full name"
-                          autoFocus
                         />
                       </div>
                       <div className="form-group">
@@ -2447,7 +2446,7 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                           className="input"
                           value={formAltMobile}
                           onChange={(e) => setFormAltMobile(e.target.value)}
-                          placeholder="10 Digits"
+                          placeholder="10-digit mobile"
                           style={liveAltMobileError ? { borderColor: 'var(--danger)', background: 'var(--danger-l)' } : {}}
                         />
                         {liveAltMobileError && (
@@ -2518,7 +2517,7 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                         rows={2}
                         value={formNotes}
                         onChange={(e) => setFormNotes(e.target.value)}
-                        placeholder="Customer preferences, design notes..."
+                        aria-label="Notes"
                       />
                     </div>
                   </div>
@@ -2627,13 +2626,13 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                     <div className="g2" style={{ marginBottom: 14 }}>
                       <div className="form-group">
                         <label className="label">
-                          Aadhar Number <span className="label-optional">(optional — 12-digit UID)</span>
+                          Aadhar Number <span className="label-optional">(optional)</span>
                         </label>
                         <input
                           className="input"
                           value={formAadhaar}
                           onChange={(e) => setFormAadhaar(e.target.value)}
-                          placeholder="12-digit Aadhaar number"
+                          placeholder="XXXX XXXX XXXX"
                           style={liveAadhaarError && formAadhaar.trim().length > 0 ? { borderColor: 'var(--danger)', background: 'var(--danger-l)' } : {}}
                         />
                         {liveAadhaarError && formAadhaar.trim().length > 0 ? (
@@ -2798,3 +2797,4 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
     </div>
   );
 };
+
