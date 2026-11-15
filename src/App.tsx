@@ -55,7 +55,7 @@ import { DataImportView } from './components/modules/DataImportView';
 import { 
   mockStore, mockDailyRates, mockCounters, mockCustomers, 
   mockInventory, mockInvoices, mockLoans, mockRepairs, mockSchemes, 
-  mockCashRegister, mockMetalBookings, mockCancellations, mockShipments,
+  mockCashRegister, mockMetalBookings, mockCancellations, mockCreditMemos, mockShipments,
   mockOldGoldPurchases, mockCashOutflows, mockOldMetalStock,
   mockSuppliers, mockPurchaseOrders, mockGoodsReceipts, mockSupplierBills,
   mockSupplierPayments, mockUsers
@@ -63,7 +63,7 @@ import {
 import { 
   Counter, DailyRates, InventoryItem, SalesInvoice, GirviLoan, 
   RepairOrder, SavingScheme, PaymentTransaction, PaymentMode, 
-  DenominationCount, RepairStatus, MetalBooking, CancellationRecord,
+  DenominationCount, RepairStatus, MetalBooking, CancellationRecord, CreditMemoRecord,
   ShipmentRecord, OldGoldPurchase, CashOutflowRecord, OldMetalStockItem,
   Supplier, PurchaseOrder, GoodsReceipt, SupplierBill, SupplierPayment,
   UserAccount, StoreProfile
@@ -92,6 +92,7 @@ export function App() {
   // Extended Sidebar Models State
   const [metalBookings, setMetalBookings] = useState<MetalBooking[]>(mockMetalBookings);
   const [cancellations, setCancellations] = useState<CancellationRecord[]>(mockCancellations);
+  const [creditMemos, setCreditMemos] = useState<CreditMemoRecord[]>(mockCreditMemos);
   const [shipments, setShipments] = useState<ShipmentRecord[]>(mockShipments);
   const [oldGoldPurchases, setOldGoldPurchases] = useState<OldGoldPurchase[]>(mockOldGoldPurchases);
   const [cashOutflows, setCashOutflows] = useState<CashOutflowRecord[]>(mockCashOutflows);
@@ -318,6 +319,20 @@ export function App() {
     }
   };
 
+  const handleCancelInvoice = (invoice: SalesInvoice, cancellation: CancellationRecord, memo: CreditMemoRecord | undefined, restock: boolean) => {
+    const original = invoices.find(existing => existing.id === invoice.id);
+    if (!original || original.status === 'CANCELLED' || original.status === 'ESTIMATE') return;
+    setInvoices(current => current.map(existing => existing.id === invoice.id ? invoice : existing));
+    setCancellations(current => [cancellation, ...current]);
+    if (memo) setCreditMemos(current => [memo, ...current]);
+    if (restock) {
+      setInventory(current => current.map(stock => {
+        const count = original.items.filter(item => item.itemId ? item.itemId === stock.id : item.itemCode === stock.itemCode).length;
+        return count ? { ...stock, stockQty: stock.stockQty + count } : stock;
+      }));
+    }
+  };
+
   const handleAddPayment = (invoiceId: string, payment: PaymentTransaction) => {
     setInvoices(current => current.map(invoice =>
       invoice.id === invoiceId ? applyInvoiceReceipt(invoice, payment) ?? invoice : invoice
@@ -430,7 +445,7 @@ export function App() {
   };
 
   const handleCreateBooking = (booking: MetalBooking) => {
-    setMetalBookings([booking, ...metalBookings]);
+    setMetalBookings(current => current.some(existing => existing.id === booking.id) ? current : [booking, ...current]);
   };
 
   const handleRecordOldGoldPurchase = (purchase: OldGoldPurchase) => {
@@ -529,6 +544,7 @@ export function App() {
               inventory={inventory}
               invoices={invoices}
               onSaveInvoice={handleSaveInvoice}
+              onCancelInvoice={handleCancelInvoice}
               onAddPayment={handleAddPayment}
             />
           )}
@@ -547,6 +563,10 @@ export function App() {
             <CancellationsView
               store={store}
               cancellations={cancellations}
+              creditMemos={creditMemos}
+              onIssueRefund={memo => setCreditMemos(current => current.map(existing =>
+                existing.id === memo.id && existing.refundStatus === 'pending' ? memo : existing
+              ))}
             />
           )}
 
@@ -745,6 +765,8 @@ export function App() {
               invoices={invoices}
               repairs={repairs}
               loans={loans}
+              bookings={metalBookings}
+              creditMemos={creditMemos}
               onNavigate={navigateTo}
             />
           )}
