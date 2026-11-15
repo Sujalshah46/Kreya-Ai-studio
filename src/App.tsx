@@ -469,7 +469,8 @@ export function App() {
   };
 
   return (
-    <div className="h-screen w-screen bg-[#f8fafc] flex font-sans text-slate-800 antialiased select-none overflow-hidden">
+    <div className="h-screen w-screen flex antialiased overflow-hidden" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+      <a className="skip-link" href="#main">Skip to content</a>
       {/* Left Application Sidebar */}
       <Sidebar
         currentModule={currentModule}
@@ -493,7 +494,7 @@ export function App() {
           currentModule={currentModule}
         />
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#f8fafc] text-slate-800">
+        <main id="main" tabIndex={-1} className={`flex-1 overflow-y-auto ${currentModule === 'dashboard' ? '' : 'p-4 md:py-6 md:px-7'}`}>
           
           {/* 1. MAIN */}
           {currentModule === 'dashboard' && (
