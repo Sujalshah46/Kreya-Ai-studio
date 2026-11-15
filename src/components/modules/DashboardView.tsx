@@ -5,6 +5,40 @@ import {
 } from 'lucide-react';
 import { SalesInvoice, GirviLoan, RepairOrder, InventoryItem, DailyRates, StoreProfile, Customer } from '../../types';
 
+const businessDate = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+});
+const monthLabel = new Intl.DateTimeFormat('en-GB', {
+  month: 'short', year: 'numeric', timeZone: 'UTC'
+});
+const moneyFormat = new Intl.NumberFormat('en-IN');
+const otherPaymentColors = ['#537b9c', '#946787', '#797f49'];
+
+function dateKey(value?: string): string | undefined {
+  if (!value) return undefined;
+  // Date-only and local datetime values already represent the shop calendar.
+  const localDate = value.match(/^(\d{4}-\d{2}-\d{2})(?:$|[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$)/);
+  const date = new Date(localDate ? localDate[1] + 'T00:00:00Z' : value);
+  if (!Number.isFinite(date.getTime())) return undefined;
+  return localDate ? date.toISOString().slice(0, 10) : businessDate.format(date);
+}
+
+function chartTick(value: number, step: number): string {
+  if (value >= 100000) return '₹' + (step >= 100000 ? Math.round(value / 100000) : value / 100000) + 'L';
+  return '₹' + value / 1000 + 'k';
+}
+
+function donutSlice(start: number, sweep: number): string {
+  const point = (radius: number, angle: number) =>
+    [radius * Math.cos(angle), radius * Math.sin(angle)].join(' ');
+  const outerStart = point(66, start);
+  const outerEnd = point(66, start + sweep);
+  const innerStart = point(42, start);
+  const innerEnd = point(42, start + sweep);
+  const large = sweep > Math.PI ? 1 : 0;
+  return `M ${outerStart} A 66 66 0 ${large} 1 ${outerEnd} L ${innerEnd} A 42 42 0 ${large} 0 ${innerStart} Z`;
+}
+
 interface DashboardViewProps {
   store: StoreProfile;
   rates: DailyRates;
@@ -50,22 +84,66 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const rate22k = rates.gold22kPer10g || (rates.gold22kPerGram ? rates.gold22kPerGram * 10 : Math.round(rate24k * 0.916));
   const rate18k = rates.gold18kPer10g || (rates.gold18kPerGram ? rates.gold18kPerGram * 10 : Math.round(rate24k * 0.75));
 
-  // Payment modes breakdown
-  const paymentModeMap: Record<string, number> = {};
-  allPayments.forEach(p => {
-    const m = (p.mode || 'CASH').toUpperCase();
-    paymentModeMap[m] = (paymentModeMap[m] || 0) + (p.amount || 0);
-  });
-  if (Object.keys(paymentModeMap).length === 0 && todayCashIn > 0) {
-    paymentModeMap['UPI'] = 100000;
-    paymentModeMap['CASH'] = 10000;
+  // Use dated invoice records for the chart and never substitute demo chart values.
+  const today = businessDate.format(new Date());
+  const todayUtc = new Date(today + 'T00:00:00Z');
+  const firstMonth = new Date(todayUtc);
+  firstMonth.setUTCDate(1);
+  firstMonth.setUTCMonth(firstMonth.getUTCMonth() - 11);
+  const firstMonthKey = firstMonth.toISOString().slice(0, 7);
+  const paymentStart = new Date(todayUtc);
+  paymentStart.setUTCDate(paymentStart.getUTCDate() - 29);
+  const paymentStartKey = paymentStart.toISOString().slice(0, 10);
+  const months = new Map<string, { revenue: number; collected: number }>();
+  const paymentModes = new Map<string, number>();
+  const monthTotals = (date: string) => {
+    const key = date.slice(0, 7);
+    const totals = months.get(key) ?? { revenue: 0, collected: 0 };
+    months.set(key, totals);
+    return totals;
+  };
+
+  for (const invoice of invoices) {
+    const invoiceDate = dateKey(invoice.invoiceDate ?? invoice.date);
+    if (invoiceDate && invoiceDate <= today && invoiceDate.slice(0, 7) >= firstMonthKey &&
+        String(invoice.status).toUpperCase() !== 'CANCELLED' && Number.isFinite(invoice.productTotalValue)) {
+      monthTotals(invoiceDate).revenue += invoice.productTotalValue;
+    }
+    const payments = invoice.paymentTransactions?.length ? invoice.paymentTransactions : invoice.payments ?? [];
+    for (const payment of payments) {
+      const date = dateKey(payment.date) ?? dateKey(payment.timestamp);
+      if (!date || date > today || !Number.isFinite(payment.amount) || payment.amount <= 0) continue;
+      if (date.slice(0, 7) >= firstMonthKey) monthTotals(date).collected += payment.amount;
+      const mode = payment.mode?.trim().toUpperCase();
+      if (mode && date >= paymentStartKey) paymentModes.set(mode, (paymentModes.get(mode) ?? 0) + payment.amount);
+    }
   }
-  const totalPaymentSum = Object.values(paymentModeMap).reduce((a, b) => a + b, 0) || 1;
-  const paymentBreakdown = Object.entries(paymentModeMap).map(([mode, amt]) => ({
-    mode: mode === 'CASH' ? 'Cash' : mode,
-    amount: amt,
-    percent: Math.round((amt / totalPaymentSum) * 100)
-  })).sort((a, b) => b.amount - a.amount);
+
+  const chartMonths = [...months.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const highest = Math.max(0, ...chartMonths.flatMap(([, totals]) => [totals.revenue, totals.collected]));
+  const tickUnit = highest >= 100000 ? 50000 : 1000;
+  const step = Math.max(tickUnit, Math.ceil(highest / 4 / tickUnit) * tickUnit);
+  const ticks = [0, 1, 2, 3, 4].map(index => index * step);
+  const chartX = (index: number) => chartMonths.length === 1 ? 376 : 50 + index * 652 / (chartMonths.length - 1);
+  const chartY = (amount: number) => 183 - amount / (4 * step) * 178;
+  const totalPaymentSum = [...paymentModes.values()].reduce((sum, amount) => sum + amount, 0);
+  let angle = 0;
+  let otherColorIndex = 0;
+  const paymentBreakdown = [...paymentModes.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([mode, amount]) => {
+      const sweep = 2 * Math.PI * amount / totalPaymentSum;
+      const gap = Math.min(2 * Math.PI / 180, sweep / 3);
+      const path = donutSlice(angle, sweep - gap);
+      angle += sweep;
+      return {
+        mode: mode === 'CASH' ? 'Cash' : mode,
+        amount,
+        percent: Math.round(amount / totalPaymentSum * 100),
+        color: mode === 'UPI' ? '#237a57' : mode === 'CASH' ? '#c5a46d' : otherPaymentColors[otherColorIndex++ % otherPaymentColors.length],
+        path
+      };
+    });
 
   // Top customers by purchase
   const customerSpendMap = new Map<string, { name: string; phone: string; total: number; orders: number }>();
@@ -268,7 +346,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               borderBottom: '1px solid #f0f2ef'
             }}
           >
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', fontWeight: 600, color: '#202522' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 650, color: '#202522' }}>
               <TrendingUp className="w-4 h-4 text-[#237a57]" />
               <span>Monthly Revenue & Collections</span>
             </h3>
@@ -295,70 +373,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </linearGradient>
                 </defs>
 
-                {/* Grid horizontal lines */}
-                <g className="recharts-cartesian-grid">
-                  <line strokeDasharray="3 3" stroke="#e5e8e4" x1="50" y1="183" x2="702" y2="183" />
-                  <line strokeDasharray="3 3" stroke="#e5e8e4" x1="50" y1="138.5" x2="702" y2="138.5" />
-                  <line strokeDasharray="3 3" stroke="#e5e8e4" x1="50" y1="94" x2="702" y2="94" />
-                  <line strokeDasharray="3 3" stroke="#e5e8e4" x1="50" y1="49.5" x2="702" y2="49.5" />
-                  <line strokeDasharray="3 3" stroke="#e5e8e4" x1="50" y1="5" x2="702" y2="5" />
-                </g>
-
-                {/* X-Axis */}
-                <g className="xAxis">
-                  <text fontSize="11" x="376" y="202" textAnchor="middle" fill="#89918b">
-                    Nov 2026
+                {ticks.map(value => (
+                  <g key={value}>
+                    <line strokeDasharray="3 3" stroke="#e5e8e4" x1="50" y1={chartY(value)} x2="702" y2={chartY(value)} />
+                    <text fontSize="11" x="42" y={chartY(value) + 4} textAnchor="end" fill="#89918b">{chartTick(value, step)}</text>
+                  </g>
+                ))}
+                {chartMonths.map(([month], index) => (
+                  <text key={month} fontSize="11" x={chartX(index)} y="202" textAnchor="middle" fill="#89918b">
+                    {monthLabel.format(new Date(month + '-01T00:00:00Z'))}
                   </text>
-                </g>
-
-                {/* Y-Axis */}
-                <g className="yAxis">
-                  <text fontSize="11" x="42" y="186" textAnchor="end" fill="#89918b">₹0k</text>
-                  <text fontSize="11" x="42" y="142" textAnchor="end" fill="#89918b">₹50k</text>
-                  <text fontSize="11" x="42" y="97" textAnchor="end" fill="#89918b">₹1L</text>
-                  <text fontSize="11" x="42" y="53" textAnchor="end" fill="#89918b">₹2L</text>
-                  <text fontSize="11" x="42" y="12" textAnchor="end" fill="#89918b">₹2L</text>
-                </g>
-
-                {/* Revenue Area (Emerald) */}
-                <path 
-                  d="M 50,183 L 376,8.08 L 702,183 Z" 
-                  fill="url(#gRev)" 
-                />
-                <path 
-                  d="M 50,183 L 376,8.08 L 702,183" 
-                  fill="none" 
-                  stroke="#237a57" 
-                  strokeWidth="2.5" 
-                />
-                <circle 
-                  cx="376" 
-                  cy="8.08" 
-                  r="4" 
-                  stroke="#237a57" 
-                  strokeWidth="2" 
-                  fill="#ffffff" 
-                />
-
-                {/* Collections Area (Champagne Gold) */}
-                <path 
-                  d="M 50,183 L 376,85.1 L 702,183 Z" 
-                  fill="url(#gCol)" 
-                />
-                <path 
-                  d="M 50,183 L 376,85.1 L 702,183" 
-                  fill="none" 
-                  stroke="#c5a46d" 
-                  strokeWidth="2.5" 
-                />
-                <circle 
-                  cx="376" 
-                  cy="85.1" 
-                  r="4" 
-                  stroke="#c5a46d" 
-                  strokeWidth="2" 
-                  fill="#ffffff" 
-                />
+                ))}
+                {([
+                  { key: 'revenue', label: 'Revenue', color: '#237a57', gradient: 'gRev' },
+                  { key: 'collected', label: 'Collected', color: '#c5a46d', gradient: 'gCol' }
+                ] as const).map(series => {
+                  const points = chartMonths.map(([month, totals], index) => ({
+                    month, amount: totals[series.key], x: chartX(index), y: chartY(totals[series.key])
+                  }));
+                  const line = points.map(({ x, y }) => `${x},${y}`).join(' L ');
+                  return (
+                    <g key={series.key}>
+                      {points.length > 1 && (
+                        <>
+                          <path d={`M ${points[0].x},183 L ${line} L ${points[points.length - 1].x},183 Z`} fill={`url(#${series.gradient})`} />
+                          <path d={`M ${line}`} fill="none" stroke={series.color} strokeWidth="2" />
+                        </>
+                      )}
+                      {points.map(point => (
+                        <circle key={point.month} cx={point.x} cy={point.y} r="3" fill={series.color}>
+                          <title>{`${series.label}: ₹${moneyFormat.format(point.amount)}`}</title>
+                        </circle>
+                      ))}
+                    </g>
+                  );
+                })}
+                {chartMonths.length === 0 && (
+                  <text x="376" y="100" textAnchor="middle" fill="#89918b">No revenue or collections in this period.</text>
+                )}
               </svg>
 
               {/* Bottom Chart Legend */}
@@ -376,11 +428,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#237a57', display: 'inline-block' }} />
-                  <span style={{ color: '#237a57', fontWeight: 500 }}>Revenue (₹{monthlyRevenue.toLocaleString('en-IN')})</span>
+                  <span style={{ color: '#237a57', fontWeight: 500 }}>Revenue</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#c5a46d', display: 'inline-block' }} />
-                  <span style={{ color: '#c5a46d', fontWeight: 500 }}>Collected (₹{todayCashIn.toLocaleString('en-IN')})</span>
+                  <span style={{ color: '#c5a46d', fontWeight: 500 }}>Collected</span>
                 </div>
               </div>
             </div>
@@ -409,7 +461,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               borderBottom: '1px solid #f0f2ef'
             }}
           >
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', fontWeight: 600, color: '#202522' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 650, color: '#202522' }}>
               <Clock className="w-4 h-4 text-[#c5a46d]" />
               <span>Payment Modes</span>
             </h3>
@@ -417,20 +469,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="dash-panel-body" style={{ padding: '14px 18px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            {/* SVG Donut Chart Matching Live Production Exactly */}
-            <div style={{ width: '100%', height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="150" height="140" viewBox="0 0 150 140">
-                {/* UPI Slice (91% - Emerald #237a57) */}
-                <path 
-                  d="M 75,10 A 60,60 0 1,1 18,102 L 35,93 A 40,40 0 1,0 75,30 Z" 
-                  fill="#237a57" 
-                />
-                {/* Cash Slice (9% - Champagne Gold #c5a46d) */}
-                <path 
-                  d="M 18,102 A 60,60 0 0,1 75,10 L 75,30 A 40,40 0 0,0 35,93 Z" 
-                  fill="#c5a46d" 
-                />
-              </svg>
+            <div style={{ width: '100%', height: '150px', display: 'grid', placeItems: 'center' }}>
+              {paymentBreakdown.length ? (
+                <svg width="100%" height="150" viewBox="-70 -75 140 150" role="img" aria-label="Payment modes over the last 30 days">
+                  {paymentBreakdown.length === 1 ? (
+                    <circle r="54" fill="none" stroke={paymentBreakdown[0].color} strokeWidth="24" />
+                  ) : paymentBreakdown.map(payment => (
+                    <path key={payment.mode} d={payment.path} fill={payment.color}>
+                      <title>{`${payment.mode}: ₹${moneyFormat.format(payment.amount)}`}</title>
+                    </path>
+                  ))}
+                </svg>
+              ) : <span className="helper">No payments in this period.</span>}
             </div>
 
             {/* Breakdown Rows Matching Screenshot */}
@@ -442,7 +492,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       width: '8px', 
                       height: '8px', 
                       borderRadius: '2px', 
-                      background: p.mode === 'Cash' ? '#c5a46d' : '#237a57', 
+                      background: p.color, 
                       flexShrink: 0 
                     }} 
                   />
@@ -604,7 +654,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               borderBottom: '1px solid #f0f2ef'
             }}
           >
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', fontWeight: 600, color: '#202522' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 650, color: '#202522' }}>
               <User className="w-4 h-4 text-emerald-700" />
               <span>Top 10 Customers</span>
             </h3>
@@ -702,7 +752,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               borderBottom: '1px solid #f0f2ef'
             }}
           >
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', fontWeight: 600, color: '#202522' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 650, color: '#202522' }}>
               <FileText className="w-4 h-4 text-emerald-700" />
               <span>Recent Orders</span>
             </h3>
@@ -779,7 +829,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               borderBottom: '1px solid #f0f2ef'
             }}
           >
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', fontWeight: 600, color: '#202522' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 650, color: '#202522' }}>
               <CreditCard className="w-4 h-4 text-emerald-700" />
               <span>Open Loans (0)</span>
             </h3>
