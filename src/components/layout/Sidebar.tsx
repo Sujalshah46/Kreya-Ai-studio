@@ -63,7 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside 
-      className={`${collapsed ? 'w-14' : 'w-60'} bg-white border-r border-[#e2e8f0] flex flex-col h-screen select-none transition-all duration-200 z-10 shrink-0`}
+      className={`${collapsed ? 'w-[var(--sidebar-mini)]' : 'w-[var(--sidebar)]'} bg-white border-r border-[#e2e8f0] flex flex-col h-screen select-none transition-all duration-200 z-10 shrink-0`}
     >
       {/* Top Shop Brand Area Matching User Live PWA */}
       <div className="p-3 border-b border-[#e2e8f0] bg-white">
@@ -97,7 +97,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Find a screen..."
+              aria-label="Find a screen"
+              placeholder="Find a screen…"
               className="w-full bg-[#f9fafb] border border-slate-200 rounded-md pl-8 pr-2 py-1 text-xs text-slate-700 placeholder-slate-400 focus:outline-hidden focus:border-emerald-600 focus:bg-white"
             />
           </div>
