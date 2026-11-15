@@ -3,10 +3,13 @@ import {
   TrendingUp, ShoppingCart, Activity, AlertTriangle, CreditCard, Users, 
   Package, Clock, Wrench, Calendar, ChevronDown, User, FileText, ChevronRight
 } from 'lucide-react';
-import { SalesInvoice, GirviLoan, RepairOrder, InventoryItem, DailyRates, StoreProfile, Customer } from '../../types';
+import { SalesInvoice, GirviLoan, RepairOrder, InventoryItem, DailyRates, StoreProfile, Customer, MetalBooking } from '../../types';
 
 const businessDate = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+});
+const orderDateLabel = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC'
 });
 const monthLabel = new Intl.DateTimeFormat('en-GB', {
   month: 'short', year: 'numeric', timeZone: 'UTC'
@@ -47,6 +50,7 @@ interface DashboardViewProps {
   repairs: RepairOrder[];
   inventory: InventoryItem[];
   customers?: Customer[];
+  bookings?: MetalBooking[];
   onNavigate: (module: string) => void;
 }
 
@@ -58,26 +62,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   repairs = [],
   inventory = [],
   customers = [],
+  bookings = [],
   onNavigate
 }) => {
-  // Aggregate KPI figures
-  const totalInvoicesCount = invoices.length;
-  const todaySales = invoices.reduce((acc, inv) => acc + (inv.productTotalValue || 0), 0);
-  const monthlyRevenue = invoices.reduce((acc, inv) => acc + (inv.productTotalValue || 0), 0);
-  
-  // Total cash & payments received
-  const allPayments = invoices.flatMap(inv => inv.payments || []);
-  const todayCashIn = allPayments.reduce((acc, p) => acc + (p.amount || 0), 0) || invoices.reduce((acc, inv) => acc + (inv.paidAmount || 0), 0);
-  const totalOutstanding = invoices.reduce((acc, inv) => acc + (inv.balanceDue || 0), 0);
+  const today = businessDate.format(new Date());
+  const currentMonth = today.slice(0, 7);
+  const postedInvoices = invoices.filter(invoice =>
+    invoice.status !== 'CANCELLED' && invoice.status !== 'ESTIMATE'
+  );
+  const monthlyInvoices = postedInvoices.filter(invoice => {
+    const date = dateKey(invoice.invoiceDate ?? invoice.date);
+    return date?.slice(0, 7) === currentMonth && date <= today;
+  });
+  const todayInvoices = monthlyInvoices.filter(invoice => dateKey(invoice.invoiceDate ?? invoice.date) === today);
+  const todaySales = todayInvoices.reduce((total, invoice) => total + invoice.productTotalValue, 0);
+  const monthlyRevenue = monthlyInvoices.reduce((total, invoice) => total + invoice.productTotalValue, 0);
+  const totalOutstanding = postedInvoices.reduce((total, invoice) => total + invoice.balanceDue, 0);
 
-  const loanPortfolio = loans.reduce((acc, l) => acc + (l.principalDue || 0), 0);
-  const customerCount = customers.length > 0 ? customers.length : 2;
-  const openGoldWeight = 0.000;
-  const openSilverWeight = 0.000;
-  const pendingDelivery = invoices.filter(i => i.deliveryStatus === 'PENDING_COLLECTION').length || 1;
-  const pendingRepairs = repairs.filter(r => r.status !== 'delivered' && r.status !== 'DELIVERED').length;
-  const openBookings = 0;
-  const inventoryItemsCount = inventory.length > 0 ? inventory.length : 1;
+  const openLoans = loans.filter(loan => ['ACTIVE', 'OVERDUE', 'OPEN'].includes(loan.status.toUpperCase()));
+  const loanPortfolio = openLoans.reduce((total, loan) => total + loan.principalDue, 0);
+  const customerCount = customers.length;
+  const openGoldWeight = 0;
+  const openSilverWeight = 0;
+  const pendingDelivery = postedInvoices.filter(invoice => invoice.deliveryStatus === 'PENDING_COLLECTION').length;
+  const pendingRepairs = repairs.filter(repair => repair.status.toLowerCase() !== 'delivered').length;
+  const openBookings = bookings.filter(booking => ['ACTIVE', 'OPEN'].includes(booking.status.toUpperCase())).length;
+  const inventoryItemsCount = inventory.length;
 
   // Rate values for today
   const rate24k = rates.gold24kPer10g || (rates.gold24kPerGram ? rates.gold24kPerGram * 10 : 150000);
@@ -85,7 +95,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const rate18k = rates.gold18kPer10g || (rates.gold18kPerGram ? rates.gold18kPerGram * 10 : Math.round(rate24k * 0.75));
 
   // Use dated invoice records for the chart and never substitute demo chart values.
-  const today = businessDate.format(new Date());
   const todayUtc = new Date(today + 'T00:00:00Z');
   const firstMonth = new Date(todayUtc);
   firstMonth.setUTCDate(1);
@@ -103,16 +112,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return totals;
   };
 
+  let todayCashIn = 0;
   for (const invoice of invoices) {
     const invoiceDate = dateKey(invoice.invoiceDate ?? invoice.date);
     if (invoiceDate && invoiceDate <= today && invoiceDate.slice(0, 7) >= firstMonthKey &&
-        String(invoice.status).toUpperCase() !== 'CANCELLED' && Number.isFinite(invoice.productTotalValue)) {
+        invoice.status !== 'CANCELLED' && invoice.status !== 'ESTIMATE' && Number.isFinite(invoice.productTotalValue)) {
       monthTotals(invoiceDate).revenue += invoice.productTotalValue;
     }
     const payments = invoice.paymentTransactions?.length ? invoice.paymentTransactions : invoice.payments ?? [];
     for (const payment of payments) {
       const date = dateKey(payment.date) ?? dateKey(payment.timestamp);
       if (!date || date > today || !Number.isFinite(payment.amount) || payment.amount <= 0) continue;
+      if (date === today) todayCashIn += payment.amount;
       if (date.slice(0, 7) >= firstMonthKey) monthTotals(date).collected += payment.amount;
       const mode = payment.mode?.trim().toUpperCase();
       if (mode && date >= paymentStartKey) paymentModes.set(mode, (paymentModes.get(mode) ?? 0) + payment.amount);
@@ -162,31 +173,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // Top customers by purchase
   const customerSpendMap = new Map<string, { name: string; phone: string; total: number; orders: number }>();
-  invoices.forEach(inv => {
-    const custName = inv.customer?.name || 'Pakshal';
-    const custPhone = inv.customer?.mobile || '9876543210';
-    const existing = customerSpendMap.get(custName) || { name: custName, phone: custPhone, total: 0, orders: 0 };
+  postedInvoices.forEach(inv => {
+    const custName = inv.customer?.name || 'Unknown customer';
+    const custPhone = inv.customer?.mobile || '';
+    const key = inv.customer?.id || custName;
+    const existing = customerSpendMap.get(key) || { name: custName, phone: custPhone, total: 0, orders: 0 };
     existing.total += (inv.productTotalValue || 0);
     existing.orders += 1;
-    customerSpendMap.set(custName, existing);
+    customerSpendMap.set(key, existing);
   });
-  if (customerSpendMap.size === 0) {
-    customerSpendMap.set('Pakshal', { name: 'Pakshal', phone: '9876543210', total: 196532, orders: 1 });
-  }
-  const topCustomers = Array.from(customerSpendMap.values()).sort((a, b) => b.total - a.total);
+  const topCustomers = [...customerSpendMap.values()].sort((a, b) => b.total - a.total).slice(0, 10);
   const maxCustomerSpend = topCustomers[0]?.total || 1;
-
-  // Recent orders list
-  const recentOrders = invoices.length > 0 ? invoices.slice(0, 5) : [
-    {
-      id: 'inv-1',
-      invoiceNo: 'INV-2026-00001',
-      customer: { name: 'Pakshal' },
-      date: '15 Nov 2026',
-      productTotalValue: 196532,
-      status: 'partially paid'
-    }
-  ];
+  const recentOrders = [...postedInvoices].sort((a, b) =>
+    (dateKey(b.invoiceDate ?? b.date) ?? '').localeCompare(dateKey(a.invoiceDate ?? a.date) ?? '')
+  ).slice(0, 5);
 
   return (
     <>
@@ -284,7 +284,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div>
             <div className="kpi-value">₹{todaySales.toLocaleString('en-IN')}</div>
-            <div className="kpi-sub">{totalInvoicesCount} invoices today</div>
+            <div className="kpi-sub">{todayInvoices.length} invoices today</div>
           </div>
         </div>
 
@@ -298,7 +298,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div>
             <div className="kpi-value">₹{monthlyRevenue.toLocaleString('en-IN')}</div>
-            <div className="kpi-sub">{totalInvoicesCount} orders this month</div>
+            <div className="kpi-sub">{monthlyInvoices.length} orders this month</div>
           </div>
         </div>
 
@@ -312,7 +312,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div>
             <div className="kpi-value">₹{todayCashIn.toLocaleString('en-IN')}</div>
-            <div className="kpi-sub">Cash/UPI/card received, less refunds</div>
+            <div className="kpi-sub">Receipts recorded against invoices</div>
           </div>
         </div>
 
@@ -531,7 +531,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div>
             <div className="kpi-value">₹{loanPortfolio.toLocaleString('en-IN')}</div>
-            <div className="kpi-sub">0 open loans</div>
+            <div className="kpi-sub">{openLoans.length} open loans</div>
           </div>
         </div>
 
@@ -779,18 +779,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="mono" style={{ fontWeight: 600, color: '#202522', fontSize: '13px' }}>
-                    {ord.invoiceNo || 'INV-2026-00001'}
+                    {ord.invoiceNo || ord.invoiceNumber || '—'}
                   </div>
                   <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#5f6661', fontSize: '12.5px' }}>
-                    {ord.customer?.name || 'Pakshal'}
+                    {ord.customer?.name || 'Unknown customer'}
                   </div>
                   <div style={{ fontSize: '11.5px', color: '#89918b', marginTop: '1px' }}>
-                    {ord.date || '15 Nov 2026'}
+                    {dateKey(ord.invoiceDate ?? ord.date) ? orderDateLabel.format(new Date(dateKey(ord.invoiceDate ?? ord.date)! + 'T00:00:00Z')) : '—'}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: '#202522' }}>
-                    ₹{(ord.productTotalValue || 196532).toLocaleString('en-IN')}
+                    ₹{moneyFormat.format(ord.productTotalValue)}
                   </div>
                   <span 
                     className="badge badge-yellow" 
@@ -805,7 +805,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       color: '#92400e'
                     }}
                   >
-                    partially paid
+                    {ord.status.toLowerCase().replace(/_/g, ' ')}
                   </span>
                 </div>
               </div>
@@ -837,11 +837,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           >
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 650, color: '#202522' }}>
               <CreditCard className="w-4 h-4 text-emerald-700" />
-              <span>Open Loans (0)</span>
+              <span>Open Loans ({openLoans.length})</span>
             </h3>
           </div>
           <div className="dash-panel-body dash-empty" style={{ padding: '24px 18px', textAlign: 'center', color: '#89918b', fontSize: '13px' }}>
-            <p>No open loans.</p>
+            {openLoans.length === 0 ? <p>No open loans.</p> : openLoans.slice(0, 5).map(loan => (
+              <div className="dash-list-row justify-between" key={loan.id}>
+                <span>{loan.loanNo}</span>
+                <span>₹{moneyFormat.format(loan.principalDue)}</span>
+              </div>
+            ))}
           </div>
         </section>
       </div>
