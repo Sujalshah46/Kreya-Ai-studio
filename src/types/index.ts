@@ -29,6 +29,7 @@ export interface StoreProfile {
   email?: string;
   mobile?: string;
   invoicePrefix?: string;
+  upiId?: string;
   printerType?: string;
   huidRegistered?: boolean;
   bisLicenseNo?: string;
