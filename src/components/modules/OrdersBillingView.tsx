@@ -886,7 +886,12 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
         <form className="card-body" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}
           onSubmit={event => {
             event.preventDefault();
-            setDateFilter({ from: fromDate, to: toDate });
+            const form = new FormData(event.currentTarget);
+            const from = String(form.get('fromDate') ?? '');
+            const to = String(form.get('toDate') ?? '');
+            setFromDate(from);
+            setToDate(to);
+            setDateFilter({ from, to });
           }}
         >
           <div className="search-box" style={{ flex: 1, minWidth: 200 }}>
@@ -901,6 +906,7 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
           <input 
             className="input input-sm" 
             type="date"
+            name="fromDate"
             aria-label="From date"
             max={toDate || undefined}
             value={fromDate}
@@ -910,6 +916,7 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
           <input 
             className="input input-sm" 
             type="date"
+            name="toDate"
             aria-label="To date"
             min={fromDate || undefined}
             value={toDate}
