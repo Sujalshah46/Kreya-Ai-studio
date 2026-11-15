@@ -479,7 +479,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="helper" style={{ fontSize: '11.5px', color: '#89918b', margin: 0 }}>30 days</span>
           </div>
 
-          <div className="dash-panel-body" style={{ padding: '14px 18px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div className="dash-panel-body" style={{ padding: '14px 18px', flex: 1, display: 'flex', flexDirection: 'column' }}>
             <div style={{ width: '100%', height: '150px', display: 'grid', placeItems: 'center' }}>
               {paymentBreakdown.length ? (
                 <svg width="100%" height="150" viewBox="-70 -75 140 150" role="img" aria-label="Payment modes over the last 30 days">
