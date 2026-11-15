@@ -506,6 +506,7 @@ export function App() {
               repairs={repairs}
               inventory={inventory}
               customers={customers}
+              bookings={metalBookings}
               onNavigate={navigateTo}
             />
           )}
