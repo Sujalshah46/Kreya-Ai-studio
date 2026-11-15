@@ -93,6 +93,17 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
   // Additional action modals for full button parity
   const [showItemCardsModal, setShowItemCardsModal] = useState<SalesInvoice | null>(null);
   const [showPayLinkModal, setShowPayLinkModal] = useState<SalesInvoice | null>(null);
+  const showroomUpi = store.upiId?.trim() ?? '';
+  const linkAmount = showPayLinkModal?.balanceDue ?? 0;
+  const linkInvoiceNo = showPayLinkModal?.invoiceNo || showPayLinkModal?.invoiceNumber || '';
+  const linkMobile = (showPayLinkModal?.customer.mobile || showPayLinkModal?.customer.phone || '').replace(/\D/g, '');
+  const messagingNumber = /^\d{10}$/.test(linkMobile) ? '91' + linkMobile :
+    /^91\d{10}$/.test(linkMobile) ? linkMobile : '';
+  const paymentLink = /^[a-z0-9_.-]+@[a-z0-9.-]+$/i.test(showroomUpi) && Number.isFinite(linkAmount) && linkAmount > 0 && linkInvoiceNo
+    ? 'upi://pay?' + new URLSearchParams({ pa: showroomUpi, pn: store.tradeName, am: linkAmount.toFixed(2), cu: 'INR', tn: 'Invoice ' + linkInvoiceNo })
+    : '';
+  const paymentMessage = 'Please pay ₹' + linkAmount.toFixed(2) + ' for invoice ' + linkInvoiceNo +
+    ' from ' + store.tradeName + ': ' + paymentLink;
   const [showShipModal, setShowShipModal] = useState<SalesInvoice | null>(null);
   const [showPaymentSummaryModal, setShowPaymentSummaryModal] = useState<SalesInvoice | null>(null);
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
@@ -3329,57 +3340,45 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                 <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 6, borderTop: '1px solid var(--border)' }}>
                   <span style={{ fontWeight: 600, fontSize: 13 }}>Outstanding Balance:</span>
                   <strong style={{ fontSize: 15, color: 'var(--danger)' }}>
-                    ₹{(showPayLinkModal.balanceDue && showPayLinkModal.balanceDue > 0 ? showPayLinkModal.balanceDue : showPayLinkModal.totalAmount || 0).toLocaleString('en-IN')}
+                    ₹{linkAmount.toLocaleString('en-IN')}
                   </strong>
                 </div>
               </div>
 
               <div className="form-group">
-                <label className="label">Generated UPI Payment Link</label>
+                <label className="label" htmlFor="order-upi-link">Generated UPI Payment Link</label>
+                {!paymentLink && <p className="helper">
+                  {linkAmount <= 0 ? 'This invoice has no outstanding balance.' :
+                    'Save a valid showroom UPI ID in Shop Settings to generate a payment link.'}
+                </p>}
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <input 
-                    className="input" 
-                    readOnly
-                    value={`upi://pay?pa=dadhibaman@okaxis&pn=Dadhibaman+Jewellers&am=${showPayLinkModal.balanceDue || showPayLinkModal.totalAmount || 0}&tn=Invoice+${showPayLinkModal.invoiceNo}`}
-                    style={{ fontSize: 11, fontFamily: 'monospace' }}
-                  />
-                  <button 
-                    type="button" 
-                    className={`btn btn-sm ${copiedLink ? 'btn-gold' : 'btn-outline'}`}
-                    onClick={() => {
-                      const link = `upi://pay?pa=dadhibaman@okaxis&pn=Dadhibaman+Jewellers&am=${showPayLinkModal.balanceDue || showPayLinkModal.totalAmount || 0}&tn=Invoice+${showPayLinkModal.invoiceNo}`;
-                      navigator.clipboard?.writeText(link);
-                      setCopiedLink(true);
-                      setTimeout(() => setCopiedLink(false), 2500);
+                  <input id="order-upi-link" className="input mono" readOnly value={paymentLink} />
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline"
+                    disabled={!paymentLink}
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(paymentLink);
+                        setCopiedLink(true);
+                        setTimeout(() => setCopiedLink(false), 2500);
+                      } catch {
+                        alert('Copy the payment link manually from the field.');
+                      }
                     }}
                   >
                     <Copy size={13} /> {copiedLink ? 'Copied!' : 'Copy'}
                   </button>
                 </div>
               </div>
-
-              <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-                <button 
-                  type="button" 
-                  className="btn btn-sm btn-primary"
-                  style={{ flex: 1 }}
-                  onClick={() => {
-                    const mobile = showPayLinkModal.customer.mobile || showPayLinkModal.customer.phone || '';
-                    const amt = showPayLinkModal.balanceDue || showPayLinkModal.totalAmount || 0;
-                    const text = encodeURIComponent(`Dear ${showPayLinkModal.customer.name}, please complete payment of Rs ${amt} for invoice ${showPayLinkModal.invoiceNo} from Dadhibaman Jewellers: upi://pay?pa=dadhibaman@okaxis&pn=Dadhibaman+Jewellers&am=${amt}&tn=Invoice+${showPayLinkModal.invoiceNo}`);
-                    window.open(`https://api.whatsapp.com/send?phone=91${mobile}&text=${text}`, '_blank');
-                  }}
-                >
+              <div className="flex gap-2 mt-3">
+                <button type="button" className="btn btn-sm btn-primary flex-1" disabled={!paymentLink || !messagingNumber}
+                  onClick={() => window.open('https://api.whatsapp.com/send?' +
+                    new URLSearchParams({ phone: messagingNumber, text: paymentMessage }), '_blank', 'noopener,noreferrer')}>
                   <Send size={13} /> WhatsApp
                 </button>
-                <button 
-                  type="button" 
-                  className="btn btn-sm btn-outline"
-                  style={{ flex: 1 }}
-                  onClick={() => {
-                    alert(`SMS sent to ${showPayLinkModal.customer.mobile || showPayLinkModal.customer.phone || 'customer'}`);
-                  }}
-                >
+                <button type="button" className="btn btn-sm btn-outline flex-1" disabled={!paymentLink || !messagingNumber}
+                  onClick={() => { window.location.href = 'sms:+' + messagingNumber + '?body=' + encodeURIComponent(paymentMessage); }}>
                   <Share2 size={13} /> SMS Link
                 </button>
               </div>
