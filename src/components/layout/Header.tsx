@@ -103,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <>
       {/* Main Header Bar Matching Screenshot */}
-      <header className="h-14 bg-white border-b border-[#e2e8f0] px-6 flex items-center justify-between sticky top-0 z-20 select-none">
+      <header className="h-[var(--header)] shrink-0 bg-white/[0.92] border-b border-[var(--border)] px-6 flex items-center justify-between sticky top-0 z-20 select-none">
         {/* Left: Breadcrumb & Title */}
         <div className="flex flex-col justify-center">
           <div className="text-[11px] text-slate-400 font-medium">
