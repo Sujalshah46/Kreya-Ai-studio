@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { 
   Flame, Layers, Plus, Search, ShieldCheck, ArrowRight, 
   CheckCircle2, Clock, Factory, Scale, FileText, Download, Printer, X, FileSpreadsheet, RefreshCw
@@ -144,6 +145,8 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
 
   const [activeStageFilter, setActiveStageFilter] = useState<string>('ALL');
   const [selectedMetal, setSelectedMetal] = useState<string>('ALL');
+  const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
+  const selectAllRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState<string>('');
   const [activeMainTab, setActiveMainTab] = useState<'batches' | 'refinery_jobs' | 'refined_stock'>('batches');
 
@@ -299,17 +302,18 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
 
   const totalScrapValuation = pieces.reduce((a, b) => a + b.totalValue, 0);
 
-  // Filtered pieces by active tab and search
+  const belongsToTab = (piece: ScrapPiece, tab: MetalStockTab) => {
+    const closed = piece.status === 'Settled' || refineryJobs.some(job =>
+      (job.id === piece.refineryJobId || job.jobNo === piece.refineryJobId) && job.status === 'REFINED_BACK');
+    const atRefiner = !closed && Boolean(piece.refineryJobId || piece.stage === 'BAR_REFINING');
+    if (tab === 'Closed') return closed;
+    if (tab === 'At refiner') return atRefiner;
+    if (closed || atRefiner) return false;
+    if (tab === 'Pending test') return piece.testStatus === 'Pending test' || piece.stage === 'INTAKE';
+    return tab === 'In stock' && piece.testStatus === 'Tested' && (piece.stage === 'TESTED' || piece.stage === 'MELTED');
+  };
   const filteredPieces = pieces.filter(p => {
-    if (activeTab === 'Pending test') {
-      if (p.testStatus !== 'Pending test' && p.stage !== 'INTAKE') return false;
-    } else if (activeTab === 'In stock') {
-      if (p.stage !== 'TESTED' && p.stage !== 'MELTED') return false;
-    } else if (activeTab === 'At refiner') {
-      if (p.stage !== 'BAR_REFINING' && !p.refineryJobId) return false;
-    } else if (activeTab === 'Closed') {
-      if (p.status !== 'Settled' && p.stage !== 'BAR_REFINING' && !p.refineryJobId) return false;
-    }
+    if (!belongsToTab(p, activeTab)) return false;
     if (activeStageFilter !== 'ALL' && p.stage !== activeStageFilter) return false;
     if (selectedMetal !== 'ALL' && p.metal !== selectedMetal) return false;
     if (search.trim()) {
@@ -324,71 +328,61 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
     return true;
   });
 
-  const handleExportCsv = () => {
+  const canSelect = activeTab === 'Pending test' || activeTab === 'In stock';
+  const selectedPieces = filteredPieces.filter(piece => selectedBatchIds.includes(piece.id));
+  const allSelected = canSelect && filteredPieces.length > 0 && selectedPieces.length === filteredPieces.length;
+  const jobMetalSelection = selectedPieces[0]?.metal;
+  const dispatchFine = selectedPieces.reduce((sum, piece) => sum + piece.fineWeight, 0);
+  const canDispatch = activeTab === 'In stock' && selectedPieces.length > 0 && selectedPieces.every(piece =>
+    piece.metal === jobMetalSelection && Number.isFinite(piece.fineWeight) && piece.fineWeight > 0);
+
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = selectedPieces.length > 0 && !allSelected;
+  }, [selectedPieces.length, allSelected]);
+
+  const showTab = (tab: MetalStockTab) => {
+    setSelectedBatchIds([]);
+    setActiveTab(tab);
+  };
+  const refinerLabel = (piece: ScrapPiece) => refineryJobs.find(job =>
+    job.id === piece.refineryJobId || job.jobNo === piece.refineryJobId)?.refiner ?? piece.refineryJobId ?? '';
+
+  const downloadStock = (name: string, headers: string[], rows: Array<Array<string | number | undefined>>, format: 'csv' | 'xlsx') => {
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([headers, ...rows]), 'Metal stock');
+    XLSX.writeFile(workbook, `${name}_${new Date().toISOString().slice(0, 10)}.${format}`, { bookType: format });
+  };
+
+  const handleExport = (format: 'csv' | 'xlsx') => {
     if (activeTab === 'Refinery jobs') {
       const headers = ['Job No', 'Sent Date', 'Metal', 'Refiner', 'Carrier', 'Pieces', 'Sent Fine (g)', 'Received Fine (g)', 'Loss (g)', 'Status'];
       const rows = refineryJobs.map(j => [
-        j.jobNo, j.sentDate, j.metal, `"${j.refiner}"`, `"${j.carriedBy}"`, j.pieces, j.sentFine.toFixed(3), j.receivedFine.toFixed(3), j.lossFine.toFixed(3), j.status
+        j.jobNo, j.sentDate, j.metal, j.refiner, j.carriedBy, j.pieces, j.sentFine.toFixed(3), j.receivedFine.toFixed(3), j.lossFine.toFixed(3), j.status
       ]);
-      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `refinery_jobs_${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
+      downloadStock('refinery_jobs', headers, rows, format);
     } else if (activeTab === 'Refined stock') {
       const headers = ['Bar No', 'Metal', 'Type', 'Weight (g)', 'Fine Touch %', 'Received From Job', 'Date', 'Vault', 'Status', 'Purpose'];
       const rows = refinedStock.map(b => [
-        b.barNo, b.metal, b.type, b.weight.toFixed(3), b.fineTouch, b.receivedFromJob, b.dateReceived, b.vaultSafe, b.status, `"${b.purpose}"`
+        b.barNo, b.metal, b.type, b.weight.toFixed(3), b.fineTouch, b.receivedFromJob, b.dateReceived, b.vaultSafe, b.status, b.purpose
       ]);
-      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `refined_bullion_bars_${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
+      downloadStock('refined_bullion_bars', headers, rows, format);
     } else {
-      const headers = ['Batch ID', 'Date', 'Source', 'Metal', 'Purity', 'Gross Wt (g)', 'Net Wt (g)', 'Touch %', 'Fine Wt (g)', 'Stage', 'Test Status', 'Vault'];
+      const headers = ['Batch ID', 'Date', 'Source', 'Metal', 'Purity', 'Gross Wt (g)', 'Net Wt (g)', 'Touch %', 'Fine Wt (g)', 'Stage', 'Tested', 'Vault', 'Refiner'];
       const rows = filteredPieces.map(p => [
-        p.id, p.date, `"${p.source}"`, p.metal, p.purity, p.grossWeight.toFixed(3), p.netWeight.toFixed(3), p.testedTouch || 91.6, p.fineWeight.toFixed(3), p.stage, p.testStatus, p.vaultLocation
+        p.id, p.date, p.source, p.metal, p.purity, p.grossWeight.toFixed(3), p.netWeight.toFixed(3), p.testedTouch, p.fineWeight.toFixed(3), p.stage, p.testStatus, p.vaultLocation, refinerLabel(p)
       ]);
-      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `old_metal_stock_${activeTab.toLowerCase().replace(/ /g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
+      downloadStock('old_metal_stock', headers, rows, format);
     }
-  };
-
-  const handleExportExcel = () => {
-    handleExportCsv();
   };
 
   const handleTriggerMove = () => {
-    const piece = filteredPieces[0] || pieces[0];
-    if (piece) {
-      setActivePieceForMove(piece);
-      setTargetStage(
-        piece.stage === 'INTAKE' ? 'TESTED' :
-        piece.stage === 'TESTED' ? 'MELTED' : 'BAR_REFINING'
-      );
-      setShowMoveStageModal(true);
-    } else {
-      alert('No scrap pieces available to move.');
-    }
-  };
-
-  const handleTriggerReceiveBar = () => {
-    const job = refineryJobs.find(j => j.status !== 'REFINED_BACK') || refineryJobs[0];
-    if (job) {
-      handleOpenReceiveReturn(job);
-    } else {
-      alert('All refinery jobs are already refined back! Send new batch to refinery first.');
-    }
+    if (!canSelect || selectedPieces.length !== 1) return;
+    const [piece] = selectedPieces;
+    setActivePieceForMove(piece);
+    setMoveTouchInput(piece.testedTouch?.toString() ?? '');
+    setMoveMeltingLossInput('0');
+    setTargetStage(piece.stage === 'INTAKE' ? 'TESTED' : piece.stage === 'TESTED' ? 'MELTED' : 'TESTED');
+    setShowMoveStageModal(true);
   };
 
   const handleCreateScrapBatch = (e: React.FormEvent) => {
@@ -424,9 +418,17 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
   };
 
   const handleConfirmStageMove = () => {
-    if (!activePieceForMove) return;
-    const parsedTouch = parseFloat(moveTouchInput) || activePieceForMove.testedTouch || 91.6;
-    const meltingLoss = targetStage === 'MELTED' ? (parseFloat(moveMeltingLossInput) || 0) : 0;
+    if (!activePieceForMove || targetStage === 'BAR_REFINING') return;
+    const parsedTouch = Number(moveTouchInput);
+    if (!(parsedTouch > 0 && parsedTouch <= 100)) {
+      alert('Enter an assay value greater than zero and at most 100%.');
+      return;
+    }
+    const meltingLoss = targetStage === 'MELTED' ? Number(moveMeltingLossInput) : 0;
+    if (!Number.isFinite(meltingLoss) || meltingLoss < 0 || meltingLoss >= activePieceForMove.netWeight) {
+      alert('Enter a non-negative melting loss below the net weight.');
+      return;
+    }
     const adjustedNet = Math.max(0, activePieceForMove.netWeight - meltingLoss);
     const adjustedFine = adjustedNet * (parsedTouch / 100);
 
@@ -447,6 +449,7 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
       }
       return p;
     }));
+    setSelectedBatchIds([]);
     setShowMoveStageModal(false);
   };
 
@@ -464,7 +467,7 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
 
   const handleConfirmReceiveReturn = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeJobForReturn) return;
+    if (!activeJobForReturn || !refineryJobs.some(job => job.id === activeJobForReturn.id && job.status === 'IN_PROCESS')) return;
     const gross = parseFloat(returnBarGrossWeight) || 0;
     const touch = parseFloat(returnTouchPurity) || 99.9;
     const fineRec = gross * (touch / 100);
@@ -508,7 +511,7 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
       {/* Header */}
       <div className="page-hdr">
         <div className="page-hdr-left">
-          <h1>Old Metal Stock & Refinery</h1>
+          <h1>Old Metal Stock</h1>
           <p>Old gold & melted scrap pieces → refinery jobs (Gold & Silver) → 99.9% refined bullion to settle supplier bills</p>
         </div>
         <div className="btn-group">
@@ -516,6 +519,7 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
             type="button" 
             className="btn btn-outline"
             onClick={handleTriggerMove}
+            disabled={!canSelect || selectedPieces.length !== 1}
             title="Move / Advance stage for piece"
           >
             <ArrowRight size={14} />
@@ -524,7 +528,13 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
           <button 
             type="button" 
             className="btn btn-outline"
-            onClick={() => setShowRefineryJobModal(true)}
+            disabled={!canDispatch}
+            onClick={() => {
+              if (!canDispatch) return;
+              setJobMetal(jobMetalSelection === 'gold' ? 'Gold' : 'Silver');
+              setJobCarriedBy('');
+              setShowRefineryJobModal(true);
+            }}
             title="Send to refinery for pure bullion conversion"
           >
             <Factory size={14} />
@@ -533,16 +543,7 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
           <button 
             type="button" 
             className="btn btn-outline"
-            onClick={handleTriggerReceiveBar}
-            title="Receive refined 999 bar back from refinery"
-          >
-            <Scale size={14} />
-            <span>Receive Bar</span>
-          </button>
-          <button 
-            type="button" 
-            className="btn btn-outline"
-            onClick={handleExportCsv}
+            onClick={() => handleExport('csv')}
             title="Export CSV"
           >
             <Download size={14} />
@@ -551,19 +552,11 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
           <button 
             type="button" 
             className="btn btn-outline"
-            onClick={handleExportExcel}
+            onClick={() => handleExport('xlsx')}
             title="Export Excel"
           >
             <FileSpreadsheet size={14} />
             <span>Excel</span>
-          </button>
-          <button 
-            type="button" 
-            className="btn btn-primary"
-            onClick={() => setShowAddModal(true)}
-          >
-            <Plus size={14} />
-            <span>+ New Scrap Batch</span>
           </button>
         </div>
       </div>
@@ -573,42 +566,42 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
         <button 
           type="button" 
           className={`tab ${activeTab === 'Pending test' ? 'active' : ''}`}
-          onClick={() => setActiveTab('Pending test')}
+          onClick={() => showTab('Pending test')}
         >
-          Pending test ({pieces.filter(p => p.testStatus === 'Pending test' || p.stage === 'INTAKE').length})
+          Pending test ({pieces.filter(piece => belongsToTab(piece, 'Pending test')).length})
         </button>
         <button 
           type="button" 
           className={`tab ${activeTab === 'In stock' ? 'active' : ''}`}
-          onClick={() => setActiveTab('In stock')}
+          onClick={() => showTab('In stock')}
         >
-          In stock ({pieces.filter(p => p.stage === 'TESTED' || p.stage === 'MELTED').length})
+          In stock ({pieces.filter(piece => belongsToTab(piece, 'In stock')).length})
         </button>
         <button 
           type="button" 
           className={`tab ${activeTab === 'At refiner' ? 'active' : ''}`}
-          onClick={() => setActiveTab('At refiner')}
+          onClick={() => showTab('At refiner')}
         >
-          At refiner ({pieces.filter(p => p.stage === 'BAR_REFINING' || Boolean(p.refineryJobId)).length})
+          At refiner ({pieces.filter(piece => belongsToTab(piece, 'At refiner')).length})
         </button>
         <button 
           type="button" 
           className={`tab ${activeTab === 'Closed' ? 'active' : ''}`}
-          onClick={() => setActiveTab('Closed')}
+          onClick={() => showTab('Closed')}
         >
-          Closed ({pieces.filter(p => p.status === 'Settled' || p.stage === 'BAR_REFINING').length})
+          Closed ({pieces.filter(piece => belongsToTab(piece, 'Closed')).length})
         </button>
         <button 
           type="button" 
           className={`tab ${activeTab === 'Refinery jobs' ? 'active' : ''}`}
-          onClick={() => setActiveTab('Refinery jobs')}
+          onClick={() => showTab('Refinery jobs')}
         >
           Refinery jobs ({refineryJobs.length})
         </button>
         <button 
           type="button" 
           className={`tab ${activeTab === 'Refined stock' ? 'active' : ''}`}
-          onClick={() => setActiveTab('Refined stock')}
+          onClick={() => showTab('Refined stock')}
         >
           Refined stock ({refinedStock.length})
         </button>
@@ -711,15 +704,15 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
           <Search size={14} style={{ color: 'var(--muted)', flexShrink: 0 }} />
           <input 
             type="text" 
-            placeholder="Search batch code, source, purity, vault..."
+            placeholder="Search…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSelectedBatchIds([]); setSearch(e.target.value); }}
             style={{ border: 'none', outline: 'none', width: '100%', background: 'transparent', fontSize: '13px' }}
           />
           {search && (
             <button 
               type="button" 
-              onClick={() => setSearch('')}
+              onClick={() => { setSelectedBatchIds([]); setSearch(''); }}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}
             >
               ✕
@@ -731,7 +724,7 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
           className="input input-sm" 
           style={{ width: 'auto' }}
           value={activeStageFilter} 
-          onChange={(e) => setActiveStageFilter(e.target.value)}
+          onChange={(e) => { setSelectedBatchIds([]); setActiveStageFilter(e.target.value); }}
         >
           <option value="ALL">All Stages</option>
           <option value="INTAKE">1. Intake (Raw Scrap)</option>
@@ -744,7 +737,7 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
           className="input input-sm" 
           style={{ width: 'auto' }}
           value={selectedMetal} 
-          onChange={(e) => setSelectedMetal(e.target.value)}
+          onChange={(e) => { setSelectedBatchIds([]); setSelectedMetal(e.target.value); }}
         >
           <option value="ALL">All Metals</option>
           <option value="gold">Gold</option>
@@ -759,25 +752,34 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
           <span className="helper">
             Showing {filteredPieces.length} of {pieces.length} batches
           </span>
+          {activeTab === 'Pending test' && (
+            <button type="button" className="btn btn-outline btn-xs" onClick={() => setShowAddModal(true)}>
+              <Plus size={14} /> New scrap batch
+            </button>
+          )}
         </div>
         <div className="tbl-wrap">
           <table className="tbl-desktop-only">
             <thead>
               <tr>
+                <th><input ref={selectAllRef} type="checkbox" aria-label="Select all visible batches"
+                  checked={allSelected} disabled={!canSelect || filteredPieces.length === 0}
+                  onChange={event => setSelectedBatchIds(event.target.checked ? filteredPieces.map(piece => piece.id) : [])} /></th>
                 <th>Batch ID</th>
                 <th>Date & Source</th>
                 <th>Metal & Purity</th>
                 <th style={{ textAlign: 'right' }}>Gross Wt</th>
                 <th style={{ textAlign: 'right' }}>Net Wt</th>
-                <th style={{ textAlign: 'center' }}>Tested Touch</th>
+                <th style={{ textAlign: 'center' }}>Tested</th>
                 <th style={{ textAlign: 'right' }}>Fine Gold Eqv</th>
                 <th style={{ textAlign: 'right' }}>Rate / Total Value</th>
                 <th style={{ textAlign: 'center' }}>Current Stage</th>
                 <th>Vault Location</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <th>Refiner</th>
               </tr>
             </thead>
             <tbody>
+              {filteredPieces.length === 0 && <tr><td colSpan={12} className="empty">No matching batches.</td></tr>}
               {filteredPieces.map(piece => {
                 const stageBadgeClass = 
                   piece.stage === 'INTAKE' ? 'badge-gray' :
@@ -791,6 +793,10 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
 
                 return (
                   <tr key={piece.id}>
+                    <td><input type="checkbox" aria-label={`Select batch ${piece.id}`}
+                      checked={selectedBatchIds.includes(piece.id)} disabled={!canSelect}
+                      onChange={event => setSelectedBatchIds(previous => event.target.checked
+                        ? [...previous, piece.id] : previous.filter(id => id !== piece.id))} /></td>
                     <td className="mono" style={{ fontWeight: 700 }}>{piece.id}</td>
                     <td>
                       <div style={{ fontWeight: 500 }}>{piece.source}</div>
@@ -819,29 +825,8 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
                         {stageLabel}
                       </span>
                     </td>
-                    <td>
-                      <div style={{ fontSize: 12 }}>{piece.vaultLocation}</div>
-                      {piece.refineryJobId && (
-                        <div style={{ fontSize: 10, color: 'var(--primary)', fontWeight: 600 }}>{piece.refineryJobId}</div>
-                      )}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <button 
-                        type="button" 
-                        className="btn btn-outline btn-xs"
-                        onClick={() => {
-                          setActivePieceForMove(piece);
-                          setTargetStage(
-                            piece.stage === 'INTAKE' ? 'TESTED' :
-                            piece.stage === 'TESTED' ? 'MELTED' :
-                            piece.stage === 'MELTED' ? 'BAR_REFINING' : 'BAR_REFINING'
-                          );
-                          setShowMoveStageModal(true);
-                        }}
-                      >
-                        Advance Stage →
-                      </button>
-                    </td>
+                    <td>{piece.vaultLocation}</td>
+                    <td>{refinerLabel(piece) || '—'}</td>
                   </tr>
                 );
               })}
@@ -1169,7 +1154,7 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
               <div style={{ background: 'var(--zebra)', padding: '12px 14px', borderRadius: '10px' }}>
                 <div style={{ fontWeight: 700 }}>{activePieceForMove.source}</div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                  Net: {activePieceForMove.netWeight.toFixed(3)}g · Fine: {activePieceForMove.fineWeight.toFixed(3)}g · Touch: {activePieceForMove.testedTouch || 91.6}%
+                  Net: {activePieceForMove.netWeight.toFixed(3)}g · Fine: {activePieceForMove.fineWeight.toFixed(3)}g · Touch: {activePieceForMove.testedTouch == null ? 'Pending test' : `${activePieceForMove.testedTouch}%`}
                 </div>
               </div>
 
@@ -1269,7 +1254,7 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
               <div style={{ background: 'var(--zebra)', padding: '12px 14px', borderRadius: '10px' }}>
                 <div style={{ fontWeight: 700 }}>Dispatch Summary</div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                  Selected Scrap Batches: {pieces.filter(p => p.stage === 'MELTED' || p.stage === 'TESTED').length} batches · Fine Weight: {totalFineGoldInVault.toFixed(3)}g
+                  Selected Scrap Batches: {selectedPieces.length} · Fine Weight: {dispatchFine.toFixed(3)}g
                 </div>
               </div>
 
@@ -1278,7 +1263,7 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
                 <select 
                   className="input"
                   value={jobMetal}
-                  onChange={(e) => setJobMetal(e.target.value as any)}
+                  disabled
                 >
                   <option value="Gold">Gold (Fine Au Bullion)</option>
                   <option value="Silver">Silver (Fine Ag Bullion)</option>
@@ -1311,7 +1296,7 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
               </div>
 
               <div style={{ background: '#fef3c7', border: '1px solid #fde68a', padding: '10px 14px', borderRadius: '8px', fontSize: 12, color: '#92400e' }}>
-                Scrap will be locked into refinery job, dispatched with delivery challan, and pure 99.9% bullion bar will be received back into safe.
+                Selected batches move to At refiner when you record the job. Record the returned bars from Refinery jobs.
               </div>
             </div>
 
@@ -1326,23 +1311,31 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
               <button 
                 type="button" 
                 className="btn btn-primary"
+                disabled={!canDispatch || !jobCarriedBy.trim()}
                 onClick={() => {
+                  if (!canDispatch || !jobCarriedBy.trim()) return;
+                  const now = new Date();
+                  const id = crypto.randomUUID();
                   const newJob = {
-                    id: `rj-${Date.now()}`,
-                    jobNo: `RJ-2026-${String(refineryJobs.length + 45).padStart(5, '0')}`,
+                    id,
+                    jobNo: `RJ-${now.getFullYear()}-${id.slice(0, 8).toUpperCase()}`,
                     sentDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
                     metal: jobMetal,
                     refiner: jobRefiner,
-                    carriedBy: jobCarriedBy,
-                    pieces: 4,
-                    sentFine: 32.500,
+                    carriedBy: jobCarriedBy.trim(),
+                    pieces: selectedPieces.length,
+                    sentFine: dispatchFine,
                     receivedFine: 0.000,
                     lossFine: 0.000,
                     status: 'IN_PROCESS' as const
                   };
-                  setRefineryJobs([newJob, ...refineryJobs]);
+                  const dispatchIds = new Set(selectedPieces.map(piece => piece.id));
+                  setRefineryJobs(current => [newJob, ...current]);
+                  setPieces(current => current.map(piece => dispatchIds.has(piece.id)
+                    ? { ...piece, stage: 'BAR_REFINING', refineryJobId: newJob.jobNo } : piece));
                   setShowRefineryJobModal(false);
-                  alert(`Refinery job ${newJob.jobNo} created and dispatched to ${jobRefiner}!`);
+                  showTab('At refiner');
+                  alert(`Refinery job ${newJob.jobNo} recorded for ${jobRefiner}.`);
                 }}
               >
                 Confirm & Dispatch to Refinery
@@ -1483,3 +1476,4 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
     </div>
   );
 };
+

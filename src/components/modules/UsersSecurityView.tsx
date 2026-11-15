@@ -368,7 +368,7 @@ export const UsersSecurityView: React.FC<UsersSecurityViewProps> = ({
       <div className="page-hdr flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="page-hdr-left">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold tracking-tight">Users, Security & RBAC</h1>
+            <h1 className="text-xl font-bold tracking-tight">Users</h1>
             {/* Header banner Counter badge */}
             <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#fef8ee] text-[#92400e] rounded-full border border-[#efdcb6] text-xs font-semibold shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse" />
@@ -503,12 +503,11 @@ export const UsersSecurityView: React.FC<UsersSecurityViewProps> = ({
               <table className="tbl w-full text-xs">
                 <thead>
                   <tr className="border-b border-slate-200 text-slate-500">
-                    <th className="py-2.5 px-3 text-left">STAFF MEMBER</th>
-                    <th className="py-2.5 px-3 text-left">ROLE & PRIVILEGES</th>
-                    <th className="py-2.5 px-3 text-left">ASSIGNED TERMINAL</th>
-                    <th className="py-2.5 px-3 text-left">PIN AUTH</th>
-                    <th className="py-2.5 px-3 text-left">KEY PERMISSIONS</th>
+                    <th className="py-2.5 px-3 text-left">USER</th>
+                    <th className="py-2.5 px-3 text-left">ROLES</th>
                     <th className="py-2.5 px-3 text-left">STATUS</th>
+                    <th className="py-2.5 px-3 text-left">LAST SIGN-IN</th>
+                    <th className="py-2.5 px-3 text-left">SESSIONS</th>
                     <th className="py-2.5 px-3 text-right">ACTIONS</th>
                   </tr>
                 </thead>
@@ -542,60 +541,12 @@ export const UsersSecurityView: React.FC<UsersSecurityViewProps> = ({
                         </td>
 
                         <td className="py-3 px-3">
-                          <div className="font-medium text-slate-800 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                            <span>{u.assignedCounter}</span>
-                          </div>
-                          <div className="text-[10px] text-slate-400">Last: {u.lastLogin}</div>
-                        </td>
-
-                        <td className="py-3 px-3 font-mono">
-                          <div className="flex items-center gap-1.5">
-                            <KeyRound size={12} className="text-slate-400" />
-                            <span className="font-bold tracking-widest text-slate-700">••••</span>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenPinModal(u)}
-                              className="text-[11px] text-[#237a57] hover:underline ml-1 font-sans font-medium"
-                            >
-                              Change
-                            </button>
-                          </div>
-                        </td>
-
-                        <td className="py-3 px-3">
-                          <div className="flex flex-wrap gap-1 max-w-[240px]">
-                            {u.permissions?.allowManualDiscount && (
-                              <span className="text-[10px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded border border-emerald-200">
-                                Manual Disc.
-                              </span>
-                            )}
-                            {u.permissions?.allowRateOverride && (
-                              <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200">
-                                Rate Override
-                              </span>
-                            )}
-                            {u.permissions?.allowBackdatedEntries && (
-                              <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded border border-amber-200">
-                                Backdated
-                              </span>
-                            )}
-                            {u.permissions?.allowDeleteRecords && (
-                              <span className="text-[10px] px-1.5 py-0.5 bg-red-50 text-red-700 rounded border border-red-200">
-                                Delete Record
-                              </span>
-                            )}
-                            {!u.permissions?.allowManualDiscount && !u.permissions?.allowRateOverride && !u.permissions?.allowBackdatedEntries && (
-                              <span className="text-[10px] text-slate-400">Standard Restricted POS</span>
-                            )}
-                          </div>
-                        </td>
-
-                        <td className="py-3 px-3">
-                          <span className={`badge ${u.isActive ? 'badge-green' : 'badge-red'}`}>
-                            {u.isActive ? 'Active' : 'Disabled'}
+                          <span className={`badge ${u.isLocked ? 'badge-yellow' : u.isActive ? 'badge-green' : 'badge-red'}`}>
+                            {u.isLocked ? 'Locked' : u.isActive ? 'Active' : 'Disabled'}
                           </span>
                         </td>
+                        <td className="py-3 px-3">{u.lastLogin || '—'}</td>
+                        <td className="py-3 px-3" title="Session counts are unavailable">—</td>
 
                         <td className="py-3 px-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
@@ -640,7 +591,7 @@ export const UsersSecurityView: React.FC<UsersSecurityViewProps> = ({
 
             <div className="dt-pager p-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 bg-slate-50">
               <span>Showing {filteredUsers.length} of {usersList.length} staff members</span>
-              <span>All changes tracked in tamper-evident audit trail</span>
+              <span></span>
             </div>
           </div>
 
@@ -1249,3 +1200,4 @@ export const UsersSecurityView: React.FC<UsersSecurityViewProps> = ({
     </div>
   );
 };
+

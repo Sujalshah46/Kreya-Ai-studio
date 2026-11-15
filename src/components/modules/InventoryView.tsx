@@ -486,7 +486,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             Import Excel
           </button>
           <button className="btn btn-primary" onClick={handleOpenAdd}>
-            + Add item
+            Add item
           </button>
         </div>
       </div>
@@ -497,7 +497,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           className={`tab ${activeTab === 'items' ? 'active' : ''}`}
           onClick={() => setActiveTab('items')}
         >
-          Items ({inventory.length})
+          Items
         </button>
         <button 
           className={`tab ${activeTab === 'stock_in_out' ? 'active' : ''}`}
@@ -522,7 +522,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <Search size={15} style={{ color: 'var(--muted)', flexShrink: 0 }} />
               <input 
                 type="text" 
-                placeholder="Barcode, item code, HUID, name..." 
+                aria-label="Search inventory"
+                placeholder="Name, code, HUID, barcode, design…" 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ border: 'none', outline: 'none', width: '100%', background: 'transparent', fontSize: '13px' }}
@@ -601,23 +602,25 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <table className="tbl-desktop-only">
                 <thead>
                   <tr>
-                    <th>Barcode / SKU</th>
-                    <th>Item Name & Category</th>
-                    <th>Purity</th>
-                    <th style={{ textAlign: 'right' }}>Gross Wt</th>
-                    <th style={{ textAlign: 'right' }}>Net Wt</th>
-                    <th style={{ textAlign: 'right' }}>Making Charge</th>
-                    <th style={{ textAlign: 'right' }}>Cost Price</th>
-                    <th style={{ textAlign: 'right' }}>Retail Price</th>
-                    <th style={{ textAlign: 'center' }}>Qty</th>
-                    <th>Location / Tray</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
+                    <th aria-label="Photo" />
+                    <th>Code</th>
+                    <th>Item</th>
+                    <th>Metal</th>
+                    <th className="num">Gross g</th>
+                    <th className="num">Net g</th>
+                    <th className="num">Stones</th>
+                    <th className="num">Qty</th>
+                    <th className="num">MRP</th>
+                    <th className="num">Retail</th>
+                    <th className="num">W/Sale</th>
+                    <th>Added by</th>
+                    <th aria-label="Actions" />
                   </tr>
                 </thead>
                 <tbody>
                   {filteredItems.length === 0 ? (
                     <tr>
-                      <td colSpan={11} style={{ textAlign: 'center', padding: '36px', color: 'var(--muted)' }}>
+                      <td colSpan={13} style={{ textAlign: 'center', padding: '36px', color: 'var(--muted)' }}>
                         No inventory items found matching your filters.
                       </td>
                     </tr>
@@ -626,90 +629,26 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       const isLow = item.stockQty <= (item.minStock ?? 1);
                       return (
                         <tr key={item.id}>
-                          {/* Barcode / SKU */}
+                          <td>{item.imageUrl ? <img className="td-thumb" src={item.imageUrl} alt="" loading="lazy" /> : <span className="td-no-img" aria-hidden="true">—</span>}</td>
+                          <td className="mono">
+                            <strong>{item.itemCode}</strong>
+                            {item.huid && <div className="helper">HUID: {item.huid}</div>}
+                          </td>
                           <td>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                              <span className="mono" style={{ fontWeight: 700 }}>{item.itemCode}</span>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                <span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{item.barcode}</span>
-                                {item.huid && (
-                                  <span className="badge badge-purple" style={{ fontSize: 10, padding: '1px 6px' }}>
-                                    HUID: {item.huid}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                            <button type="button" className="btn btn-ghost btn-xs" onClick={() => setViewingItem(item)}>{item.itemName}</button>
+                            {item.designNo && <div className="helper">{item.designNo}</div>}
                           </td>
-
-                          {/* Item Name & Category */}
-                          <td>
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              <span 
-                                style={{ fontWeight: 600, color: 'var(--primary)', cursor: 'pointer' }}
-                                onClick={() => setViewingItem(item)}
-                              >
-                                {item.itemName}
-                              </span>
-                              <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-                                {item.category.toUpperCase()} {item.subCategory ? `· ${item.subCategory}` : ''}
-                                {item.designNo ? ` · #${item.designNo}` : ''}
-                              </span>
-                            </div>
+                          <td>{item.metalType || item.metalGroup} <span className="helper">{item.purityKarat}</span></td>
+                          <td className="num">{item.grossWeight.toFixed(3)}</td>
+                          <td className="num">{item.netWeight.toFixed(3)}</td>
+                          <td className="num">{item.stoneWeight > 0 ? item.stoneWeight.toFixed(3) + ' g' : '—'}</td>
+                          <td className="num">
+                            <span className={`badge ${item.stockQty <= 0 ? 'badge-red' : isLow ? 'badge-yellow' : 'badge-green'}`}>{item.stockQty}</span>
                           </td>
-
-                          {/* Purity */}
-                          <td>
-                            <span className="badge badge-yellow" style={{ fontWeight: 600 }}>
-                              {item.purityKarat.includes('22K') ? 'Gold 22K' : item.purityKarat}
-                            </span>
-                          </td>
-
-                          {/* Gross Wt */}
-                          <td style={{ textAlign: 'right' }} className="mono">
-                            {item.grossWeight.toFixed(3)} g
-                          </td>
-
-                          {/* Net Wt */}
-                          <td style={{ textAlign: 'right', fontWeight: 600 }} className="mono">
-                            {item.netWeight.toFixed(3)} g
-                          </td>
-
-                          {/* Making Charge */}
-                          <td style={{ textAlign: 'right' }} className="mono">
-                            {item.makingType === 'per_piece' 
-                              ? `₹${item.makingRate} /pc`
-                              : item.makingType === 'percent_of_metal'
-                                ? `${item.makingRate}%`
-                                : `₹${item.makingRate} /g`}
-                          </td>
-
-                          {/* Cost Price */}
-                          <td style={{ textAlign: 'right', color: 'var(--muted)' }} className="mono">
-                            ₹{item.costPrice.toLocaleString('en-IN')}
-                          </td>
-
-                          {/* Retail Price */}
-                          <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--primary)' }} className="mono">
-                            ₹{item.retailPrice.toLocaleString('en-IN')}
-                          </td>
-
-                          {/* Qty */}
-                          <td style={{ textAlign: 'center' }}>
-                            <span className={`badge ${item.stockQty <= 0 ? 'badge-red' : isLow ? 'badge-yellow' : 'badge-green'}`}>
-                              {item.stockQty} pcs
-                            </span>
-                          </td>
-
-                          {/* Location / Tray */}
-                          <td>
-                            <div style={{ fontSize: 12 }}>
-                              <div style={{ fontWeight: 500 }}>{item.location || 'Showroom'}</div>
-                              {item.rackTray && (
-                                <div style={{ color: 'var(--muted)', fontSize: 11 }}>{item.rackTray}</div>
-                              )}
-                            </div>
-                          </td>
-
+                          <td className="num">{item.mrp === undefined ? '—' : '₹' + item.mrp.toLocaleString('en-IN')}</td>
+                          <td className="num">₹{item.retailPrice.toLocaleString('en-IN')}</td>
+                          <td className="num">₹{item.wholesalePrice.toLocaleString('en-IN')}</td>
+                          <td>—</td>
                           {/* Actions: View, Print Tag, Edit, Delete */}
                           <td style={{ textAlign: 'right' }}>
                             <div style={{ display: 'inline-flex', gap: 4 }}>
@@ -1949,3 +1888,4 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     </div>
   );
 };
+

@@ -272,7 +272,7 @@ export const CashOutflowsView: React.FC<CashOutflowsViewProps> = ({
       {/* Header */}
       <div className="page-hdr">
         <div className="page-hdr-left">
-          <h1>Cash Outflows & Petty Expenses</h1>
+          <h1>Cash outflows</h1>
           <p>Showroom till disbursements · Category tracking · Petty cash voucher generation · Void audit</p>
         </div>
         <div className="btn-group">
@@ -430,17 +430,17 @@ export const CashOutflowsView: React.FC<CashOutflowsViewProps> = ({
           <table style={{ width: '100%', fontSize: 13 }}>
             <thead>
               <tr>
-                <th style={{ width: 130 }}>Voucher No</th>
-                <th style={{ width: 95 }}>Date</th>
+                <th>Date</th>
+                <th>No.</th>
                 <th>Category</th>
-                <th>Paid To / Payee</th>
-                <th style={{ textAlign: 'right', width: 110 }}>Amount (₹)</th>
-                <th style={{ width: 95 }}>Mode</th>
-                <th>Till / Counter</th>
-                <th>Particulars / Purpose</th>
-                <th style={{ width: 110 }}>Authorized By</th>
-                <th style={{ textAlign: 'center', width: 85 }}>Status</th>
-                <th style={{ textAlign: 'right', width: 115 }}>Actions</th>
+                <th>Mode</th>
+                <th className="num">Amount</th>
+                <th>Customer</th>
+                <th>Source</th>
+                <th>Reference</th>
+                <th>By</th>
+                <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -466,41 +466,15 @@ export const CashOutflowsView: React.FC<CashOutflowsViewProps> = ({
                         textDecoration: isVoid ? 'line-through' : undefined
                       }}
                     >
-                      <td className="font-mono" style={{ fontWeight: 700, color: 'var(--text)' }}>
-                        {v.voucherNo}
-                      </td>
-                      <td className="font-mono" style={{ fontSize: 12, color: 'var(--muted)' }}>
-                        {v.date.slice(0, 10)}
-                      </td>
-                      <td>
-                        <span className="badge badge-blue" style={{ fontSize: 11 }}>
-                          {getCategoryLabel(v.category)}
-                        </span>
-                      </td>
-                      <td style={{ fontWeight: 600 }}>
-                        {v.paidTo}
-                      </td>
-                      <td style={{ textAlign: 'right', fontWeight: 800, color: isVoid ? 'var(--muted)' : 'var(--danger)' }} className="font-mono">
-                        ₹{v.amount.toLocaleString('en-IN')}
-                      </td>
-                      <td>
-                        <span className="badge badge-gray">{v.paymentMode}</span>
-                      </td>
-                      <td className="font-mono" style={{ fontSize: 12 }}>
-                        {v.counterCode || 'MAIN1'}
-                      </td>
-                      <td style={{ fontSize: 12, color: 'var(--text2)' }}>
-                        {v.notes || '—'}
-                        {v.referenceNo && (
-                          <div className="font-mono" style={{ fontSize: 10.5, color: 'var(--muted)' }}>Ref: {v.referenceNo}</div>
-                        )}
-                        {isVoid && v.voidReason && (
-                          <div style={{ color: 'var(--danger)', fontSize: 10.5, fontStyle: 'italic' }}>Void: {v.voidReason}</div>
-                        )}
-                      </td>
-                      <td style={{ fontSize: 12, color: 'var(--muted)' }}>
-                        {v.authorizedBy || v.approvedBy || 'Store Manager'}
-                      </td>
+                      <td className="font-mono">{v.date.slice(0, 10)}</td>
+                      <td className="font-mono">{v.voucherNo}</td>
+                      <td><span className="badge badge-blue">{getCategoryLabel(v.category)}</span></td>
+                      <td><span className="badge badge-gray">{v.paymentMode}</span></td>
+                      <td className="num">₹{v.amount.toLocaleString('en-IN')}</td>
+                      <td>{v.paidTo || '—'}</td>
+                      <td>{v.sourceRef || '—'}</td>
+                      <td>{v.referenceNo || '—'}</td>
+                      <td>{v.authorizedBy || v.approvedBy || '—'}</td>
                       <td style={{ textAlign: 'center' }}>
                         <span className={`badge ${isVoid ? 'badge-red' : 'badge-green'}`}>
                           {isVoid ? 'VOIDED' : 'ACTIVE'}
@@ -844,3 +818,4 @@ export const CashOutflowsView: React.FC<CashOutflowsViewProps> = ({
     </div>
   );
 };
+

@@ -29,65 +29,13 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
   store,
   inventory: initialInventory
 }) => {
-  const dbSingleStockItem: InventoryItem = {
-    id: 'item-sbj-01',
-    itemCode: 'SBJCH-01',
-    barcode: '890123456001',
-    huid: 'ZX98YU',
-    itemName: 'Gold Chain 22K Rope',
-    category: 'gold',
-    subCategory: 'Chain',
-    metalType: 'Gold',
-    metalGroup: 'GOLD',
-    purityKarat: '22K (916)',
-    purityPercent: 91.60,
-    grossWeight: 12.350,
-    stoneWeight: 0.000,
-    netWeight: 12.350,
-    wastagePercent: 6.0,
-    makingMode: 'PER_NET_GRAM',
-    makingRate: 450.0,
-    makingType: 'per_gram',
-    costPrice: 88920.0,
-    retailPrice: 97812.0,
-    wholesalePrice: 92470.0,
-    mrp: 104500.0,
-    hsn: '7113',
-    quantity: 3,
-    minStock: 1,
-    itemSize: '20 in',
-    designNo: 'DS-CH-901',
-    gender: 'Unisex',
-    retailMarginPct: 25.0,
-    wholesaleMarginPct: 12.0,
-    stockQty: 3,
-    location: 'Main Showroom',
-    rackTray: 'Chain Tray 01',
-    stones: [],
-    status: 'IN_STOCK'
-  };
-
-  const inventory = React.useMemo(() => {
-    if (!initialInventory || initialInventory.length === 0) {
-      return [dbSingleStockItem];
-    }
-    const hasSbj = initialInventory.some(i => i.itemCode === 'SBJCH-01');
-    const mapped = initialInventory.map(item => item.itemCode === 'SBJCH-01' ? {
-      ...dbSingleStockItem,
-      ...item,
-      grossWeight: 12.350,
-      netWeight: 12.350,
-      quantity: item.quantity || 3,
-      stockQty: item.stockQty || 3
-    } : item);
-    return hasSbj ? mapped : [dbSingleStockItem, ...mapped];
-  }, [initialInventory]);
-
-  // Active audit metadata
-  const [auditNo, setAuditNo] = useState('SV-2026-0005');
-  const [auditName, setAuditName] = useState('Physical Stock Audit 15 Nov 2026');
+  const [auditInventory, setAuditInventory] = useState<InventoryItem[]>([]);
+  const [auditNo, setAuditNo] = useState('');
+  const [auditName, setAuditName] = useState('');
   const [startedBy] = useState('Admin');
-  const [startedAt] = useState('15-Nov-2026 10:30 am');
+  const [startedAt, setStartedAt] = useState('');
+  const [auditLocked, setAuditLocked] = useState(false);
+  const inventory = auditInventory;
   const [auditMethod, setAuditMethod] = useState<'scan' | 'count'>('scan');
   const [selectedTray, setSelectedTray] = useState<string>('ALL');
 
@@ -100,27 +48,8 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
   const [scanInput, setScanInput] = useState('');
   const [scanMessage, setScanMessage] = useState<{ text: string; type: 'success' | 'warn' | 'error' } | null>(null);
 
-  // Scanned item IDs (default first item matched)
-  const [scannedIds, setScannedIds] = useState<string[]>([
-    'item-sbj-01'
-  ]);
-
-  // Scanned log records
-  const [scanRecords, setScanRecords] = useState<ScanRecord[]>([
-    {
-      id: 'sc-1',
-      code: 'SBJCH-01',
-      itemId: 'item-sbj-01',
-      itemName: 'Gold Chain 22K Rope',
-      huid: 'ZX98YU',
-      category: 'gold',
-      purity: 'Gold 22K',
-      weight: 12.350,
-      result: 'MATCHED',
-      scannedAt: '10:31:15 AM',
-      scannedBy: 'Admin'
-    }
-  ]);
+  const [scannedIds, setScannedIds] = useState<string[]>([]);
+  const [scanRecords, setScanRecords] = useState<ScanRecord[]>([]);
 
   // Excess tags scanned (not found in current inventory)
   const [excessTags, setExcessTags] = useState<ScanRecord[]>([]);
@@ -188,7 +117,7 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
 
   const handleScanSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!scanInput.trim()) return;
+    if (auditLocked || !scanInput.trim()) return;
 
     const q = scanInput.trim().toUpperCase();
     const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
@@ -200,7 +129,7 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
       i.huid.toUpperCase() === q
     );
 
-    if (found) {
+    if (found && found.stockQty > 0) {
       if (scannedIds.includes(found.id)) {
         playAuditTone('error');
         setScanMessage({ text: `Tag "${found.itemCode}" was already scanned previously in this audit session!`, type: 'warn' });
@@ -246,7 +175,13 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
   const handleStartNewAudit = (e: React.FormEvent) => {
     e.preventDefault();
     setAuditNo(`SV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
-    setAuditName(newAuditName);
+    if (!newAuditName.trim()) return;
+    setAuditName(newAuditName.trim());
+    setAuditInventory(initialInventory.filter(item => item.stockQty > 0));
+    setStartedAt(new Date().toLocaleString('en-GB'));
+    setSelectedTray('ALL');
+    setActiveTab('category_wise');
+    setAuditLocked(false);
     setAuditMethod(newAuditMethod);
     setScannedIds([]);
     setScanRecords([]);
@@ -257,6 +192,7 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
   };
 
   const handleMarkLocated = (item: InventoryItem) => {
+    if (auditLocked || scannedIds.includes(item.id)) return;
     setScannedIds([...scannedIds, item.id]);
     playAuditTone('found');
     const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
@@ -279,19 +215,23 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
   };
 
   const [showReconcileModal, setShowReconcileModal] = useState(false);
-  const [reconcileAction, setReconcileAction] = useState<'adjust_stock' | 'write_off' | 'mark_located' | 'variance_note'>('adjust_stock');
-  const [reconcileNotes, setReconcileNotes] = useState('Physical stock audit reconciliation approved by Store Manager.');
+  const [reconcileAction, setReconcileAction] = useState<'mark_located' | 'variance_note'>('variance_note');
+  const [reconcileNotes, setReconcileNotes] = useState('');
   const [reconciledIds, setReconciledIds] = useState<string[]>([]);
 
   const handleApplyReconciliation = () => {
-    const unverifiedIds = missingItems.map(i => i.id);
-    setReconciledIds(prev => [...prev, ...unverifiedIds]);
+    if (auditLocked || !reconcileNotes.trim()) return;
+    const unverifiedIds = missingItems.map(item => item.id);
+    setReconciledIds(current => [...new Set([...current, ...unverifiedIds])]);
+    if (reconcileAction === 'mark_located') {
+      setScannedIds(current => [...new Set([...current, ...unverifiedIds])]);
+    }
     setShowReconcileModal(false);
-    alert(`Reconciliation applied successfully! ${unverifiedIds.length} missing item(s) resolved via "${reconcileAction}". Stock ledger adjusted.`);
   };
 
   const handleCompleteAudit = () => {
-    alert(`Audit ${auditNo} successfully verified and locked! ${verifiedPieces} matched, ${missingPieces} missing, ${excessTags.length} excess tags.`);
+    setAuditLocked(true);
+    setScanMessage({ text: `Verification ${auditNo} completed. Stock quantities were not changed.`, type: 'success' });
   };
 
   return (
@@ -309,11 +249,13 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
             onClick={() => setShowNewAuditModal(true)}
           >
             <Plus size={14} />
-            <span>New Verification</span>
+            <span>New verification</span>
           </button>
+          {auditNo && <>
           <button 
             type="button" 
             className="btn btn-outline"
+            disabled={auditLocked || (!missingItems.length && !excessTags.length)}
             onClick={() => setShowReconcileModal(true)}
             style={{ 
               borderColor: (missingItems.length > 0 || excessTags.length > 0) ? 'var(--primary)' : undefined,
@@ -335,12 +277,15 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
             type="button" 
             className="btn btn-primary"
             onClick={handleCompleteAudit}
+            disabled={auditLocked}
           >
-            ✓ Complete & Lock Audit
+            {auditLocked ? 'Verification completed' : '✓ Complete & Lock Audit'}
           </button>
+          </>}
         </div>
       </div>
 
+      {!auditNo ? <p className="helper">No active verification.</p> : <>
       {/* 5 Audit KPI Cards (.sum-grid with .sum-box, .sum-val, .sum-lbl) */}
       <div className="sum-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
         {/* 1. Total Scanned */}
@@ -408,7 +353,8 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
               <input 
                 type="text" 
                 placeholder="Scan barcode or type item code (e.g. SBJCH-01, ZX98YU)..."
-                value={scanInput}
+                disabled={auditLocked}
+              value={scanInput}
                 onChange={(e) => setScanInput(e.target.value)}
                 autoFocus
               />
@@ -713,6 +659,8 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
         </div>
       )}
 
+      </>}
+
       {/* MODAL: New Physical Audit Session */}
       {showNewAuditModal && (
         <div className="overlay" onClick={() => setShowNewAuditModal(false)}>
@@ -810,8 +758,6 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
                   value={reconcileAction}
                   onChange={(e) => setReconcileAction(e.target.value as any)}
                 >
-                  <option value="adjust_stock">Adjust System Stock to Match Physical Scanned Count</option>
-                  <option value="write_off">Write Off Missing Items as Inventory Loss / Shrinkage</option>
                   <option value="mark_located">Mark as Located in Alternate Safe / Tray</option>
                   <option value="variance_note">Record Investigation Memo & Keep Under Audit Watch</option>
                 </select>
@@ -829,7 +775,7 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
               </div>
 
               <div style={{ background: '#fef3c7', border: '1px solid #fde68a', padding: '10px 14px', borderRadius: '8px', fontSize: 12, color: '#92400e' }}>
-                Applying reconciliation will record a permanent adjustment entry in the stock ledger and link to audit voucher #{auditNo}.
+                Reconciliation records the review of discrepancies in this verification. Inventory and stock ledger quantities are unaffected.
               </div>
             </div>
             <div className="modal-foot">
@@ -843,9 +789,10 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
               <button 
                 type="button" 
                 className="btn btn-primary"
+                disabled={!reconcileNotes.trim() || auditLocked}
                 onClick={handleApplyReconciliation}
               >
-                Apply Reconciliation & Update Ledger
+                Apply reconciliation
               </button>
             </div>
           </div>
@@ -854,3 +801,4 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
     </div>
   );
 };
+

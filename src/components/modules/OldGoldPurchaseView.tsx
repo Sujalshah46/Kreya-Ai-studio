@@ -154,7 +154,8 @@ export const OldGoldPurchaseView: React.FC<OldGoldPurchaseViewProps> = ({
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [selectedPurchase, setSelectedPurchase] = useState<OldGoldPurchase | null>(purchases[0] || null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -398,7 +399,10 @@ export const OldGoldPurchaseView: React.FC<OldGoldPurchaseViewProps> = ({
       (p.customerName && p.customerName.toLowerCase().includes(q)) ||
       (p.customerMobile && p.customerMobile.includes(q));
 
-    const matchesDate = !dateFilter || (p.purchaseDate || p.date || '').includes(dateFilter);
+    const date = (p.purchaseDate || p.date || '').slice(0, 10);
+    const hasDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
+    const matchesDate = (!dateFrom || (hasDate && date >= dateFrom)) &&
+      (!dateTo || (hasDate && date <= dateTo));
     return matchesQ && matchesDate;
   });
 
@@ -420,7 +424,7 @@ export const OldGoldPurchaseView: React.FC<OldGoldPurchaseViewProps> = ({
       {/* Header */}
       <div className="page-hdr">
         <div className="page-hdr-left">
-          <h1>Old Gold & Silver Purchases (Scrap Intake)</h1>
+          <h1>Old Gold/Silver Purchases</h1>
           <p>Scrap custody intake · Touch assays & melter loss testing · Net pure metal valuation · Purchase vouchers</p>
         </div>
         <div className="btn-group">
@@ -468,44 +472,32 @@ export const OldGoldPurchaseView: React.FC<OldGoldPurchaseViewProps> = ({
       </div>
 
       {/* Search Row */}
-      <div className="search-row" style={{ flexWrap: 'wrap', gap: 10 }}>
+      <form onSubmit={event => {
+        event.preventDefault();
+        const fields = new FormData(event.currentTarget);
+        setSearchQuery(String(fields.get('query') ?? ''));
+        setDateFrom(String(fields.get('from') ?? ''));
+        setDateTo(String(fields.get('to') ?? ''));
+      }} className="search-row" style={{ flexWrap: 'wrap', gap: 10 }}>
         <div className="search-box" style={{ flex: 1, minWidth: 260 }}>
           <Search size={16} />
           <input 
             type="text"
+            name="query"
+            aria-label="Search purchases"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search voucher no, customer or mobile..."
+            placeholder="Search by purchase no or customer..."
           />
         </div>
-        <button 
-          type="button" 
-          className="btn btn-outline btn-sm"
-          onClick={() => {}}
-          title="Search vouchers"
-        >
-          <Search size={14} /> Search
-        </button>
-        <button 
-          type="button" 
-          className="btn btn-outline btn-sm"
-          onClick={() => {
-            setSearchQuery('');
-            setDateFilter('');
-          }}
-          title="Clear search and filters"
-        >
-          Clear
-        </button>
-
-        <input 
-          type="date"
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-          className="input input-sm"
-          style={{ width: 'auto' }}
-        />
-      </div>
+        <input type="date" name="from" aria-label="From date" className="input input-sm"
+          style={{ width: 'auto' }} value={dateFrom} max={dateTo || undefined}
+          onChange={event => setDateFrom(event.target.value)} />
+        <input type="date" name="to" aria-label="To date" className="input input-sm"
+          style={{ width: 'auto' }} value={dateTo} min={dateFrom || undefined}
+          onChange={event => setDateTo(event.target.value)} />
+        <button type="submit" className="btn btn-outline btn-sm"><Search size={14} /> Search</button>
+      </form>
 
       {/* Purchases Table Card */}
       <div className="card">
@@ -523,24 +515,22 @@ export const OldGoldPurchaseView: React.FC<OldGoldPurchaseViewProps> = ({
           <table style={{ width: '100%', fontSize: 12.5 }}>
             <thead>
               <tr>
-                <th style={{ width: 130 }}>Voucher No</th>
-                <th style={{ width: 95 }}>Date</th>
-                <th>Customer / Seller</th>
-                <th>Scrap Items</th>
-                <th style={{ textAlign: 'right', width: 95 }}>Gross Wt</th>
-                <th style={{ textAlign: 'right', width: 90 }}>Net Wt</th>
-                <th style={{ textAlign: 'center', width: 85 }}>Touch %</th>
-                <th style={{ textAlign: 'right', width: 95 }}>Fine Wt</th>
-                <th style={{ textAlign: 'right', width: 105 }}>Rate / 10g</th>
-                <th style={{ textAlign: 'right', width: 110 }}>Total Value</th>
-                <th style={{ textAlign: 'center', width: 110 }}>Settlement</th>
-                <th style={{ textAlign: 'right', width: 120 }}>Actions</th>
+                <th>Purchase No</th>
+                <th>Date</th>
+                <th>Customer</th>
+                <th>Items</th>
+                <th className="num">Gold</th>
+                <th className="num">Silver</th>
+                <th className="num">Total Value</th>
+                <th className="num">Cash Paid</th>
+                <th className="num">Invoice Adj</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="empty">
+                  <td colSpan={10} className="empty">
                     No scrap purchases found
                   </td>
                 </tr>
@@ -548,8 +538,10 @@ export const OldGoldPurchaseView: React.FC<OldGoldPurchaseViewProps> = ({
                 filteredPurchases.map((p) => {
                   const isSelected = selectedPurchase?.id === p.id;
                   const firstItem = p.items && p.items[0];
-                  const touchVal = firstItem?.touchPurity || p.touchPurityPercent || p.purityTouchPercent || 91.6;
-                  const fineVal = p.netFineWeight || p.netFineGoldWeight || 0;
+                  const weight = (metal: string) => p.items?.length
+                    ? p.items.reduce((sum, item) => sum + (item.metalType.toUpperCase() === metal ? item.netWeight : 0), 0)
+                    : p.metalType?.toUpperCase() === metal ? (p.netWeight ?? p.grossWeight) : 0;
+                  const cashPaid = p.payoutMode.toUpperCase() === 'CASH' ? (p.totalCashPaidOut ?? p.totalCashPayout) : 0;
                   const totalVal = p.totalValuation || p.totalPurchaseValue || p.totalAmount || 0;
 
                   return (
@@ -574,31 +566,11 @@ export const OldGoldPurchaseView: React.FC<OldGoldPurchaseViewProps> = ({
                           <span className="helper" style={{ marginLeft: 4 }}>+{(p.items || []).length - 1} more</span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }} className="font-mono">
-                        {p.grossWeight.toFixed(3)}g
-                      </td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--gold)' }} className="font-mono">
-                        {(p.netWeight || p.grossWeight).toFixed(3)}g
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <span className="badge badge-purple" style={{ fontSize: 11 }}>
-                          {touchVal}%
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--primary)' }} className="font-mono">
-                        {fineVal.toFixed(3)}g
-                      </td>
-                      <td style={{ textAlign: 'right' }} className="font-mono">
-                        ₹{(p.rateAppliedPer10g || p.ratePer10g || 78500).toLocaleString('en-IN')}
-                      </td>
-                      <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--success)' }} className="font-mono">
-                        ₹{totalVal.toLocaleString('en-IN')}
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <span className={`badge ${p.adjustedAmount && p.adjustedAmount > 0 ? 'badge-blue' : 'badge-green'}`}>
-                          {p.adjustedAmount && p.adjustedAmount > 0 ? 'INVOICE ADJ' : (p.payoutMode || 'CASH')}
-                        </span>
-                      </td>
+                      <td className="num">{weight('GOLD').toFixed(3)} g</td>
+                      <td className="num">{weight('SILVER').toFixed(3)} g</td>
+                      <td className="num">₹{totalVal.toLocaleString('en-IN')}</td>
+                      <td className="num">{cashPaid === undefined ? '—' : `₹${cashPaid.toLocaleString('en-IN')}`}</td>
+                      <td className="num">₹{(p.adjustedAmount ?? 0).toLocaleString('en-IN')}</td>
                       <td style={{ textAlign: 'right' }}>
                         <div className="btn-group" style={{ justifyContent: 'flex-end' }}>
                           <button
@@ -1204,3 +1176,4 @@ export const OldGoldPurchaseView: React.FC<OldGoldPurchaseViewProps> = ({
     </div>
   );
 };
+

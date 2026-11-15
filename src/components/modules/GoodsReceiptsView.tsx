@@ -493,7 +493,7 @@ export const GoodsReceiptsView: React.FC<GoodsReceiptsViewProps> = ({
               <Truck size={22} />
             </div>
             <div>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Goods Receipts (GRN)</h1>
+              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Goods Receipts</h1>
               <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
                 Goods received from suppliers go into stock here. Open a receipt for its PO, supplier bills and payments.
               </p>
@@ -502,6 +502,20 @@ export const GoodsReceiptsView: React.FC<GoodsReceiptsViewProps> = ({
         </div>
 
         <div className="btn-group">
+          <button 
+            type="button" 
+            className="btn btn-outline"
+            onClick={() => {
+              setIntakeMode('direct');
+              setFormReceiptDate(new Date().toISOString().slice(0, 10));
+              setFormChallanNo(`DC/DIR/${Math.floor(1000 + Math.random() * 9000)}`);
+              setFormNotes('Direct inward receipt without PO');
+              setFormOverrideReason('');
+              setShowInwardModal(true);
+            }}
+          >
+            <Plus size={15} /> Receive without PO
+          </button>
           <button 
             type="button" 
             className="btn btn-outline"
@@ -524,20 +538,6 @@ export const GoodsReceiptsView: React.FC<GoodsReceiptsViewProps> = ({
             <Download size={15} /> Export CSV
           </button>
 
-          <button 
-            type="button" 
-            className="btn btn-outline"
-            onClick={() => {
-              setIntakeMode('direct');
-              setFormReceiptDate(new Date().toISOString().slice(0, 10));
-              setFormChallanNo(`DC/DIR/${Math.floor(1000 + Math.random() * 9000)}`);
-              setFormNotes('Direct inward receipt without PO');
-              setFormOverrideReason('');
-              setShowInwardModal(true);
-            }}
-          >
-            <Plus size={15} /> Receive without PO
-          </button>
 
           <button 
             type="button" 
@@ -641,14 +641,14 @@ export const GoodsReceiptsView: React.FC<GoodsReceiptsViewProps> = ({
           <table className="table">
             <thead>
               <tr>
-                <th style={{ width: 140 }}>GRN #</th>
-                <th>Receipt Date</th>
+                <th style={{ width: 140 }}>GRN</th>
+                <th>Date</th>
                 <th>Supplier</th>
-                <th>PO Number</th>
-                <th>Challan #</th>
+                <th>PO</th>
+                <th>Challan</th>
                 <th className="num">Pieces</th>
-                <th className="num">Net Wt</th>
                 <th style={{ textAlign: 'center' }}>Billed</th>
+                <th className="num">Bills</th>
                 <th style={{ textAlign: 'center' }}>Status</th>
                 <th style={{ textAlign: 'right', width: 120 }}>Actions</th>
               </tr>
@@ -688,7 +688,6 @@ export const GoodsReceiptsView: React.FC<GoodsReceiptsViewProps> = ({
                     </td>
                     <td><span className="mono">{grn.challanNo || '—'}</span></td>
                     <td className="num mono" style={{ fontWeight: 700 }}>{grn.receivedPieces} pc</td>
-                    <td className="num mono">{grn.receivedNetWeight.toFixed(3)} g</td>
                     <td style={{ textAlign: 'center' }}>
                       {grn.status !== 'POSTED' ? (
                         <span className="helper">—</span>
@@ -699,6 +698,11 @@ export const GoodsReceiptsView: React.FC<GoodsReceiptsViewProps> = ({
                       ) : (
                         <span className="badge badge-gray">Unbilled</span>
                       )}
+                    </td>
+                    <td className="num mono">
+                      {supplierBills.filter(bill =>
+                        bill.status.toUpperCase() !== 'CANCELLED' && bill.grnNumbers?.includes(grn.grnNumber)
+                      ).length}
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       {grn.status === 'POSTED' ? (
@@ -1646,3 +1650,4 @@ export const GoodsReceiptsView: React.FC<GoodsReceiptsViewProps> = ({
     </div>
   );
 };
+

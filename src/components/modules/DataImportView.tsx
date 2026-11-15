@@ -200,7 +200,8 @@ export const DataImportView: React.FC<DataImportViewProps> = ({
           else if (k === 'phone') val = c.mobile || c.phone || '';
           else if (k === 'phone2') val = (c as any).phone2 || '';
           else if (k === 'email') val = c.email || '';
-          else if (k === 'street1') val = c.address || '';
+          else if (k === 'street1') val = c.street1 ?? c.address;
+          else if (k === 'street2') val = c.street2 ?? '';
           else if (k === 'city') val = c.city || '';
           else if (k === 'state') val = c.state || '';
           else if (k === 'pincode') val = c.pincode || '';
@@ -835,7 +836,7 @@ export const DataImportView: React.FC<DataImportViewProps> = ({
         <div className="page-hdr-left">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: 'var(--graphite, #202522)' }}>
-              Data Import & Export
+              Data Import
             </h1>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#fef8ee] text-[#92400e] rounded-full border border-[#efdcb6] text-xs font-semibold shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse" />
@@ -890,7 +891,7 @@ export const DataImportView: React.FC<DataImportViewProps> = ({
           }}
         >
           <Users size={15} />
-          <span>Customers Import</span>
+          <span>Customers</span>
         </button>
 
         <button
@@ -1052,7 +1053,7 @@ export const DataImportView: React.FC<DataImportViewProps> = ({
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 >
                   <Download size={13} />
-                  Excel template (.xlsx)
+                  Excel template
                 </button>
                 <button
                   type="button"
@@ -1061,7 +1062,7 @@ export const DataImportView: React.FC<DataImportViewProps> = ({
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 >
                   <Download size={13} />
-                  CSV template (.csv)
+                  CSV template
                 </button>
                 <button
                   type="button"
@@ -1071,7 +1072,7 @@ export const DataImportView: React.FC<DataImportViewProps> = ({
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 >
                   <Users size={13} />
-                  With my customers ({customers.length} to update)
+                  With my customers (to update)
                 </button>
               </div>
             </div>
@@ -1526,3 +1527,4 @@ export const DataImportView: React.FC<DataImportViewProps> = ({
 };
 
 export default DataImportView;
+

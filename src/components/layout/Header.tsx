@@ -53,13 +53,14 @@ export const Header: React.FC<HeaderProps> = ({
     switch (currentModule) {
       case 'dashboard': return 'Main / Dashboard';
       case 'daily-rates': return 'Main / Daily Metal Rates';
-      case 'customers': return 'Customers / Customer 360';
+      case 'customers': return 'Customers / Customers';
       case 'payments-pending': return 'Customers / Payments & Pending';
       case 'billing': return 'Sales / Orders & Billing';
       case 'metal-booking': return 'Sales / Metal Advance Booking';
       case 'cancellations': return 'Sales / Cancellations';
       case 'cash-register': return 'Sales / Cash Register';
-      case 'buyback': return 'Sales / Returns & Buy-back';
+      case 'returns-buyback':
+      case 'buyback': return 'Sales / Returns / Buy-back';
       case 'shipments': return 'Sales / Shipments';
       case 'repairs': return 'Services / Repair Orders';
       case 'loans': return 'Finance / Gold & Silver Loans';
@@ -68,6 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
       case 'cash-outflows': return 'Finance / Cash Outflows';
       case 'inventory': return 'Stock / Inventory';
       case 'valuation': return 'Stock / Stock & Valuation';
+      case 'stock-ledger':
       case 'tags': return 'Stock / Stock Ledger & Tags';
       case 'inventory-verification': return 'Stock / Inventory Verification';
       case 'old-metal-stock': return 'Stock / Old Metal Stock';
@@ -83,18 +85,19 @@ export const Header: React.FC<HeaderProps> = ({
       case 'backup-settings': return 'Reports / Export & Backup';
       case 'import': return 'Reports / Data Import';
       case 'sync': return 'Admin / Sync & Database Infrastructure';
-      case 'shop-settings': return 'Admin / Store Profile & Counters';
+      case 'settings':
+      case 'shop-settings': return 'Admin / Shop Settings';
       case 'profile': return 'Admin / Store Profile & Counters';
       case 'business-settings': return 'Admin / Business Settings';
       case 'integrations': return 'Admin / Integrations';
-      case 'users': return 'Admin / Users & Security RBAC';
+      case 'users': return 'Admin / Users';
       case 'roles-permissions': return 'Admin / Roles & Permissions';
       case 'theme-layout': return 'Admin / Theme & Layout';
       case 'login-page': return 'Admin / Login Page';
       case 'security': return 'Admin / Security';
       case 'licence': return 'Admin / Licence';
-      case 'audit-log': return 'Admin / Audit Logs & Governance';
-      case 'audit-logs': return 'Admin / Audit Logs & Governance';
+      case 'audit-log': return 'Admin / Audit Log';
+      case 'audit-logs': return 'Admin / Audit Log';
       case 'error-log': return 'Admin / Error Log';
       default: return 'Main / Dashboard';
     }
@@ -110,7 +113,7 @@ export const Header: React.FC<HeaderProps> = ({
             {getModuleTitle()}
           </div>
           <h1 className="text-base font-bold text-slate-900 leading-tight">
-            {getModuleTitle().split(' / ')[1] || 'Dashboard'}
+            {getModuleTitle().split(' / ').slice(1).join(' / ') || 'Dashboard'}
           </h1>
         </div>
 
@@ -123,8 +126,8 @@ export const Header: React.FC<HeaderProps> = ({
             title="Active counter & cash register session"
           >
             <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-            <span>Counter MAIN</span>
-            <span className="font-normal opacity-80"> · REG-2026-00001 · closing</span>
+            <span>Counter {activeCounter.code}</span>
+            {activeCounter.activeRegisterId && <span className="font-normal opacity-80"> · {activeCounter.activeRegisterId}</span>}
           </button>
 
           {/* User Badge Matching Screenshot */}
@@ -207,3 +210,4 @@ export const Header: React.FC<HeaderProps> = ({
     </>
   );
 };
+

@@ -40,6 +40,7 @@ import { ShopSettingsUsersView } from './components/modules/ShopSettingsUsersVie
 import { StoreProfileCountersView } from './components/modules/StoreProfileCountersView';
 import { UsersSecurityView } from './components/modules/UsersSecurityView';
 import { AuditLogsView } from './components/modules/AuditLogsView';
+import { DataExportBackupView } from './components/modules/DataExportBackupView';
 import { SyncDatabaseView } from './components/modules/SyncDatabaseView';
 import { BusinessSettingsView } from './components/modules/BusinessSettingsView';
 import { IntegrationsView } from './components/modules/IntegrationsView';
@@ -125,7 +126,7 @@ export function App() {
       case '/outflows':
       case '/cash-outflows': return 'cash-outflows';
       case '/inventory': return 'inventory';
-      case '/stock': return 'stock-valuation';
+      case '/stock': return 'valuation';
       case '/tags':
       case '/stock-ledger': return 'stock-ledger';
       case '/stock-verification': return 'inventory-verification';
@@ -171,7 +172,7 @@ export function App() {
   const getPathFromModule = (mod: string): string => {
     switch (mod) {
       case 'daily-rates': return '/daily-rates';
-      case 'customers': return 'customers';
+      case 'customers': return '/customers';
       case 'payments-pending': return '/payments';
       case 'billing': return '/orders';
       case 'metal-booking': return '/bookings';
@@ -185,10 +186,11 @@ export function App() {
       case 'old-gold':
       case 'old-metal': return '/old-gold';
       case 'schemes':
-      case 'savings-schemes': return '/schemes';
+      case 'savings-schemes': return '/deposits';
       case 'outflows':
       case 'cash-outflows': return '/outflows';
       case 'inventory': return '/inventory';
+      case 'valuation':
       case 'stock-valuation': return '/stock';
       case 'tags':
       case 'stock-ledger': return '/stock-ledger';
@@ -272,19 +274,19 @@ export function App() {
       }
       if (e.key === 'F1') {
         e.preventDefault();
-        setCurrentModule('billing');
+        navigateTo('billing');
       }
       if (e.key === 'F2') {
         e.preventDefault();
-        setCurrentModule('inventory');
+        navigateTo('inventory');
       }
       if (e.key === 'F3') {
         e.preventDefault();
-        setCurrentModule('daily-rates');
+        navigateTo('daily-rates');
       }
       if (e.key === 'F4') {
         e.preventDefault();
-        setCurrentModule('cash-register');
+        navigateTo('cash-register');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -789,7 +791,12 @@ export function App() {
             />
           )}
 
-          {(currentModule === 'backup-settings' || currentModule === 'sync') && (
+          {currentModule === 'backup-settings' && (
+            <DataExportBackupView store={store} customers={customers} inventory={inventory} invoices={invoices}
+              loans={loans} repairs={repairs} schemes={schemes} />
+          )}
+
+          {currentModule === 'sync' && (
             <SyncDatabaseView
               store={store}
               customers={customers}
@@ -798,7 +805,7 @@ export function App() {
               loans={loans}
               repairs={repairs}
               schemes={schemes}
-              defaultTab={currentModule === 'backup-settings' ? 'backup' : 'sync'}
+              defaultTab="sync"
               onNavigate={navigateTo}
             />
           )}
@@ -878,7 +885,7 @@ export function App() {
           )}
 
           {(currentModule === 'login-page' || currentModule === 'settings-login') && (
-            <LoginPageView />
+            <LoginPageView store={store} />
           )}
 
           {(currentModule === 'security' || currentModule === 'settings-security') && (

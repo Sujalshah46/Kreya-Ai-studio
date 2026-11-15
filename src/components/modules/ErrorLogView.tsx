@@ -155,66 +155,34 @@ export const ErrorLogView: React.FC<ErrorLogViewProps> = ({ onNavigate }) => {
           </span>
         </div>
 
-        <div className="card-body" style={{ padding: 0 }}>
-          {filteredErrors.map((err) => (
-            <div key={err.id} style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--muted)' }}>{err.timestamp}</span>
-                  <span className="badge badge-gray">{err.source}</span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {err.resolved ? (
-                    <span className="badge badge-green" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <CheckCircle2 size={12} />
-                      <span>Resolved</span>
-                    </span>
-                  ) : (
-                    <span className="badge badge-red" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <AlertCircle size={12} />
-                      <span>Open / Attention</span>
-                    </span>
-                  )}
-
-                  <button
-                    onClick={() => toggleResolved(err.id)}
-                    className="btn btn-outline btn-xs"
-                    title={err.resolved ? "Reopen issue" : "Mark as resolved"}
-                  >
-                    {err.resolved ? "Reopen" : "Mark Resolved"}
-                  </button>
-                </div>
-              </div>
-
-              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: 0 }}>
-                {err.message}
-              </p>
-
-              {err.stack && (
-                <div style={{ position: 'relative' }}>
-                  <div style={{ background: '#0f172a', color: '#a7f3d0', padding: '10px 14px', borderRadius: 8, fontFamily: 'monospace', fontSize: 11.5, overflowX: 'auto' }}>
-                    {err.stack}
-                  </div>
-                  <button
-                    onClick={() => handleCopyStack(err.stack!, err.id)}
-                    className="btn btn-ghost btn-xs"
-                    style={{ position: 'absolute', top: 6, right: 6, color: 'rgba(255,255,255,0.7)' }}
-                    title="Copy Stack Trace"
-                  >
-                    <Copy size={12} />
-                    {copiedId === err.id && <span style={{ fontSize: 10, color: '#4ade80', marginLeft: 4 }}>Copied!</span>}
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-
-          {filteredErrors.length === 0 && (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-              No {filterTab.toLowerCase()} diagnostic records found.
-            </div>
-          )}
+        <div className="tbl-wrap">
+          <table className="tbl">
+            <thead><tr>
+              <th scope="col">Last Seen</th><th scope="col">Where</th><th scope="col">Message</th>
+              <th scope="col">Times</th><th scope="col">Reference</th><th scope="col">Actions</th>
+            </tr></thead>
+            <tbody>
+              {filteredErrors.map(err => (
+                <tr key={err.id}>
+                  <td className="whitespace-nowrap">{err.timestamp}</td><td>{err.source}</td>
+                  <td>{err.message}</td><td>1</td>
+                  <td>
+                    {err.stack ? <details>
+                      <summary className="cursor-pointer">{err.id}</summary>
+                      <code className="block whitespace-pre-wrap">{err.stack}</code>
+                      <button type="button" className="btn btn-outline btn-xs" onClick={() => handleCopyStack(err.stack!, err.id)}>
+                        <Copy size={12} /> {copiedId === err.id ? 'Copied' : 'Copy stack trace'}
+                      </button>
+                    </details> : err.id}
+                  </td>
+                  <td><button type="button" className="btn btn-outline btn-xs" onClick={() => toggleResolved(err.id)}>
+                    {err.resolved ? 'Reopen' : 'Mark Resolved'}
+                  </button></td>
+                </tr>
+              ))}
+              {filteredErrors.length === 0 && <tr><td colSpan={6} className="text-center py-8">No diagnostic records found.</td></tr>}
+            </tbody>
+          </table>
         </div>
         <div className="dt-pager" style={{ padding: '8px 16px', background: 'var(--surface2)', fontSize: 11, color: 'var(--muted)' }}>
           Real-time diagnostic error channel · S.B Borana Jewellers
@@ -225,3 +193,4 @@ export const ErrorLogView: React.FC<ErrorLogViewProps> = ({ onNavigate }) => {
 };
 
 export default ErrorLogView;
+

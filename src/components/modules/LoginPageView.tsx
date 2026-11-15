@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { readPreviewPreferences, savePreviewPreferences } from './previewPreferences';
+import type { StoreProfile } from '../../types';
 import { LogIn, Save, Check, Image, KeyRound, Clock, ShieldCheck, CheckCircle2, Monitor, Smartphone, Palette, Sparkles } from 'lucide-react';
 
 type LoginStyle = 'Split' | 'Large image' | 'Centred card';
@@ -11,13 +13,20 @@ interface ColorPreset {
   gradient: string;
 }
 
-export const LoginPageView: React.FC = () => {
-  const [loginStyle, setLoginStyle] = useState<LoginStyle>('Split');
-  const [selectedColor, setSelectedColor] = useState<string>('emerald');
+export const LoginPageView: React.FC<{ store?: StoreProfile }> = ({ store }) => {
+  const key = 'kreya:login-preview:' + (store?.id ?? 'default');
+  const [initial] = useState(() => readPreviewPreferences(key, {
+    style: 'Split' as LoginStyle, color: 'emerald', ownColours: false
+  }));
+  const [loginStyle, setLoginStyle] = useState<LoginStyle>(
+    ['Split', 'Large image', 'Centred card'].includes(initial.style) ? initial.style : 'Split'
+  );
+  const [selectedColor, setSelectedColor] = useState(initial.color);
+  const [ownColours, setOwnColours] = useState(initial.ownColours);
   const [previewDevice, setPreviewDevice] = useState<PreviewDevice>('Desktop');
-  const [storeName, setStoreName] = useState('S.B Borana Jewellers');
+  const storeName = store?.tradeName || 'S.B Borana Jewellers';
   const [tagline, setTagline] = useState('Exclusive Gold & Diamond Jewellery · Mumbai');
-  const [saved, setSaved] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
 
   // Color Presets
   const colorPresets: ColorPreset[] = [
@@ -28,11 +37,13 @@ export const LoginPageView: React.FC = () => {
     { id: 'ruby', name: 'Ruby', primary: '#be123c', gradient: 'linear-gradient(135deg, #881337 0%, #e11d48 100%)' }
   ];
 
-  const activeColor = colorPresets.find(c => c.id === selectedColor) || colorPresets[0];
+  const activeColor = ownColours
+    ? colorPresets.find(c => c.id === selectedColor) || colorPresets[0]
+    : { primary: 'var(--primary)', gradient: 'linear-gradient(135deg, var(--primary-d), var(--primary))' };
 
   const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    setSaveMessage(savePreviewPreferences(key, { style: loginStyle, color: selectedColor, ownColours })
+      ? 'Login preview settings saved in this browser.' : 'The browser could not save the login preview settings.');
   };
 
   return (
@@ -43,7 +54,7 @@ export const LoginPageView: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <h1 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 20, fontWeight: 700, margin: 0 }}>
               <LogIn size={22} style={{ color: activeColor.primary }} />
-              Login Page Branding
+              Login Page
             </h1>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#fef8ee] text-[#92400e] rounded-full border border-[#efdcb6] text-xs font-semibold shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse" />
@@ -70,10 +81,10 @@ export const LoginPageView: React.FC = () => {
         </div>
       </div>
 
-      {saved && (
+      {saveMessage && (
         <div style={{ padding: 12, background: 'var(--primary-xl)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--primary-d)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
           <CheckCircle2 size={16} />
-          <span style={{ fontWeight: 600 }}>Login page layout ("{loginStyle}") & color theme successfully saved!</span>
+          <span role="status" style={{ fontWeight: 600 }}>{saveMessage}</span>
         </div>
       )}
 
@@ -127,9 +138,13 @@ export const LoginPageView: React.FC = () => {
           {/* Color Presets */}
           <div className="card" style={{ padding: 18 }}>
             <div className="card-header" style={{ marginBottom: 12 }}>
-              <span className="card-title">Color Presets</span>
+              <span className="card-title">Colours</span>
             </div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div className="seg" style={{ marginBottom: 10 }}>
+              <button type="button" aria-pressed={!ownColours} onClick={() => setOwnColours(false)}>Follow shop theme</button>
+              <button type="button" aria-pressed={ownColours} onClick={() => setOwnColours(true)}>Own colours</button>
+            </div>
+            {ownColours && <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               {colorPresets.map(preset => (
                 <button
                   key={preset.id}
@@ -152,7 +167,7 @@ export const LoginPageView: React.FC = () => {
                   <span>{preset.name}</span>
                 </button>
               ))}
-            </div>
+            </div>}
           </div>
         </div>
 
@@ -228,16 +243,16 @@ export const LoginPageView: React.FC = () => {
                     boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
                   }}
                 >
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Sign in to Counter</div>
-                  <div style={{ fontSize: 10, color: '#64748b', marginBottom: 10 }}>Quick PIN or Email</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Sign in to your shop</div>
+                  <div style={{ fontSize: 10, color: '#64748b', marginBottom: 10 }}>Sign in</div>
                   <div style={{ background: '#f1f5f9', padding: '6px 10px', borderRadius: 4, fontSize: 11, marginBottom: 8, color: '#334155' }}>
                     ••••
                   </div>
                   <button 
-                    type="button" 
+                    type="button" disabled
                     style={{ background: activeColor.primary, color: '#fff', border: 'none', padding: '6px', borderRadius: 4, fontWeight: 700, fontSize: 11 }}
                   >
-                    Unlock Terminal
+                    Sign in
                   </button>
                 </div>
               </div>
@@ -284,3 +299,4 @@ export const LoginPageView: React.FC = () => {
 };
 
 export default LoginPageView;
+

@@ -1072,7 +1072,7 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({ onNa
   const [isCreatingRole, setIsCreatingRole] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
   const [newRoleDesc, setNewRoleDesc] = useState('');
-  const [viewMode, setViewMode] = useState<'single' | 'matrix'>('single');
+  const [viewMode, setViewMode] = useState<'single' | 'matrix'>('matrix');
 
   const modules = Array.from(new Set(PERMISSIONS_DATA.map(p => p.module))).sort();
 
@@ -1223,7 +1223,7 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({ onNa
       {saved && (
         <div style={{ padding: 12, background: 'var(--primary-xl)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--primary-d)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
           <CheckCircle2 size={16} />
-          <span style={{ fontWeight: 600 }}>RBAC permissions matrix successfully saved across all active roles!</span>
+          <span style={{ fontWeight: 600 }}>Permission changes recorded for this preview session.</span>
         </div>
       )}
 
@@ -1438,7 +1438,7 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({ onNa
             <div className="flex items-center gap-2">
               <KeyRound className="w-4 h-4 text-slate-600" />
               <span className="font-bold text-slate-800 uppercase tracking-wider">
-                Complete Showroom Access Matrix (8 Roles × 95 Permissions)
+                Permissions by role
               </span>
             </div>
             <span className="text-[11px] text-slate-500">Click checkbox to grant or revoke</span>
@@ -1448,7 +1448,7 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({ onNa
             <table className="w-full text-left text-xs border-collapse">
               <thead className="bg-slate-50 text-slate-600 font-semibold text-[10px] uppercase tracking-wider border-b border-slate-200 sticky top-0 z-10">
                 <tr>
-                  <th className="py-2 px-3 sticky left-0 bg-slate-50 z-20 min-w-[240px] shadow-xs">CAPABILITY / PERMISSION</th>
+                  <th className="py-2 px-3 sticky left-0 bg-slate-50 z-20 min-w-[240px] shadow-xs">PERMISSION</th>
                   <th className="py-2 px-2 text-center">MODULE</th>
                   {roles.map(r => (
                     <th key={r.id} className="py-2 px-2 text-center min-w-[70px]">
@@ -1476,6 +1476,7 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({ onNa
                         <td key={r.id} className="py-2 px-2 text-center">
                           <input
                             type="checkbox"
+                            aria-label={r.name + ": " + p.description}
                             checked={hasPerm}
                             onChange={() => handleTogglePermission(r.id, p.key)}
                             className="rounded border-slate-300 text-emerald-700 focus:ring-emerald-600 cursor-pointer"
@@ -1555,3 +1556,4 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({ onNa
     </div>
   );
 };
+

@@ -256,6 +256,14 @@ export const CashRegisterView: React.FC<CashRegisterViewProps> = ({
           </button>
           <button 
             type="button"
+            className="btn btn-primary"
+            onClick={() => setShowDenomModal(true)}
+            title="Start closing"
+          >
+            <Lock size={13} /> Start closing
+          </button>
+          <button 
+            type="button"
             className="btn btn-outline"
             onClick={() => setShowClosingSlipModal(true)}
             title="Statement"
@@ -269,14 +277,6 @@ export const CashRegisterView: React.FC<CashRegisterViewProps> = ({
             title="Excel Export"
           >
             <Download size={13} /> Excel
-          </button>
-          <button 
-            type="button"
-            className="btn btn-primary"
-            onClick={() => setShowDenomModal(true)}
-            title="Start closing"
-          >
-            <Lock size={13} /> Start closing
           </button>
           </div>
         </div>
@@ -531,11 +531,11 @@ export const CashRegisterView: React.FC<CashRegisterViewProps> = ({
             <table style={{ width: '100%', fontSize: 13 }}>
               <thead>
                 <tr>
-                  <th>PAYMENT MODE</th>
-                  <th style={{ textAlign: 'center' }}>TRANSACTIONS</th>
-                  <th style={{ textAlign: 'right' }}>INFLOW (+)</th>
-                  <th style={{ textAlign: 'right' }}>OUTFLOW (-)</th>
-                  <th style={{ textAlign: 'right' }}>NET TOTAL (₹)</th>
+                  <th>Mode</th>
+                  <th style={{ textAlign: 'center' }}>Count</th>
+                  <th style={{ textAlign: 'right' }}>Received</th>
+                  <th style={{ textAlign: 'right' }}>Refunds / Paid Out</th>
+                  <th style={{ textAlign: 'right' }}>Net</th>
                 </tr>
               </thead>
               <tbody>

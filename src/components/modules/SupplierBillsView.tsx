@@ -564,7 +564,7 @@ export const SupplierBillsView: React.FC<SupplierBillsViewProps> = ({
               <Receipt size={22} />
             </div>
             <div>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Supplier Bills (Inward)</h1>
+              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Supplier Bills</h1>
               <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
                 Bills received from suppliers. Capture invoice numbers, match against goods receipts, check against PO rates, then post for payment.
               </p>
@@ -573,6 +573,13 @@ export const SupplierBillsView: React.FC<SupplierBillsViewProps> = ({
         </div>
 
         <div className="btn-group">
+          <button 
+            type="button" 
+            className="btn btn-primary"
+            onClick={handleOpenNewBill}
+          >
+            <Plus size={16} /> New bill
+          </button>
           <button 
             type="button" 
             className="btn btn-outline"
@@ -613,13 +620,6 @@ export const SupplierBillsView: React.FC<SupplierBillsViewProps> = ({
             <CreditCard size={15} /> Record Payment
           </button>
 
-          <button 
-            type="button" 
-            className="btn btn-primary"
-            onClick={handleOpenNewBill}
-          >
-            <Plus size={16} /> New bill
-          </button>
         </div>
       </div>
 
@@ -711,17 +711,18 @@ export const SupplierBillsView: React.FC<SupplierBillsViewProps> = ({
           <table className="table">
             <thead>
               <tr>
-                <th style={{ width: 140 }}>Bill #</th>
-                <th>Supplier Inv. #</th>
-                <th>Invoice Date</th>
+                <th style={{ width: 140 }}>Bill</th>
+                <th>Supplier Inv.</th>
+                <th>Date</th>
                 <th>Supplier</th>
-                <th>Linked Ref</th>
-                <th className="num">Total Amount</th>
-                <th className="num">Balance Due</th>
-                <th>Due Date</th>
-                <th style={{ textAlign: 'center' }}>Invoice Doc</th>
+                <th>PO</th>
+                <th>GRN</th>
+                <th className="num">Total</th>
+                <th className="num">Balance</th>
+                <th>Due</th>
+                <th style={{ textAlign: 'center' }}>Invoice</th>
                 <th style={{ textAlign: 'center' }}>Status</th>
-                <th style={{ textAlign: 'center' }}>Pay Status</th>
+                <th style={{ textAlign: 'center' }}>Paid</th>
                 <th style={{ textAlign: 'right', width: 120 }}>Actions</th>
               </tr>
             </thead>
@@ -749,11 +750,8 @@ export const SupplierBillsView: React.FC<SupplierBillsViewProps> = ({
                       <div style={{ fontWeight: 600 }}>{bill.supplierName}</div>
                       <div className="helper" style={{ fontSize: 11 }}>ITC: {bill.itcEligible ? 'Eligible' : 'Ineligible'}</div>
                     </td>
-                    <td>
-                      <div className="helper mono" style={{ fontSize: 11 }}>
-                        {bill.poNumbers?.join(', ') || bill.grnNumbers?.join(', ') || 'Direct'}
-                      </div>
-                    </td>
+                    <td className="mono">{bill.poNumbers?.join(', ') || '—'}</td>
+                    <td className="mono">{bill.grnNumbers?.join(', ') || '—'}</td>
                     <td className="num mono" style={{ fontWeight: 700 }}>
                       ₹{bill.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
@@ -851,7 +849,7 @@ export const SupplierBillsView: React.FC<SupplierBillsViewProps> = ({
 
               {filteredBills.length === 0 && (
                 <tr>
-                  <td colSpan={12} style={{ textAlign: 'center', padding: '40px 20px' }}>
+                  <td colSpan={13} style={{ textAlign: 'center', padding: '40px 20px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                       <Receipt size={36} style={{ color: 'var(--muted)', opacity: 0.5 }} />
                       <div style={{ fontWeight: 600, fontSize: 15 }}>No Supplier Bills Found</div>
@@ -1602,3 +1600,4 @@ export const SupplierBillsView: React.FC<SupplierBillsViewProps> = ({
     </div>
   );
 };
+

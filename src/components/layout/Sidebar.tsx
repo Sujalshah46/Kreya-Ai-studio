@@ -48,7 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const isNavActive = (id: string) => {
     if (currentModule === id) return true;
-    if (id === 'shop-settings' && (currentModule === 'profile' || currentModule === 'shop-settings')) return true;
+    if (id === 'shop-settings' && (currentModule === 'profile' || currentModule === 'settings' || currentModule === 'shop-settings')) return true;
     if (id === 'audit-log' && (currentModule === 'audit-logs' || currentModule === 'audit-log')) return true;
     if (id === 'backup-settings' && (currentModule === 'sync' || currentModule === 'backup-settings')) return true;
     return false;
@@ -601,7 +601,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('sync')}
+                onClick={() => onNavigate('backup-settings')}
                 className={navItemClass('backup-settings')}
                 title="Export / Backup"
               >
@@ -645,13 +645,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {(openSections.ADMIN || collapsed) && (
             <div className="space-y-0.5 mt-0.5">
               <button
-                onClick={() => onNavigate('profile')}
+                onClick={() => onNavigate('settings')}
                 className={navItemClass('shop-settings')}
-                title="Store Profile & Counters"
+                title="Shop Settings"
               >
                 <div className="flex items-center space-x-2.5">
                   <Settings className="w-4 h-4 shrink-0" />
-                  {!collapsed && <span>Store Profile & Counters</span>}
+                  {!collapsed && <span>Shop Settings</span>}
                 </div>
               </button>
 
@@ -746,11 +746,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 onClick={() => onNavigate('audit-logs')}
                 className={navItemClass('audit-log')}
-                title="Audit Logs Stream"
+                title="Audit Log"
               >
                 <div className="flex items-center space-x-2.5">
                   <History className="w-4 h-4 shrink-0" />
-                  {!collapsed && <span>Audit Logs</span>}
+                  {!collapsed && <span>Audit Log</span>}
                 </div>
               </button>
 
@@ -790,3 +790,4 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </aside>
   );
 };
+

@@ -325,18 +325,10 @@ export const SavingsSchemesView: React.FC<SavingsSchemesViewProps> = ({
       {/* Header */}
       <div className="page-hdr">
         <div className="page-hdr-left">
-          <h1>Savings Schemes (Chit Fund / Swarna Nidhi)</h1>
+          <h1>Savings Schemes</h1>
           <p>Recurring chit fund & gold saving schemes · Monthly installments · Jeweler maturity bonus tracking</p>
         </div>
         <div className="btn-group">
-          <button 
-            className="btn btn-outline"
-            onClick={() => setShowLuckyDrawModal(true)}
-            style={{ color: 'var(--gold)', borderColor: 'var(--gold)' }}
-          >
-            <Gift size={14} />
-            <span>Monthly Lucky Draw</span>
-          </button>
           <button 
             className="btn btn-primary"
             onClick={() => setShowNewSchemeModal(true)}
@@ -388,29 +380,10 @@ export const SavingsSchemesView: React.FC<SavingsSchemesViewProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search scheme no, customer name or mobile..."
+            aria-label="Search savings schemes"
+            placeholder="Search scheme no., customer or mobile"
           />
         </div>
-        <button 
-          type="button" 
-          className="btn btn-outline btn-sm"
-          onClick={() => {}}
-          title="Search schemes"
-        >
-          <Search size={14} /> Search
-        </button>
-        <button 
-          type="button" 
-          className="btn btn-outline btn-sm"
-          onClick={() => {
-            setSearchQuery('');
-            setStatusFilter('active');
-          }}
-          title="Clear search and filters"
-        >
-          Clear
-        </button>
-
         <div className="tabs" style={{ marginBottom: 0, borderBottom: 'none' }}>
           {[
             { id: 'active', label: 'Active' },
@@ -447,10 +420,10 @@ export const SavingsSchemesView: React.FC<SavingsSchemesViewProps> = ({
             <thead>
               <tr>
                 <th style={{ width: 130 }}>Scheme No</th>
-                <th>Customer / Member</th>
-                <th>Scheme Name</th>
-                <th style={{ textAlign: 'right', width: 105 }}>Monthly (₹)</th>
-                <th style={{ textAlign: 'center', width: 95 }}>Paid / Total</th>
+                <th>Customer</th>
+                <th>Scheme</th>
+                <th style={{ textAlign: 'right', width: 105 }}>Monthly</th>
+                <th style={{ textAlign: 'center', width: 95 }}>Paid</th>
                 <th style={{ textAlign: 'right', width: 110 }}>Total Paid</th>
                 <th style={{ textAlign: 'right', width: 115 }}>At Maturity</th>
                 <th style={{ width: 105 }}>Next Due</th>
@@ -1160,3 +1133,4 @@ export const SavingsSchemesView: React.FC<SavingsSchemesViewProps> = ({
     </div>
   );
 };
+
