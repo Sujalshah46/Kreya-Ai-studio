@@ -136,8 +136,9 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
 
   // Filters
   const [searchOrder, setSearchOrder] = useState('');
-  const [fromDate, setFromDate] = useState('2026-11-01');
-  const [toDate, setToDate] = useState('2026-11-15');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [dateFilter, setDateFilter] = useState({ from: '', to: '' });
 
   // New Customer Quick Add states
   const [newCustName, setNewCustName] = useState('');
@@ -832,7 +833,10 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
       (inv.invoiceNo && inv.invoiceNo.toLowerCase().includes(q)) ||
       inv.customer.name.toLowerCase().includes(q) ||
       (inv.customer.mobile && inv.customer.mobile.includes(q));
-    return matchQ;
+    const date = (inv.invoiceDate || inv.date || '').slice(0, 10);
+    const hasDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
+    return matchQ && (!dateFilter.from || (hasDate && date >= dateFilter.from)) &&
+      (!dateFilter.to || (hasDate && date <= dateFilter.to));
   });
 
   // Filtered customer search for modal
@@ -879,40 +883,47 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
 
       {/* Filter Card */}
       <div className="card" style={{ marginBottom: 14 }}>
-        <div className="card-body" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <form className="card-body" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}
+          onSubmit={event => {
+            event.preventDefault();
+            setDateFilter({ from: fromDate, to: toDate });
+          }}
+        >
           <div className="search-box" style={{ flex: 1, minWidth: 200 }}>
             <Search size={13} style={{ color: 'var(--muted)' }} />
             <input 
-              placeholder="Order no, customer, mobile..." 
+              aria-label="Search orders"
+              placeholder="Order no, customer..." 
               value={searchOrder}
               onChange={(e) => setSearchOrder(e.target.value)}
             />
           </div>
           <input 
             className="input input-sm" 
-            type="date" 
+            type="date"
+            aria-label="From date"
+            max={toDate || undefined}
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
             style={{ width: 'auto' }}
           />
           <input 
             className="input input-sm" 
-            type="date" 
+            type="date"
+            aria-label="To date"
+            min={fromDate || undefined}
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
             style={{ width: 'auto' }}
           />
           <button 
-            type="button" 
+            type="submit"
             className="btn btn-sm btn-outline"
             title="Filter orders list"
-            onClick={() => {
-              // Trigger filter refresh
-            }}
           >
             <Filter size={13} /> Filter
           </button>
-          {(searchOrder || fromDate || toDate) && (
+          {(searchOrder || fromDate || toDate || dateFilter.from || dateFilter.to) && (
             <button 
               type="button" 
               className="btn btn-sm btn-outline"
@@ -921,12 +932,13 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                 setSearchOrder('');
                 setFromDate('');
                 setToDate('');
+                setDateFilter({ from: '', to: '' });
               }}
             >
               <X size={13} /> Clear
             </button>
           )}
-        </div>
+        </form>
       </div>
 
       {/* Orders Table */}
@@ -939,11 +951,12 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                 <th>Date</th>
                 <th>Customer</th>
                 <th>Items</th>
-                <th className="num">Taxable</th>
-                <th className="num">GST 3%</th>
-                <th className="num">Total</th>
+                <th className="num">Gold</th>
+                <th className="num">Silver</th>
+                <th className="num">Invoice Amt</th>
+                <th className="num">Deposit</th>
                 <th className="num">Paid</th>
-                <th className="num">Balance</th>
+                <th className="num">Pending</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -952,6 +965,8 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
               {filteredInvoices.map((inv) => {
                 const isPaid = (inv.balanceDue || 0) <= 0.01;
                 const isCancelled = inv.status === 'CANCELLED';
+                const weight = (metal: string) => inv.items.reduce((sum, item) =>
+                  sum + (item.metalType?.toLowerCase().startsWith(metal) ? item.netWeight || 0 : 0), 0);
                 return (
                   <tr key={inv.id} style={{ opacity: isCancelled ? 0.6 : 1 }}>
                     <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{inv.invoiceNo}</td>
@@ -961,9 +976,10 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                       <div style={{ fontSize: 10, color: 'var(--muted)' }}>{inv.customer.mobile || inv.customer.phone}</div>
                     </td>
                     <td>{inv.items.length} item(s)</td>
-                    <td className="num">₹{(inv.taxableAmount || 0).toLocaleString('en-IN')}</td>
-                    <td className="num">₹{((inv.cgstTotal || 0) + (inv.sgstTotal || 0)).toLocaleString('en-IN')}</td>
-                    <td className="num" style={{ fontWeight: 700 }}>₹{(inv.totalAmount || 0).toLocaleString('en-IN')}</td>
+                    <td className="num">{weight('gold').toFixed(3)} g</td>
+                    <td className="num">{weight('silver').toFixed(3)} g</td>
+                    <td className="num" style={{ fontWeight: 700 }}>₹{(inv.grandTotal ?? inv.totalAmount ?? inv.productTotalValue).toLocaleString('en-IN')}</td>
+                    <td className="num">₹{(inv.metalAdvanceAdjusted ?? 0).toLocaleString('en-IN')}</td>
                     <td className="num amt-green">₹{(inv.paidAmount || 0).toLocaleString('en-IN')}</td>
                     <td className="num" style={{ fontWeight: 700, color: (inv.balanceDue || 0) > 0 ? 'var(--danger)' : 'var(--success)' }}>
                       ₹{(inv.balanceDue || 0).toLocaleString('en-IN')}
@@ -1034,7 +1050,7 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
               })}
               {!filteredInvoices.length && (
                 <tr>
-                  <td colSpan={11} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  <td colSpan={12} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
                     No orders matching filter.
                   </td>
                 </tr>
