@@ -444,6 +444,7 @@ export interface MetalBooking {
   bookingNo: string; // "MB-2026-00008"
   bookingDate?: string;
   occasion?: string;
+  advanceReceipts?: PaymentTransaction[];
   customer?: Customer;
   customerName?: string;
   customerPhone?: string;
@@ -508,6 +509,7 @@ export interface CreditMemoRecord {
   refundMode: string;
   refundStatus: 'pending' | 'issued';
   refundDate?: string;
+  refundReference?: string;
   notes?: string;
 }
 
