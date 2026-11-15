@@ -6,13 +6,15 @@ import {
   ChevronRight, Users, CreditCard, RotateCcw, ArrowDownRight, Layers,
   AlertCircle, ArrowLeft, CheckCircle2, ChevronDown
 } from 'lucide-react';
-import { SalesInvoice, StoreProfile, RepairOrder, GirviLoan } from '../../types';
+import { SalesInvoice, StoreProfile, RepairOrder, GirviLoan, MetalBooking, CreditMemoRecord } from '../../types';
 
 interface SalesReportsViewProps {
   store: StoreProfile;
   invoices: SalesInvoice[];
   repairs?: RepairOrder[];
   loans?: GirviLoan[];
+  bookings?: MetalBooking[];
+  creditMemos?: CreditMemoRecord[];
   onNavigate?: (module: string) => void;
 }
 
@@ -45,6 +47,8 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
   invoices = [],
   repairs = [],
   loans = [],
+  bookings = [],
+  creditMemos = [],
   onNavigate
 }) => {
   const [activeReportTab, setActiveReportTab] = useState<number>(1);
@@ -88,7 +92,7 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
   const filteredInvoices = invoices.filter(inv => includesDate(reportDateKey(inv.invoiceDate ?? inv.date)));
 
   // Use receipt dates independently of invoice dates so earlier-invoice receipts stay in range.
-  const blankDay = () => ({ invoices: 0, sales: 0, gst: 0, due: 0, same: 0, earlier: 0, repairs: 0, loans: 0, cash: 0, nonCash: 0 });
+  const blankDay = () => ({ invoices: 0, sales: 0, gst: 0, due: 0, same: 0, earlier: 0, repairs: 0, loans: 0, advances: 0, cash: 0, nonCash: 0, refunds: 0 });
   const dailyTotals = new Map<string, ReturnType<typeof blankDay>>();
   const getDay = (key: string) => {
     const day = dailyTotals.get(key) ?? blankDay();
@@ -117,7 +121,7 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
       day[mode === 'CASH' ? 'cash' : 'nonCash'] += receipt.amount;
     }
   }
-  const addServiceReceipt = (category: 'repairs' | 'loans', date: string | undefined, amount: number, mode?: string) => {
+  const addServiceReceipt = (category: 'repairs' | 'loans' | 'advances', date: string | undefined, amount: number, mode?: string) => {
     const method = mode?.toUpperCase();
     if (!date || !includesDate(date) || !Number.isFinite(amount) || amount <= 0 || !method ||
         method === 'OLD_GOLD_EXCHANGE' || method === 'CUSTOMER_CREDIT') return;
@@ -136,10 +140,22 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
         payment.paymentMode ?? payment.mode);
     }
   }
+  for (const booking of bookings) {
+    for (const payment of booking.advanceReceipts ?? []) {
+      addServiceReceipt('advances', reportDateKey(payment.date) ?? reportDateKey(payment.timestamp), payment.amount, payment.mode);
+    }
+  }
+  for (const memo of creditMemos) {
+    const date = reportDateKey(memo.refundDate);
+    if (memo.refundStatus !== 'issued' || !date || !includesDate(date) || !Number.isFinite(memo.refundAmount) ||
+        memo.refundAmount <= 0 || memo.refundMode.toUpperCase() === 'CUSTOMER_CREDIT') continue;
+    getDay(date).refunds += memo.refundAmount;
+  }
   const dayBookRows = [...dailyTotals.entries()].sort(([a], [b]) => b.localeCompare(a));
   const dayBookValues = (day: ReturnType<typeof blankDay>) => [
     day.invoices, day.sales, day.gst, day.due, day.same, day.earlier,
-    null, day.repairs, day.loans, day.cash + day.nonCash, day.cash, day.nonCash, null, null
+    day.advances, day.repairs, day.loans, day.cash + day.nonCash, day.cash, day.nonCash,
+    day.refunds, day.cash + day.nonCash - day.refunds
   ];
 
   const totalGrossSales = filteredInvoices.reduce((acc, inv) => acc + (inv.productTotalValue || inv.totalAmount || 0), 0);
@@ -559,7 +575,7 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
             {activeReportTab === 1 && (
               <table className="tbl">
                 <caption className="helper text-left px-3 py-2">
-                  Collections include recorded invoice receipts, repair receipts and loan repayments. Dashes mark categories without verified ledger data.
+                  Collections and refunds use dated receipts. Older booking balances without individual receipts are excluded.
                 </caption>
                 <thead>
                   <tr>{dayBookColumns.map((column, index) => (
