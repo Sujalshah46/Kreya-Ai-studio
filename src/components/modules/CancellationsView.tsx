@@ -8,11 +8,15 @@ import { CancellationRecord, CreditMemoRecord, StoreProfile } from '../../types'
 interface CancellationsViewProps {
   store: StoreProfile;
   cancellations: CancellationRecord[];
+  creditMemos: CreditMemoRecord[];
+  onIssueRefund: (memo: CreditMemoRecord) => void;
 }
 
 export const CancellationsView: React.FC<CancellationsViewProps> = ({
   store,
-  cancellations: initialCancellations
+  cancellations: cancellationsList,
+  creditMemos,
+  onIssueRefund
 }) => {
   const [activeTab, setActiveTab] = useState<'cancellations' | 'credit_memos'>('cancellations');
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,119 +29,10 @@ export const CancellationsView: React.FC<CancellationsViewProps> = ({
   const [refundMode, setRefundMode] = useState<string>('cash');
   const [refundRefNo, setRefundRefNo] = useState<string>('');
   const [refundNotes, setRefundNotes] = useState<string>('');
-  const [refundDate, setRefundDate] = useState<string>('2026-11-15');
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  const [refundDate, setRefundDate] = useState(today);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(25);
-
-  // Rich initial cancellations matching live database
-  const [cancellationsList, setCancellationsList] = useState<CancellationRecord[]>([
-    {
-      id: 'can-001',
-      cancellationNo: 'CAN-2026-00004',
-      referenceType: 'order',
-      originalInvoiceNo: 'INV-2026-00270',
-      originalReferenceNo: 'INV-2026-00270',
-      customerName: 'Priya Sharma',
-      customerPhone: '9811234567',
-      customerMobile: '9811234567',
-      itemsSummary: '1x 22K Gold Bangle (14.200g)',
-      originalAmount: 198450,
-      paidAmount: 50000,
-      deductionAmount: 2500,
-      cancellationFeeDeducted: 2500,
-      refundAmount: 47500,
-      netRefundAmount: 47500,
-      refundMode: 'UPI',
-      creditMemoNo: 'CM-2026-00004',
-      status: 'approved',
-      reason: 'Customer requested size modification cancellation',
-      cancelledAt: '2026-11-10T14:22:00Z',
-      date: '2026-11-10',
-      operator: 'Admin',
-      approvedBy: 'Showroom Manager'
-    },
-    {
-      id: 'can-002',
-      cancellationNo: 'CAN-2026-00005',
-      referenceType: 'partial_order',
-      originalInvoiceNo: 'INV-2026-00272',
-      originalReferenceNo: 'INV-2026-00272',
-      customerName: 'Rahul Verma',
-      customerPhone: '9876543210',
-      customerMobile: '9876543210',
-      itemsSummary: '1 of 2 items: 18K Diamond Ring',
-      originalAmount: 85000,
-      paidAmount: 85000,
-      deductionAmount: 1500,
-      cancellationFeeDeducted: 1500,
-      refundAmount: 83500,
-      netRefundAmount: 83500,
-      refundMode: 'CASH',
-      creditMemoNo: 'CM-2026-00005',
-      status: 'approved',
-      reason: 'Item exchanged for heavier set in same billing',
-      cancelledAt: '2026-11-12T16:45:00Z',
-      date: '2026-11-12',
-      operator: 'Cashier 1',
-      approvedBy: 'Admin'
-    },
-    ...initialCancellations.map((c, i) => ({
-      ...c,
-      referenceType: c.referenceType || (i % 2 === 0 ? 'order' : 'partial_order'),
-      originalAmount: c.originalAmount || 65000,
-      paidAmount: c.paidAmount || c.originalAmount || 65000,
-      deductionAmount: c.cancellationFeeDeducted || c.deductionAmount || 1000,
-      refundAmount: c.refundAmount || c.netRefundAmount || 64000,
-      creditMemoNo: c.creditMemoNo || `CM-2026-0000${6 + i}`
-    }))
-  ]);
-
-  // Credit memos state
-  const [creditMemos, setCreditMemos] = useState<CreditMemoRecord[]>([
-    {
-      id: 'cm-001',
-      creditMemoNo: 'CM-2026-00004',
-      cancellationId: 'can-001',
-      orderNo: 'INV-2026-00270',
-      customerName: 'Priya Sharma',
-      customerPhone: '9811234567',
-      originalAmount: 198450,
-      deductionAmount: 2500,
-      refundAmount: 47500,
-      refundMode: 'UPI',
-      refundStatus: 'issued',
-      refundDate: '2026-11-10',
-      notes: 'UPI refund processed via HDFC merchant portal'
-    },
-    {
-      id: 'cm-002',
-      creditMemoNo: 'CM-2026-00005',
-      cancellationId: 'can-002',
-      orderNo: 'INV-2026-00272',
-      customerName: 'Rahul Verma',
-      customerPhone: '9876543210',
-      originalAmount: 85000,
-      deductionAmount: 1500,
-      refundAmount: 83500,
-      refundMode: 'CASH',
-      refundStatus: 'issued',
-      refundDate: '2026-11-12',
-      notes: 'Cash refund issued from Counter MAIN'
-    },
-    {
-      id: 'cm-003',
-      creditMemoNo: 'CM-2026-00006',
-      orderNo: 'INV-2026-00275',
-      customerName: 'Amit Saxena',
-      customerPhone: '9922334455',
-      originalAmount: 120000,
-      deductionAmount: 2000,
-      refundAmount: 118000,
-      refundMode: 'customer_credit',
-      refundStatus: 'pending',
-      notes: 'Awaiting customer account confirmation for store credit / RTGS'
-    }
-  ]);
 
   // Filter calculations
   const totalCancelledCount = cancellationsList.length;
@@ -162,19 +57,15 @@ export const CancellationsView: React.FC<CancellationsViewProps> = ({
 
   const handleProcessRefund = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeCreditMemoForRefund) return;
-
-    setCreditMemos(creditMemos.map(cm => 
-      cm.id === activeCreditMemoForRefund.id
-        ? {
-            ...cm,
-            refundStatus: 'issued',
-            refundMode: refundMode,
-            refundDate: refundDate,
-            notes: refundNotes ? `${cm.notes ? cm.notes + ' | ' : ''}${refundNotes} (Ref: ${refundRefNo || 'N/A'})` : cm.notes
-          }
-        : cm
-    ));
+    if (!activeCreditMemoForRefund || !refundDate || refundDate > today) return;
+    onIssueRefund({
+      ...activeCreditMemoForRefund,
+      refundStatus: 'issued',
+      refundMode,
+      refundDate,
+      refundReference: refundRefNo.trim() || undefined,
+      notes: [activeCreditMemoForRefund.notes, refundNotes.trim()].filter(Boolean).join(' | ')
+    });
 
     setActiveCreditMemoForRefund(null);
     setRefundRefNo('');
@@ -437,7 +328,7 @@ export const CancellationsView: React.FC<CancellationsViewProps> = ({
                         {cm.refundStatus === 'pending' ? (
                           <button
                             type="button"
-                            onClick={() => setActiveCreditMemoForRefund(cm)}
+                            onClick={() => { setRefundDate(today); setActiveCreditMemoForRefund(cm); }}
                             className="btn btn-xs btn-primary"
                           >
                             Disburse
@@ -578,6 +469,8 @@ export const CancellationsView: React.FC<CancellationsViewProps> = ({
                 <label className="label">Refund Date</label>
                 <input
                   type="date"
+                  required
+                  max={today}
                   value={refundDate}
                   onChange={(e) => setRefundDate(e.target.value)}
                   className="input"
@@ -699,3 +592,4 @@ export const CancellationsView: React.FC<CancellationsViewProps> = ({
     </div>
   );
 };
+
