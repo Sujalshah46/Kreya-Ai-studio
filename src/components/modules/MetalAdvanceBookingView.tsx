@@ -153,6 +153,11 @@ export const MetalAdvanceBookingView: React.FC<MetalAdvanceBookingViewProps> = (
   const handleCreateBooking = (e: React.FormEvent) => {
     e.preventDefault();
     const bookingNo = `BKG-2026-${String(bookingsList.length + 45).padStart(5, '0')}`;
+    if (!Number.isFinite(effectiveAdvancePaid) || effectiveAdvancePaid < 0 ||
+        Math.abs(Math.round(effectiveAdvancePaid * 100) / 100 - effectiveAdvancePaid) > 1e-9) {
+      alert('Enter a valid booking advance amount.');
+      return;
+    }
     const newBkg: MetalBooking = {
       id: `bkg-${Date.now()}`,
       bookingNo,
@@ -171,6 +176,13 @@ export const MetalAdvanceBookingView: React.FC<MetalAdvanceBookingViewProps> = (
       advanceCashPaid: paymentMode === 'CASH' ? effectiveAdvancePaid : 0,
       advancePaid: effectiveAdvancePaid,
       advanceAmountPaid: effectiveAdvancePaid,
+      advanceReceipts: effectiveAdvancePaid > 0 ? [{
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        amount: effectiveAdvancePaid,
+        mode: paymentMode,
+        referenceNo: paymentRefNo.trim() || undefined
+      }] : [],
       balanceAmountDue: balanceDue,
       balanceDue: balanceDue,
       lockedGrams: totalGoldGramsLocked || totalSilverGramsLocked,
