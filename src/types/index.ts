@@ -442,12 +442,15 @@ export interface MetalBooking {
   id: string;
   bookingNo: string; // "MB-2026-00008"
   bookingDate?: string;
+  occasion?: string;
   customer?: Customer;
   customerName?: string;
   customerPhone?: string;
   metalType: 'GOLD' | 'SILVER' | 'GOLD_22K' | 'GOLD_24K' | 'GOLD_18K' | string;
   bookedWeightGrams?: number;
   lockedGrams?: number;
+  lockedGoldGrams?: number;
+  lockedSilverGrams?: number;
   lockedRatePerGram?: number;
   bookedRatePerGram?: number;
   totalContractValue?: number;
@@ -896,3 +899,4 @@ export interface UserAccount {
   isActive: boolean;
   lastLogin: string;
 }
+
