@@ -124,7 +124,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const tickUnit = highest >= 100000 ? 50000 : 1000;
   const step = Math.max(tickUnit, Math.ceil(highest / 4 / tickUnit) * tickUnit);
   const ticks = [0, 1, 2, 3, 4].map(index => index * step);
-  const chartX = (index: number) => chartMonths.length === 1 ? 376 : 50 + index * 652 / (chartMonths.length - 1);
+  const plotRef = React.useRef<HTMLDivElement>(null);
+  const [plotWidth, setPlotWidth] = React.useState(453);
+  React.useLayoutEffect(() => {
+    const element = plotRef.current;
+    if (!element) return;
+    const measure = () => setPlotWidth(Math.max(72, element.clientWidth));
+    const observer = new ResizeObserver(measure);
+    measure();
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  const plotRight = plotWidth - 8;
+  const chartCenter = (50 + plotRight) / 2;
+  const chartX = (index: number) => chartMonths.length === 1
+    ? chartCenter
+    : 50 + index * (plotRight - 50) / (chartMonths.length - 1);
   const chartY = (amount: number) => 183 - amount / (4 * step) * 178;
   const totalPaymentSum = [...paymentModes.values()].reduce((sum, amount) => sum + amount, 0);
   let angle = 0;
@@ -174,10 +189,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   ];
 
   return (
-    <div className="flex flex-col gap-[14px]">
+    <>
       
       {/* 1. Licence Expiration Warning Banner Matching Screenshot */}
-      <div className="license-banner rounded-lg" style={{ background: '#fef8ee', borderColor: '#fde68a', borderWidth: 1 }}>
+      <div className="license-banner" role="status" style={{ background: '#fef8ee' }}>
         <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
         <span className="flex-1">Licence expires in 30 days (15-Dec-2026). Contact Kreya IT Consulting to renew.</span>
         <button 
@@ -189,6 +204,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </button>
       </div>
 
+      <div className="page dash">
       {/* 2. TODAY'S RATES Strip Matching Original Software */}
       <div 
         className="dash-rates"
@@ -261,7 +277,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* TODAY'S SALES */}
         <div className="kpi-card" onClick={() => onNavigate('orders')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">TODAY'S SALES</span>
+            <span className="kpi-label">Today's Sales</span>
             <div className="kpi-ico good">
               <ShoppingCart className="w-4 h-4" />
             </div>
@@ -275,7 +291,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* MONTHLY REVENUE */}
         <div className="kpi-card" onClick={() => onNavigate('orders')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">MONTHLY REVENUE</span>
+            <span className="kpi-label">Monthly Revenue</span>
             <div className="kpi-ico">
               <TrendingUp className="w-4 h-4" />
             </div>
@@ -289,7 +305,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* TODAY'S CASH IN */}
         <div className="kpi-card" onClick={() => onNavigate('payments')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">TODAY'S CASH IN</span>
+            <span className="kpi-label">Today's Cash In</span>
             <div className="kpi-ico good">
               <Activity className="w-4 h-4" />
             </div>
@@ -303,7 +319,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* OUTSTANDING */}
         <div className="kpi-card" onClick={() => onNavigate('payments')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">OUTSTANDING</span>
+            <span className="kpi-label">Outstanding</span>
             <div className="kpi-ico">
               <AlertTriangle className="w-4 h-4" />
             </div>
@@ -318,11 +334,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* 4. Middle Row: Monthly Revenue & Payment Modes Charts */}
       <div 
         className="dash-row"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '2fr 1fr',
-          gap: '14px'
-        }}
       >
         {/* Monthly Revenue & Collections Panel with Real Area Chart */}
         <section 
@@ -354,12 +365,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="dash-panel-body" style={{ padding: '14px 18px', flex: 1 }}>
-            <div className="recharts-responsive-container" style={{ width: '100%', height: '240px', minWidth: 0, position: 'relative' }}>
+            <div ref={plotRef} className="recharts-responsive-container" style={{ width: '100%', height: '240px', minWidth: 0, position: 'relative' }}>
               <svg 
                 className="recharts-surface" 
                 width="100%" 
                 height="100%" 
-                viewBox="0 0 710 240" 
+                viewBox={`0 0 ${plotWidth} 240`} 
                 style={{ width: '100%', height: '100%', overflow: 'visible' }}
               >
                 <defs>
@@ -375,7 +386,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                 {ticks.map(value => (
                   <g key={value}>
-                    <line strokeDasharray="3 3" stroke="#e5e8e4" x1="50" y1={chartY(value)} x2="702" y2={chartY(value)} />
+                    <line strokeDasharray="3 3" stroke="#e5e8e4" x1="50" y1={chartY(value)} x2={plotRight} y2={chartY(value)} />
                     <text fontSize="11" x="42" y={chartY(value) + 4} textAnchor="end" fill="#89918b">{chartTick(value, step)}</text>
                   </g>
                 ))}
@@ -409,7 +420,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   );
                 })}
                 {chartMonths.length === 0 && (
-                  <text x="376" y="100" textAnchor="middle" fill="#89918b">No revenue or collections in this period.</text>
+                  <text x={chartCenter} y="100" textAnchor="middle" fill="#89918b">No revenue or collections in this period.</text>
                 )}
               </svg>
 
@@ -511,9 +522,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* 5. 8 Operational Metric Boxes (.dash-kpis.small) */}
       <div className="dash-kpis small">
         {/* LOAN PORTFOLIO */}
-        <div className="kpi-card" onClick={() => onNavigate('loans')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card small" onClick={() => onNavigate('loans')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">LOAN PORTFOLIO</span>
+            <span className="kpi-label">Loan Portfolio</span>
             <div className="kpi-ico">
               <CreditCard className="w-3.5 h-3.5" />
             </div>
@@ -525,9 +536,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* CUSTOMERS */}
-        <div className="kpi-card" onClick={() => onNavigate('customers')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card small" onClick={() => onNavigate('customers')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">CUSTOMERS</span>
+            <span className="kpi-label">Customers</span>
             <div className="kpi-ico">
               <Users className="w-3.5 h-3.5" />
             </div>
@@ -539,9 +550,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* OPEN GOLD */}
-        <div className="kpi-card" onClick={() => onNavigate('metal-stock')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card small" onClick={() => onNavigate('metal-stock')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">OPEN GOLD</span>
+            <span className="kpi-label">Open Gold</span>
             <div className="kpi-ico gold">
               <Package className="w-3.5 h-3.5" />
             </div>
@@ -553,9 +564,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* OPEN SILVER */}
-        <div className="kpi-card" onClick={() => onNavigate('metal-stock')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card small" onClick={() => onNavigate('metal-stock')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">OPEN SILVER</span>
+            <span className="kpi-label">Open Silver</span>
             <div className="kpi-ico">
               <Package className="w-3.5 h-3.5" />
             </div>
@@ -567,9 +578,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* PENDING DELIVERY */}
-        <div className="kpi-card" onClick={() => onNavigate('orders')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card small" onClick={() => onNavigate('orders')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">PENDING DELIVERY</span>
+            <span className="kpi-label">Pending Delivery</span>
             <div className="kpi-ico">
               <Clock className="w-3.5 h-3.5" />
             </div>
@@ -581,9 +592,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* PENDING REPAIRS */}
-        <div className="kpi-card" onClick={() => onNavigate('repairs')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card small" onClick={() => onNavigate('repairs')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">PENDING REPAIRS</span>
+            <span className="kpi-label">Pending Repairs</span>
             <div className="kpi-ico">
               <Wrench className="w-3.5 h-3.5" />
             </div>
@@ -595,9 +606,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* OPEN BOOKINGS */}
-        <div className="kpi-card" onClick={() => onNavigate('metal-booking')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card small" onClick={() => onNavigate('metal-booking')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">OPEN BOOKINGS</span>
+            <span className="kpi-label">Open Bookings</span>
             <div className="kpi-ico">
               <Calendar className="w-3.5 h-3.5" />
             </div>
@@ -609,9 +620,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* INVENTORY ITEMS */}
-        <div className="kpi-card" onClick={() => onNavigate('inventory')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card small" onClick={() => onNavigate('inventory')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">INVENTORY ITEMS</span>
+            <span className="kpi-label">Inventory Items</span>
             <div className="kpi-ico">
               <Package className="w-3.5 h-3.5" />
             </div>
@@ -626,11 +637,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* 6. 3 Bottom Cards (.dash-row.even) */}
       <div 
         className="dash-row even"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: '14px'
-        }}
       >
         {/* Top 10 Customers Panel */}
         <section 
@@ -840,6 +846,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </section>
       </div>
 
-    </div>
+      </div>
+    </>
   );
 };
