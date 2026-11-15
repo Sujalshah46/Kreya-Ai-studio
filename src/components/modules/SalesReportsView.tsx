@@ -6,11 +6,13 @@ import {
   ChevronRight, Users, CreditCard, RotateCcw, ArrowDownRight, Layers,
   AlertCircle, ArrowLeft, CheckCircle2, ChevronDown
 } from 'lucide-react';
-import { SalesInvoice, StoreProfile } from '../../types';
+import { SalesInvoice, StoreProfile, RepairOrder, GirviLoan } from '../../types';
 
 interface SalesReportsViewProps {
   store: StoreProfile;
   invoices: SalesInvoice[];
+  repairs?: RepairOrder[];
+  loans?: GirviLoan[];
   onNavigate?: (module: string) => void;
 }
 
@@ -41,10 +43,12 @@ type DateRangePreset = 'TODAY' | 'YESTERDAY' | 'WEEK' | 'MONTH' | 'CUSTOM' | 'AL
 export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
   store,
   invoices = [],
+  repairs = [],
+  loans = [],
   onNavigate
 }) => {
   const [activeReportTab, setActiveReportTab] = useState<number>(1);
-  const [dateRange, setDateRange] = useState<DateRangePreset>('ALL');
+  const [dateRange, setDateRange] = useState<DateRangePreset>('MONTH');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [invoiceViewMode, setInvoiceViewMode] = useState<'invoices' | 'lines'>('invoices');
@@ -84,7 +88,7 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
   const filteredInvoices = invoices.filter(inv => includesDate(reportDateKey(inv.invoiceDate ?? inv.date)));
 
   // Use receipt dates independently of invoice dates so earlier-invoice receipts stay in range.
-  const blankDay = () => ({ invoices: 0, sales: 0, gst: 0, due: 0, same: 0, earlier: 0, cash: 0, nonCash: 0 });
+  const blankDay = () => ({ invoices: 0, sales: 0, gst: 0, due: 0, same: 0, earlier: 0, repairs: 0, loans: 0, cash: 0, nonCash: 0 });
   const dailyTotals = new Map<string, ReturnType<typeof blankDay>>();
   const getDay = (key: string) => {
     const day = dailyTotals.get(key) ?? blankDay();
@@ -113,10 +117,29 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
       day[mode === 'CASH' ? 'cash' : 'nonCash'] += receipt.amount;
     }
   }
+  const addServiceReceipt = (category: 'repairs' | 'loans', date: string | undefined, amount: number, mode?: string) => {
+    const method = mode?.toUpperCase();
+    if (!date || !includesDate(date) || !Number.isFinite(amount) || amount <= 0 || !method ||
+        method === 'OLD_GOLD_EXCHANGE' || method === 'CUSTOMER_CREDIT') return;
+    const day = getDay(date);
+    day[category] += amount;
+    day[method === 'CASH' ? 'cash' : 'nonCash'] += amount;
+  };
+  for (const repair of repairs) {
+    for (const payment of repair.payments ?? []) {
+      addServiceReceipt('repairs', reportDateKey(payment.date) ?? reportDateKey(payment.timestamp), payment.amount, payment.mode);
+    }
+  }
+  for (const loan of loans) {
+    for (const payment of loan.repayments ?? []) {
+      addServiceReceipt('loans', reportDateKey(payment.date), payment.totalCashReceived ?? payment.principalPaid + payment.interestPaid,
+        payment.paymentMode ?? payment.mode);
+    }
+  }
   const dayBookRows = [...dailyTotals.entries()].sort(([a], [b]) => b.localeCompare(a));
   const dayBookValues = (day: ReturnType<typeof blankDay>) => [
     day.invoices, day.sales, day.gst, day.due, day.same, day.earlier,
-    null, null, null, day.cash + day.nonCash, day.cash, day.nonCash, null, null
+    null, day.repairs, day.loans, day.cash + day.nonCash, day.cash, day.nonCash, null, null
   ];
 
   const totalGrossSales = filteredInvoices.reduce((acc, inv) => acc + (inv.productTotalValue || inv.totalAmount || 0), 0);
@@ -374,8 +397,12 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
               <input
                 type="date"
                 aria-label="From date"
-                value={dateRange === 'CUSTOM' ? fromDate : ''}
-                onChange={e => { setFromDate(e.target.value); setDateRange('CUSTOM'); }}
+                value={dateRange === 'CUSTOM' ? fromDate : dateRange === 'MONTH' ? today.slice(0, 7) + '-01' : ''}
+                onChange={e => {
+                  if (dateRange === 'MONTH') setToDate(today);
+                  setFromDate(e.target.value);
+                  setDateRange('CUSTOM');
+                }}
                 className="input input-sm"
                 style={{ padding: '2px 6px', fontSize: 12 }}
               />
@@ -383,8 +410,12 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
               <input
                 type="date"
                 aria-label="To date"
-                value={dateRange === 'CUSTOM' ? toDate : ''}
-                onChange={e => { setToDate(e.target.value); setDateRange('CUSTOM'); }}
+                value={dateRange === 'CUSTOM' ? toDate : dateRange === 'MONTH' ? today : ''}
+                onChange={e => {
+                  if (dateRange === 'MONTH') setFromDate(today.slice(0, 7) + '-01');
+                  setToDate(e.target.value);
+                  setDateRange('CUSTOM');
+                }}
                 className="input input-sm"
                 style={{ padding: '2px 6px', fontSize: 12 }}
               />
@@ -528,7 +559,7 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
             {activeReportTab === 1 && (
               <table className="tbl">
                 <caption className="helper text-left px-3 py-2">
-                  Collections shown are invoice receipts. Dashes mark categories without verified ledger data.
+                  Collections include recorded invoice receipts, repair receipts and loan repayments. Dashes mark categories without verified ledger data.
                 </caption>
                 <thead>
                   <tr>{dayBookColumns.map((column, index) => (
@@ -541,7 +572,7 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
                   )}
                   {dayBookRows.map(([date, day]) => (
                     <tr key={date}>
-                      <td>{displayDate.format(new Date(date + 'T00:00:00Z'))}</td>
+                      <td>{displayDate.format(new Date(date + 'T00:00:00Z')).replace(/ /g, '-')}</td>
                       {dayBookValues(day).map((value, index) => (
                         <td className="num" key={dayBookColumns[index + 1]}>
                           {value === null ? '—' : index === 0 ? value : displayMoney.format(value)}
@@ -1003,3 +1034,4 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
     </div>
   );
 };
+
