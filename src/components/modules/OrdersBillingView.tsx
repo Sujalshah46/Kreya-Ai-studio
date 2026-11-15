@@ -1,3 +1,4 @@
+import { applyInvoiceReceipt } from '../../data/invoicePayments';
 import React, { useState, useRef } from 'react';
 import { 
   Plus, Search, Printer, FileText, CheckCircle2, AlertCircle, 
@@ -2544,24 +2545,24 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                   type="button"
                   className="btn btn-primary btn-sm"
                   onClick={() => {
-                    const amt = parseFloat(collectAmount) || (selectedInvoiceForView.balanceDue || 0);
-                    if (amt <= 0) return;
-                    const newPay = {
-                      id: `pay-${Date.now()}`,
-                      receiptNo: `PAY-2026-${String(((selectedInvoiceForView.payments || []).length || 2) + 1).padStart(5, '0')}`,
-                      date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-                      amount: amt,
-                      mode: collectMode.toUpperCase() as any,
+                    const amount = Number(collectAmount);
+                    const receiptId = crypto.randomUUID();
+                    const newPay: PaymentTransaction = {
+                      id: receiptId,
+                      receiptNo: 'PAY-' + new Date().getFullYear() + '-' + receiptId.slice(0, 8).toUpperCase(),
+                      date: new Date().toISOString(),
+                      amount,
+                      mode: collectMode.toUpperCase() as PaymentMode,
                       referenceNo: collectRef || undefined,
                       collectorName: 'Admin',
                       notes: collectNote || undefined
                     };
-                    const updatedOrder: SalesInvoice = {
-                      ...selectedInvoiceForView,
-                      paidAmount: (selectedInvoiceForView.paidAmount || 0) + amt,
-                      balanceDue: Math.max(0, (selectedInvoiceForView.balanceDue || 0) - amt),
-                      payments: [...(selectedInvoiceForView.payments || []), newPay]
-                    };
+                    const updatedOrder = applyInvoiceReceipt(selectedInvoiceForView, newPay);
+                    if (!updatedOrder) {
+                      alert('Enter a valid payment amount that does not exceed the amount due.');
+                      return;
+                    }
+                    onAddPayment(selectedInvoiceForView.id, newPay);
                     setSelectedInvoiceForView(updatedOrder);
                     setInvoicesList(prev => prev.map(inv => inv.id === updatedOrder.id ? updatedOrder : inv));
                     setCollectAmount('');
@@ -3629,3 +3630,4 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
     </div>
   );
 };
+
