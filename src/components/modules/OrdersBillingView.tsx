@@ -1,4 +1,4 @@
-import { applyInvoiceReceipt } from '../../data/invoicePayments';
+import { applyInvoiceReceipt, invoiceReceipts } from '../../data/invoicePayments';
 import React, { useState, useRef } from 'react';
 import { 
   Plus, Search, Printer, FileText, CheckCircle2, AlertCircle, 
@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { 
   SalesInvoice, Customer, InventoryItem, DailyRates, StoreProfile, 
-  PaymentTransaction, PaymentMode, BillingLineItem, OldMetalExchange 
+  PaymentTransaction, PaymentMode, BillingLineItem, OldMetalExchange, CancellationRecord, CreditMemoRecord 
 } from '../../types';
 
 interface OrdersBillingViewProps {
@@ -17,6 +17,7 @@ interface OrdersBillingViewProps {
   inventory: InventoryItem[];
   invoices: SalesInvoice[];
   onSaveInvoice: (invoice: SalesInvoice) => void;
+  onCancelInvoice: (invoice: SalesInvoice, cancellation: CancellationRecord, memo: CreditMemoRecord | undefined, restock: boolean) => void;
   onAddPayment: (invoiceId: string, payment: PaymentTransaction) => void;
 }
 
@@ -71,6 +72,7 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
   inventory,
   invoices: initialInvoices,
   onSaveInvoice,
+  onCancelInvoice,
   onAddPayment
 }) => {
   const [invoicesList, setInvoicesList] = useState<SalesInvoice[]>(initialInvoices);
@@ -677,23 +679,64 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
   const handleProcessCancellation = () => {
     if (!selectedInvoiceForCancel) return;
     const inv = selectedInvoiceForCancel;
-    const deduction = parseFloat(cancelDeduction) || 0;
-    const totalPaid = inv.paidAmount || inv.totalAmount || 0;
-    const refundDue = Math.max(0, totalPaid - deduction);
+    if (cancelType !== 'full') {
+      alert('Partial cancellation requires item-level credit adjustments. No changes were saved.');
+      return;
+    }
+    if (inv.status === 'CANCELLED' || inv.status === 'ESTIMATE' || !cancelReason.trim()) return;
 
-    const updated = invoicesList.map(item => {
-      if (item.id === inv.id) {
-        return {
-          ...item,
-          status: 'CANCELLED' as const,
-          notes: `${item.notes ? item.notes + ' | ' : ''}Cancelled (${cancelType}): ${cancelReason}. Refund: ₹${refundDue} via ${cancelRefundMode}`
-        };
-      }
-      return item;
-    });
-
-    setInvoicesList(updated);
-    alert(`Order ${inv.invoiceNo} cancelled. Credit Memo created for ₹${refundDue.toLocaleString('en-IN')}.${cancelRestock ? ' Items restocked to inventory.' : ''}`);
+    const paid = invoiceReceipts(inv)
+      .filter(receipt => !['OLD_GOLD_EXCHANGE', 'CUSTOMER_CREDIT'].includes(receipt.mode.toUpperCase()))
+      .reduce((total, receipt) => total + Math.round(receipt.amount * 100), 0);
+    const deduction = Number(cancelDeduction);
+    const fee = Math.round(deduction * 100);
+    if (!Number.isSafeInteger(fee) || Math.abs(fee / 100 - deduction) > 1e-9 || fee < 0 || fee > paid) {
+      alert('Enter a deduction between zero and the amount collected.');
+      return;
+    }
+    const refundAmount = (paid - fee) / 100;
+    const id = crypto.randomUUID();
+    const suffix = id.slice(0, 8).toUpperCase();
+    const year = new Date().getFullYear();
+    const invoiceNo = inv.invoiceNo || inv.invoiceNumber || inv.id;
+    const creditMemoNo = refundAmount > 0 ? 'CM-' + year + '-' + suffix : undefined;
+    const cancellation: CancellationRecord = {
+      id,
+      cancellationNo: 'CAN-' + year + '-' + suffix,
+      referenceType: 'order',
+      originalInvoiceNo: invoiceNo,
+      originalReferenceNo: invoiceNo,
+      customerName: inv.customer.name,
+      customerPhone: inv.customer.mobile || inv.customer.phone,
+      originalAmount: inv.grandTotal ?? inv.totalAmount ?? inv.productTotalValue,
+      paidAmount: paid / 100,
+      deductionAmount: deduction,
+      refundAmount,
+      refundMode: cancelRefundMode,
+      creditMemoNo,
+      itemsSummary: inv.items.map(item => item.itemName).join(', '),
+      reason: cancelReason.trim(),
+      status: 'approved',
+      cancelledAt: new Date().toISOString()
+    };
+    const memo: CreditMemoRecord | undefined = creditMemoNo ? {
+      id: crypto.randomUUID(),
+      creditMemoNo,
+      cancellationId: id,
+      orderNo: invoiceNo,
+      customerName: cancellation.customerName,
+      customerPhone: cancellation.customerPhone,
+      originalAmount: cancellation.originalAmount ?? 0,
+      deductionAmount: deduction,
+      refundAmount,
+      refundMode: cancelRefundMode,
+      refundStatus: 'pending',
+      notes: cancellation.reason
+    } : undefined;
+    const cancelled: SalesInvoice = { ...inv, status: 'CANCELLED', balanceDue: 0 };
+    onCancelInvoice(cancelled, cancellation, memo, cancelRestock);
+    setInvoicesList(current => current.map(item => item.id === inv.id ? cancelled : item));
+    alert(memo ? 'Order cancelled. Credit memo is pending refund disbursement.' : 'Order cancelled.');
     setSelectedInvoiceForCancel(null);
     setCancelReason('');
     setCancelDeduction('0');
@@ -1054,6 +1097,8 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                             title="Cancel Order & Issue Credit Memo"
                             onClick={() => {
                               setSelectedInvoiceForCancel(inv);
+                              setCancelType('full');
+                              setCancelItemSelection({});
                               setCancelDeduction('0');
                               setCancelReason('');
                               setCancelRestock(true);
@@ -3229,7 +3274,7 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                 disabled={!cancelReason.trim()}
                 onClick={handleProcessCancellation}
               >
-                Confirm Cancellation & Issue Refund
+                Confirm Cancellation
               </button>
             </div>
           </div>
