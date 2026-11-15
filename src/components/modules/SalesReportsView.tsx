@@ -14,6 +14,28 @@ interface SalesReportsViewProps {
   onNavigate?: (module: string) => void;
 }
 
+const reportDate = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+});
+const displayDate = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric'
+});
+const displayMoney = new Intl.NumberFormat('en-IN', {
+  style: 'currency', currency: 'INR'
+});
+const dayBookColumns = [
+  'Date', 'Invoices', 'Sales', 'GST', 'Still Due', 'On Same-Day Inv.', 'On Earlier Inv.',
+  'Advances', 'Repairs', 'Loans & Other', 'Received', 'Of Which Cash', 'Non-Cash', 'Refunds', 'Net Collection'
+];
+
+function reportDateKey(value?: string): string | undefined {
+  if (!value) return undefined;
+  const local = value.match(/^(\d{4}-\d{2}-\d{2})(?:$|[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$)/);
+  const date = new Date(local ? local[1] + 'T00:00:00Z' : value);
+  if (!Number.isFinite(date.getTime())) return undefined;
+  return local ? date.toISOString().slice(0, 10) : reportDate.format(date);
+}
+
 type DateRangePreset = 'TODAY' | 'YESTERDAY' | 'WEEK' | 'MONTH' | 'CUSTOM' | 'ALL';
 
 export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
@@ -23,8 +45,8 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
 }) => {
   const [activeReportTab, setActiveReportTab] = useState<number>(1);
   const [dateRange, setDateRange] = useState<DateRangePreset>('ALL');
-  const [fromDate, setFromDate] = useState('2026-11-01');
-  const [toDate, setToDate] = useState('2026-11-15');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [invoiceViewMode, setInvoiceViewMode] = useState<'invoices' | 'lines'>('invoices');
   const [selectedPaymentModeDrilldown, setSelectedPaymentModeDrilldown] = useState<string | null>(null);
 
@@ -43,36 +65,59 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
     { id: 11, name: '11. Sales margin & profit' }
   ];
 
-  // Filter invoices based on date range
-  const filteredInvoices = useMemo(() => {
-    return invoices.filter(inv => {
-      if (dateRange === 'ALL') return true;
-      const rawDate = inv.date || inv.invoiceDate || '2026-11-15';
-      const invDate = new Date(rawDate);
-      const now = new Date('2026-11-15T12:00:00Z'); // normalized to system mock date
-      
-      if (dateRange === 'TODAY') {
-        return invDate.toDateString() === now.toDateString();
-      }
-      if (dateRange === 'YESTERDAY') {
-        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        return invDate.toDateString() === yesterday.toDateString();
-      }
-      if (dateRange === 'WEEK') {
-        const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        return invDate >= oneWeekAgo && invDate <= now;
-      }
-      if (dateRange === 'MONTH') {
-        return invDate.getMonth() === now.getMonth() && invDate.getFullYear() === now.getFullYear();
-      }
-      if (dateRange === 'CUSTOM') {
-        const start = new Date(fromDate);
-        const end = new Date(toDate + 'T23:59:59Z');
-        return invDate >= start && invDate <= end;
-      }
-      return true;
-    });
-  }, [invoices, dateRange, fromDate, toDate]);
+  const today = reportDate.format(new Date());
+  const yesterday = new Date(today + 'T00:00:00Z');
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const weekStart = new Date(today + 'T00:00:00Z');
+  weekStart.setUTCDate(weekStart.getUTCDate() - (weekStart.getUTCDay() + 6) % 7);
+  const yesterdayKey = yesterday.toISOString().slice(0, 10);
+  const weekStartKey = weekStart.toISOString().slice(0, 10);
+  const includesDate = (date?: string) => {
+    if (dateRange === 'ALL') return true;
+    if (!date) return false;
+    if (dateRange === 'TODAY') return date === today;
+    if (dateRange === 'YESTERDAY') return date === yesterdayKey;
+    if (dateRange === 'WEEK') return date >= weekStartKey && date <= today;
+    if (dateRange === 'MONTH') return date.slice(0, 7) === today.slice(0, 7) && date <= today;
+    return (!fromDate || date >= fromDate) && (!toDate || date <= toDate);
+  };
+  const filteredInvoices = invoices.filter(inv => includesDate(reportDateKey(inv.invoiceDate ?? inv.date)));
+
+  // Use receipt dates independently of invoice dates so earlier-invoice receipts stay in range.
+  const blankDay = () => ({ invoices: 0, sales: 0, gst: 0, due: 0, same: 0, earlier: 0, cash: 0, nonCash: 0 });
+  const dailyTotals = new Map<string, ReturnType<typeof blankDay>>();
+  const getDay = (key: string) => {
+    const day = dailyTotals.get(key) ?? blankDay();
+    dailyTotals.set(key, day);
+    return day;
+  };
+  for (const invoice of invoices) {
+    const invoiceDate = reportDateKey(invoice.invoiceDate ?? invoice.date);
+    if (invoiceDate && includesDate(invoiceDate) && invoice.status !== 'CANCELLED' && invoice.status !== 'ESTIMATE') {
+      const day = getDay(invoiceDate);
+      day.invoices += 1;
+      day.sales += invoice.grandTotal ?? invoice.totalAmount ?? invoice.productTotalValue;
+      day.gst += (invoice.cgstTotal ?? invoice.items.reduce((sum, item) => sum + item.cgstAmount, 0)) +
+        (invoice.sgstTotal ?? invoice.items.reduce((sum, item) => sum + item.sgstAmount, 0));
+      day.due += invoice.balanceDue;
+    }
+    if (!invoiceDate || invoice.status === 'ESTIMATE') continue;
+    const receipts = invoice.paymentTransactions?.length ? invoice.paymentTransactions : invoice.payments ?? [];
+    for (const receipt of receipts) {
+      const date = reportDateKey(receipt.date) ?? reportDateKey(receipt.timestamp);
+      const mode = String(receipt.mode).toUpperCase();
+      if (!date || date < invoiceDate || !includesDate(date) || !(receipt.amount > 0) ||
+          !Number.isFinite(receipt.amount) || ['OLD_GOLD_EXCHANGE', 'CUSTOMER_CREDIT'].includes(mode)) continue;
+      const day = getDay(date);
+      day[date === invoiceDate ? 'same' : 'earlier'] += receipt.amount;
+      day[mode === 'CASH' ? 'cash' : 'nonCash'] += receipt.amount;
+    }
+  }
+  const dayBookRows = [...dailyTotals.entries()].sort(([a], [b]) => b.localeCompare(a));
+  const dayBookValues = (day: ReturnType<typeof blankDay>) => [
+    day.invoices, day.sales, day.gst, day.due, day.same, day.earlier,
+    null, null, null, day.cash + day.nonCash, day.cash, day.nonCash, null, null
+  ];
 
   const totalGrossSales = filteredInvoices.reduce((acc, inv) => acc + (inv.productTotalValue || inv.totalAmount || 0), 0);
   const totalNetPayable = filteredInvoices.reduce((acc, inv) => acc + (inv.netPayable ?? inv.finalPayableAmount ?? inv.productTotalValue ?? 0), 0);
@@ -160,6 +205,14 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
   }, [filteredInvoices]);
 
   const handleExportCSV = (reportName: string = 'Sales_Register') => {
+    if (activeReportTab === 1) {
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+        dayBookColumns, ...dayBookRows.map(([date, day]) => [date, ...dayBookValues(day)])
+      ]), 'Daily Sales');
+      XLSX.writeFile(workbook, 'Daily_Sales_' + today + '.csv', { bookType: 'csv' });
+      return;
+    }
     const headers = ['Invoice No', 'Date', 'Customer', 'Items Count', 'Gross Value', 'Old Gold Credit', 'Net Payable', 'Paid', 'Balance', 'Salesperson'];
     const rows = filteredInvoices.map(inv => [
       inv.invoiceNo || inv.invoiceNumber || 'INV',
@@ -201,7 +254,9 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
       'Payment Mode': inv.paymentMode || 'CASH'
     }));
 
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const ws = activeReportTab === 1 ? XLSX.utils.aoa_to_sheet([
+      dayBookColumns, ...dayBookRows.map(([date, day]) => [date, ...dayBookValues(day)])
+    ]) : XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Sales Register');
     XLSX.writeFile(wb, `${cleanTitle}_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -313,21 +368,23 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
           </div>
 
           {/* Custom Date Pickers */}
-          {dateRange === 'CUSTOM' && (
+          {(
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface2)', padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)' }}>
               <span className="helper" style={{ fontSize: 11, margin: 0 }}>From</span>
               <input
                 type="date"
-                value={fromDate}
-                onChange={e => setFromDate(e.target.value)}
+                aria-label="From date"
+                value={dateRange === 'CUSTOM' ? fromDate : ''}
+                onChange={e => { setFromDate(e.target.value); setDateRange('CUSTOM'); }}
                 className="input input-sm"
                 style={{ padding: '2px 6px', fontSize: 12 }}
               />
               <span className="helper" style={{ fontSize: 11, margin: 0 }}>To</span>
               <input
                 type="date"
-                value={toDate}
-                onChange={e => setToDate(e.target.value)}
+                aria-label="To date"
+                value={dateRange === 'CUSTOM' ? toDate : ''}
+                onChange={e => { setToDate(e.target.value); setDateRange('CUSTOM'); }}
                 className="input input-sm"
                 style={{ padding: '2px 6px', fontSize: 12 }}
               />
@@ -468,50 +525,31 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
           </div>
 
           <div className="tbl-wrap">
-            {/* REGISTER 1: Daily sales & collection */}
             {activeReportTab === 1 && (
               <table className="tbl">
+                <caption className="helper text-left px-3 py-2">
+                  Collections shown are invoice receipts. Dashes mark categories without verified ledger data.
+                </caption>
                 <thead>
-                  <tr>
-                    <th>DATE</th>
-                    <th className="num">INVOICES</th>
-                    <th className="num">GROSS SALES (₹)</th>
-                    <th className="num">OLD GOLD (₹)</th>
-                    <th className="num">NET PAYABLE (₹)</th>
-                    <th className="num">COLLECTED (₹)</th>
-                    <th className="num">PENDING (₹)</th>
-                  </tr>
+                  <tr>{dayBookColumns.map((column, index) => (
+                    <th key={column} className={index > 0 ? 'num' : undefined} scope="col">{column}</th>
+                  ))}</tr>
                 </thead>
                 <tbody>
-                  {filteredInvoices.length === 0 ? (
-                    <tr><td colSpan={7} className="empty">No data for this period.</td></tr>
-                  ) : (
-                    <tr>
-                      <td style={{ fontWeight: 600 }}>15 Nov 2026</td>
-                      <td className="num font-bold">{filteredInvoices.length}</td>
-                      <td className="num">₹{totalGrossSales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td className="num" style={{ color: 'var(--gold-d)' }}>₹{totalOldGoldAdjusted.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td className="num font-bold">₹{totalNetPayable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td className="num font-bold" style={{ color: 'var(--success)' }}>₹{totalPaidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td className="num font-bold" style={{ color: totalBalanceDue > 0 ? 'var(--danger)' : 'var(--muted)' }}>
-                        ₹{totalBalanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-                    </tr>
+                  {dayBookRows.length === 0 && (
+                    <tr><td colSpan={dayBookColumns.length} className="empty">No data for this period.</td></tr>
                   )}
-                </tbody>
-                {filteredInvoices.length > 0 && (
-                  <tfoot>
-                    <tr>
-                      <td style={{ fontWeight: 700 }}>Total</td>
-                      <td className="num" style={{ fontWeight: 700 }}>{filteredInvoices.length}</td>
-                      <td className="num" style={{ fontWeight: 700 }}>₹{totalGrossSales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td className="num" style={{ fontWeight: 700 }}>₹{totalOldGoldAdjusted.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td className="num" style={{ fontWeight: 700 }}>₹{totalNetPayable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td className="num" style={{ fontWeight: 700, color: 'var(--success)' }}>₹{totalPaidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td className="num" style={{ fontWeight: 700, color: totalBalanceDue > 0 ? 'var(--danger)' : 'var(--muted)' }}>₹{totalBalanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                  {dayBookRows.map(([date, day]) => (
+                    <tr key={date}>
+                      <td>{displayDate.format(new Date(date + 'T00:00:00Z'))}</td>
+                      {dayBookValues(day).map((value, index) => (
+                        <td className="num" key={dayBookColumns[index + 1]}>
+                          {value === null ? '—' : index === 0 ? value : displayMoney.format(value)}
+                        </td>
+                      ))}
                     </tr>
-                  </tfoot>
-                )}
+                  ))}
+                </tbody>
               </table>
             )}
 
