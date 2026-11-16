@@ -590,4 +590,60 @@ table[data-zebra="on"] tbody tr:nth-child(even),
   background: var(--zebra, #fafaf8);
 }
 
+/* ==========================================================================
+   Module 4 Parity: Services & Repair Orders Tokens
+   Matches: https://dom-app-developer-495779.run.colosoft.com/repairs
+   ========================================================================== */
+
+/* Badges */
+.badge {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 600;
+  gap: 4px;
+  padding: 3px 9px;
+  white-space: nowrap;
+  line-height: normal;
+  border: 1px solid transparent;
+  box-sizing: border-box;
+}
+
+.badge-blue {
+  background-color: #e8f0f5;
+  color: #2e5a75;
+}
+
+.badge-orange {
+  background-color: #fbf1de;
+  color: #7a5113;
+}
+
+.badge-yellow {
+  background-color: #fbf1de;
+  color: #7a5113;
+}
+
+.badge-purple {
+  background-color: #ede9fe;
+  color: #6b21a8;
+}
+
+.badge-green {
+  background-color: #e8f2ec;
+  color: #185b40;
+}
+
+.badge-gray {
+  background-color: #f1f2ef;
+  color: #59615b;
+}
+
+.badge-gold {
+  background-color: #f4ebdd;
+  color: #7a6440;
+}
+
+
 

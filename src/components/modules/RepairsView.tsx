@@ -31,24 +31,24 @@ interface NewRepairItemRow {
 const REPAIR_STATUS_STEPS: { key: RepairStatus; label: string; badge: string; desc: string }[] = [
   { key: 'RECEIVED', label: 'Received', badge: 'badge-blue', desc: 'Intake logged & item custody verified' },
   { key: 'ESTIMATED', label: 'Estimated', badge: 'badge-yellow', desc: 'Labour & metal cost estimated' },
-  { key: 'IN_WORKSHOP', label: 'In Workshop', badge: 'badge-orange', desc: 'Assigned to karigar bench for repair' },
-  { key: 'QC_READY', label: 'QC Ready', badge: 'badge-purple', desc: 'Polished, cleaned & quality checked' },
+  { key: 'IN_WORKSHOP', label: 'In Progress', badge: 'badge-orange', desc: 'Assigned to karigar bench for repair' },
+  { key: 'QC_READY', label: 'Ready', badge: 'badge-purple', desc: 'Polished, cleaned & quality checked' },
   { key: 'DELIVERED', label: 'Delivered', badge: 'badge-green', desc: 'Handed over to customer with payment settled' }
 ];
 
 const normalizeRepairStatus = (st: string): { key: RepairStatus; label: string; badge: string; stepIdx: number } => {
   const s = String(st || '').toUpperCase();
-  if (s === 'RECEIVED') return { key: 'RECEIVED', label: 'Received', badge: 'badge-blue', stepIdx: 0 };
-  if (s === 'ESTIMATED') return { key: 'ESTIMATED', label: 'Estimated', badge: 'badge-yellow', stepIdx: 1 };
+  if (s === 'RECEIVED') return { key: 'RECEIVED', label: 'received', badge: 'badge-blue', stepIdx: 0 };
+  if (s === 'ESTIMATED') return { key: 'ESTIMATED', label: 'estimated', badge: 'badge-yellow', stepIdx: 1 };
   if (s === 'IN_WORKSHOP' || s === 'IN_PROGRESS' || s === 'ASSIGNED_KARIGAR') {
-    return { key: 'IN_WORKSHOP', label: 'In Workshop', badge: 'badge-orange', stepIdx: 2 };
+    return { key: 'IN_WORKSHOP', label: 'in progress', badge: 'badge-orange', stepIdx: 2 };
   }
   if (s === 'QC_READY' || s === 'QC_PASSED' || s === 'READY') {
-    return { key: 'QC_READY', label: 'QC Ready', badge: 'badge-purple', stepIdx: 3 };
+    return { key: 'QC_READY', label: 'ready for delivery', badge: 'badge-purple', stepIdx: 3 };
   }
-  if (s === 'DELIVERED') return { key: 'DELIVERED', label: 'Delivered', badge: 'badge-green', stepIdx: 4 };
-  if (s === 'CANCELLED') return { key: 'cancelled', label: 'Cancelled', badge: 'badge-gray', stepIdx: -1 };
-  return { key: 'RECEIVED', label: 'Received', badge: 'badge-blue', stepIdx: 0 };
+  if (s === 'DELIVERED') return { key: 'DELIVERED', label: 'delivered', badge: 'badge-green', stepIdx: 4 };
+  if (s === 'CANCELLED') return { key: 'cancelled', label: 'cancelled', badge: 'badge-gray', stepIdx: -1 };
+  return { key: 'RECEIVED', label: 'received', badge: 'badge-blue', stepIdx: 0 };
 };
 
 const DEFAULT_SAMPLE_REPAIRS: RepairOrder[] = [
@@ -466,7 +466,20 @@ export const RepairsView: React.FC<RepairsViewProps> = ({
       r.items.some(it => it.description.toLowerCase().includes(q) || it.issueType.toLowerCase().includes(q));
 
     const norm = normalizeRepairStatus(r.status);
-    const matchesStatus = statusFilter === 'all' || norm.key === statusFilter || r.status === statusFilter;
+    let matchesStatus = true;
+    if (statusFilter === 'all') {
+      matchesStatus = true;
+    } else if (statusFilter === 'received') {
+      matchesStatus = norm.key === 'RECEIVED' || String(r.status).toLowerCase() === 'received';
+    } else if (statusFilter === 'in_progress') {
+      matchesStatus = norm.key === 'IN_WORKSHOP' || norm.key === 'ESTIMATED' || String(r.status).toLowerCase().includes('progress') || String(r.status).toLowerCase().includes('workshop');
+    } else if (statusFilter === 'ready') {
+      matchesStatus = norm.key === 'QC_READY' || String(r.status).toLowerCase().includes('ready');
+    } else if (statusFilter === 'delivered') {
+      matchesStatus = norm.key === 'DELIVERED' || String(r.status).toLowerCase() === 'delivered';
+    } else {
+      matchesStatus = norm.key === statusFilter || r.status === statusFilter;
+    }
     const matchesFrom = !fromDate || r.receivedDate >= fromDate;
     const matchesTo = !toDate || r.receivedDate <= toDate;
 
@@ -485,11 +498,11 @@ export const RepairsView: React.FC<RepairsViewProps> = ({
   const totalRevenue = repairs.reduce((s, r) => s + (r.totalCost || 0), 0);
 
   return (
-    <div className="page" style={{ padding: 0 }}>
+    <div className="page">
       {/* Header */}
       <div className="page-hdr">
         <div className="page-hdr-left">
-          <h1>Repair Orders & Workshop Job Cards</h1>
+          <h1>Repair Orders</h1>
           <p>Custody intake weight verification · Issue checklist · Karigar workshop assignment · Status progression</p>
         </div>
         <div className="btn-group">
@@ -498,7 +511,7 @@ export const RepairsView: React.FC<RepairsViewProps> = ({
             onClick={() => setShowNewRepairModal(true)}
           >
             <Plus size={14} />
-            <span>New Repair</span>
+            <span>New Repair Order</span>
           </button>
         </div>
       </div>
@@ -532,15 +545,15 @@ export const RepairsView: React.FC<RepairsViewProps> = ({
         </div>
       </div>
 
-      {/* Filter Row with Progression Tabs */}
-      <div className="search-row" style={{ flexWrap: 'wrap', gap: 10 }}>
-        <div className="search-box" style={{ flex: 1, minWidth: 260 }}>
+      {/* Filter Row with Progression Filter Pills */}
+      <div className="search-row" style={{ flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 16 }}>
+        <div className="search-box">
           <Search size={16} />
           <input 
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search job no, receipt, customer or karigar..."
+            placeholder="Search by Repair No, Customer Name, Mobile..."
           />
         </div>
         <button 
@@ -563,23 +576,22 @@ export const RepairsView: React.FC<RepairsViewProps> = ({
           Clear
         </button>
 
-        <div className="tabs" style={{ marginBottom: 0, borderBottom: 'none', overflowX: 'auto' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginLeft: 'auto' }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginRight: 4 }}>Filter:</span>
           {[
-            { id: 'all', label: 'All Orders' },
-            { id: 'RECEIVED', label: 'Received' },
-            { id: 'ESTIMATED', label: 'Estimated' },
-            { id: 'IN_WORKSHOP', label: 'In Workshop' },
-            { id: 'QC_READY', label: 'QC Ready' },
-            { id: 'DELIVERED', label: 'Delivered' }
-          ].map(st => (
+            { id: 'all', label: 'All' },
+            { id: 'received', label: 'Received' },
+            { id: 'in_progress', label: 'In Progress' },
+            { id: 'ready', label: 'Ready' },
+            { id: 'delivered', label: 'Delivered' }
+          ].map(f => (
             <button
-              key={st.id}
+              key={f.id}
               type="button"
-              onClick={() => setStatusFilter(st.id)}
-              className={`tab ${statusFilter === st.id ? 'active' : ''}`}
-              style={{ padding: '6px 12px', fontSize: 12.5 }}
+              onClick={() => setStatusFilter(f.id)}
+              className={`filter-pill ${statusFilter === f.id ? 'active' : ''}`}
             >
-              {st.label}
+              {f.label}
             </button>
           ))}
         </div>
@@ -669,7 +681,7 @@ export const RepairsView: React.FC<RepairsViewProps> = ({
         </div>
 
         <div className="tbl-wrap">
-          <table style={{ width: '100%', fontSize: 13 }}>
+          <table className="table-zebra" style={{ width: '100%' }}>
             <thead>
               <tr>
                 <th style={{ width: 120 }}>Job No</th>
@@ -747,19 +759,9 @@ export const RepairsView: React.FC<RepairsViewProps> = ({
                         ₹{r.balanceDue.toLocaleString('en-IN')}
                       </td>
                       <td style={{ textAlign: 'center' }}>
-                        <select
-                          value={norm.key}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => handleStatusChange(r.id, e.target.value as RepairStatus)}
-                          className={`badge ${norm.badge}`}
-                          style={{ cursor: 'pointer', border: 'none', outline: 'none' }}
-                        >
-                          <option value="RECEIVED">RECEIVED</option>
-                          <option value="ESTIMATED">ESTIMATED</option>
-                          <option value="IN_WORKSHOP">IN WORKSHOP</option>
-                          <option value="QC_READY">QC READY</option>
-                          <option value="DELIVERED">DELIVERED</option>
-                        </select>
+                        <span className={`badge ${norm.badge}`}>
+                          {norm.label}
+                        </span>
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <div className="btn-group" style={{ justifyContent: 'flex-end' }}>
@@ -834,10 +836,10 @@ export const RepairsView: React.FC<RepairsViewProps> = ({
       {/* --- NEW REPAIR INTAKE MODAL --- */}
       {showNewRepairModal && (
         <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowNewRepairModal(false); }}>
-          <form onSubmit={handleCreateRepair} className="modal modal-xl">
+          <form onSubmit={handleCreateRepair} className="modal modal-lg">
             <div className="modal-head">
               <div>
-                <span className="card-title">New Jewellery Repair Order</span>
+                <h3>New Repair Order</h3>
                 <div className="helper">Intake custody weight verification · Issue checklist · Karigar workshop assignment</div>
               </div>
               <button 
@@ -1260,7 +1262,10 @@ export const RepairsView: React.FC<RepairsViewProps> = ({
         <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowReceiptModal(false); }}>
           <div className="modal modal-md">
             <div className="modal-head">
-              <span className="card-title">Customer Custody Token · {selectedRepair.receiptNo}</span>
+              <div>
+                <h3>Repair Job Card / Receipt</h3>
+                <div className="helper">Customer Custody Token · {selectedRepair.receiptNo}</div>
+              </div>
               <button 
                 type="button" 
                 className="btn btn-outline btn-xs"
