@@ -3,4 +3,4 @@ dist
 .git
 .DS_Store
 *.log
-database
+database/*.gz
