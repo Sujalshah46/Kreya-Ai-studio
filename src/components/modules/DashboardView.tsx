@@ -264,10 +264,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
 
-            {/* Today's Collections */}
+            {/* Today's Cash In */}
             <div className="kpi-card" onClick={() => onNavigate('payments')} style={{ cursor: 'pointer' }}>
               <div className="kpi-top">
-                <span className="kpi-label" title="Today's Cash In">Today's Collections</span>
+                <span className="kpi-label">Today's Cash In</span>
                 <span className="kpi-ico good">
                   <Activity className="w-4 h-4" />
                 </span>
@@ -281,10 +281,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
 
-            {/* Outstanding Receivables */}
+            {/* Outstanding */}
             <div className="kpi-card" onClick={() => onNavigate('payments')} style={{ cursor: 'pointer' }}>
               <div className="kpi-top">
-                <span className="kpi-label" title="Outstanding">Outstanding Receivables</span>
+                <span className="kpi-label">Outstanding</span>
                 <span className="kpi-ico warn">
                   <AlertTriangle className="w-4 h-4" />
                 </span>
@@ -516,10 +516,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           {/* 4. Secondary Operations KPI Grid */}
           <div className="dash-kpis small">
-            {/* Active Loans */}
+            {/* Loan Portfolio */}
             <div className="kpi-card small" onClick={() => onNavigate('loans')} style={{ cursor: 'pointer' }}>
               <div className="kpi-top">
-                <span className="kpi-label" title="Loan Portfolio">Active Loans</span>
+                <span className="kpi-label">Loan Portfolio</span>
                 <span className="kpi-ico">
                   <CreditCard className="w-3.5 h-3.5" />
                 </span>
@@ -586,10 +586,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="kpi-sub">Items to be delivered</div>
             </div>
 
-            {/* Open Repairs */}
+            {/* Pending Repairs */}
             <div className="kpi-card small" onClick={() => onNavigate('repairs')} style={{ cursor: 'pointer' }}>
               <div className="kpi-top">
-                <span className="kpi-label" title="Pending Repairs">Open Repairs</span>
+                <span className="kpi-label">Pending Repairs</span>
                 <span className="kpi-ico">
                   <Wrench className="w-3.5 h-3.5" />
                 </span>
@@ -614,10 +614,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="kpi-sub">Advance bookings active</div>
             </div>
 
-            {/* Low Stock Alerts */}
+            {/* Inventory Items */}
             <div className="kpi-card small" onClick={() => onNavigate('inventory')} style={{ cursor: 'pointer' }}>
               <div className="kpi-top">
-                <span className="kpi-label" title="Inventory Items">Low Stock Alerts</span>
+                <span className="kpi-label">Inventory Items</span>
                 <span className="kpi-ico">
                   <Package className="w-3.5 h-3.5" />
                 </span>
