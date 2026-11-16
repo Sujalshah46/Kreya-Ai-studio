@@ -2758,6 +2758,158 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                 </div>
               )}
 
+              {/* Sub-tab: DETAILS */}
+              {orderDetailSubTab === 'details' && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 14 }}>
+                    {/* Box 1: Order Metadata */}
+                    <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 14, border: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.04em', marginBottom: 8, textTransform: 'uppercase' }}>
+                        Order Metadata
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '6px 8px', fontSize: 12 }}>
+                        <div style={{ color: 'var(--muted)' }}>Order / Invoice</div>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 700 }}>{selectedInvoiceForView.invoiceNo}</div>
+                        <div style={{ color: 'var(--muted)' }}>Date & Time</div>
+                        <div>{selectedInvoiceForView.invoiceDate} {selectedInvoiceForView.invoiceTime || '21:27'}</div>
+                        <div style={{ color: 'var(--muted)' }}>Counter & Reg</div>
+                        <div>Counter MAIN · REG-2026-00001</div>
+                        <div style={{ color: 'var(--muted)' }}>Billed By</div>
+                        <div>{selectedInvoiceForView.salesperson || 'Admin'}</div>
+                        <div style={{ color: 'var(--muted)' }}>Place of Supply</div>
+                        <div>{selectedInvoiceForView.placeOfSupply || '27 Maharashtra'}</div>
+                        <div style={{ color: 'var(--muted)' }}>Order Status</div>
+                        <div>
+                          <span className={`badge ${selectedInvoiceForView.status === 'COMPLETED' ? 'badge-green' : selectedInvoiceForView.status === 'CANCELLED' ? 'badge-red' : 'badge-yellow'}`}>
+                            {selectedInvoiceForView.status || 'PENDING'}
+                          </span>
+                        </div>
+                        <div style={{ color: 'var(--muted)' }}>Delivery Status</div>
+                        <div>
+                          <span className={`badge ${selectedInvoiceForView.deliveryStatus === 'PENDING_COLLECTION' ? 'badge-yellow' : 'badge-blue'}`}>
+                            {selectedInvoiceForView.deliveryStatus === 'PENDING_COLLECTION' ? 'PENDING COLLECTION' : 'DELIVERED'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Box 2: Customer Profile */}
+                    <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 14, border: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.04em', marginBottom: 8, textTransform: 'uppercase' }}>
+                        Customer Profile
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '6px 8px', fontSize: 12 }}>
+                        <div style={{ color: 'var(--muted)' }}>Customer Name</div>
+                        <div style={{ fontWeight: 700 }}>{selectedInvoiceForView.customer.name}</div>
+                        <div style={{ color: 'var(--muted)' }}>Customer Code</div>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 600 }}>{selectedInvoiceForView.customer.code || 'CUST-00001'}</div>
+                        <div style={{ color: 'var(--muted)' }}>Mobile</div>
+                        <div style={{ fontFamily: 'monospace' }}>{selectedInvoiceForView.customer.mobile || selectedInvoiceForView.customer.phone}</div>
+                        <div style={{ color: 'var(--muted)' }}>City / State</div>
+                        <div>{[selectedInvoiceForView.customer.city, selectedInvoiceForView.customer.state || 'Maharashtra'].filter(Boolean).join(', ')}</div>
+                        <div style={{ color: 'var(--muted)' }}>Address</div>
+                        <div>{selectedInvoiceForView.customer.address || selectedInvoiceForView.customer.city || 'Mumbai'}</div>
+                        <div style={{ color: 'var(--muted)' }}>PAN</div>
+                        <div style={{ fontFamily: 'monospace' }}>{selectedInvoiceForView.customer.pan || '—'}</div>
+                        <div style={{ color: 'var(--muted)' }}>GSTIN</div>
+                        <div style={{ fontFamily: 'monospace' }}>{selectedInvoiceForView.customer.gstin || 'Unregistered Consumer (B2C)'}</div>
+                      </div>
+                    </div>
+
+                    {/* Box 3: Statutory Tax & Price Ledger */}
+                    <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 14, border: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.04em', marginBottom: 8, textTransform: 'uppercase' }}>
+                        Price & Tax Breakdown
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '6px 8px', fontSize: 12 }}>
+                        <div style={{ color: 'var(--muted)' }}>Gross Metal Value</div>
+                        <div className="num" style={{ textAlign: 'right', fontWeight: 600 }}>
+                          ₹{selectedInvoiceForView.items.reduce((s, it) => s + (it.metalValue || (it.netWeight * (it.metalRatePerGram || 15000))), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </div>
+                        <div style={{ color: 'var(--muted)' }}>Making Charges</div>
+                        <div className="num" style={{ textAlign: 'right', fontWeight: 600 }}>
+                          ₹{selectedInvoiceForView.items.reduce((s, it) => s + (it.makingAmount || it.makingCharges || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </div>
+                        <div style={{ color: 'var(--muted)' }}>Taxable Value</div>
+                        <div className="num" style={{ textAlign: 'right', fontWeight: 700 }}>
+                          ₹{(selectedInvoiceForView.taxableAmount || selectedInvoiceForView.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </div>
+                        <div style={{ color: 'var(--muted)' }}>CGST (1.5%)</div>
+                        <div className="num" style={{ textAlign: 'right' }}>
+                          ₹{(selectedInvoiceForView.cgstTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </div>
+                        <div style={{ color: 'var(--muted)' }}>SGST (1.5%)</div>
+                        <div className="num" style={{ textAlign: 'right' }}>
+                          ₹{(selectedInvoiceForView.sgstTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </div>
+                        <div style={{ color: 'var(--muted)' }}>Total GST (3%)</div>
+                        <div className="num" style={{ textAlign: 'right', fontWeight: 600 }}>
+                          ₹{((selectedInvoiceForView.cgstTotal || 0) + (selectedInvoiceForView.sgstTotal || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </div>
+                        <div style={{ color: 'var(--muted)', borderTop: '1px solid var(--border)', paddingTop: 4, fontWeight: 700 }}>Grand Total</div>
+                        <div className="num amt-primary" style={{ textAlign: 'right', borderTop: '1px solid var(--border)', paddingTop: 4, fontWeight: 800 }}>
+                          ₹{(selectedInvoiceForView.grandTotal ?? selectedInvoiceForView.totalAmount ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </div>
+                        <div style={{ color: 'var(--success)' }}>Amount Paid</div>
+                        <div className="num amt-green" style={{ textAlign: 'right', fontWeight: 700 }}>
+                          ₹{(selectedInvoiceForView.paidAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </div>
+                        <div style={{ color: 'var(--danger)', fontWeight: 700 }}>Balance Due</div>
+                        <div className="num" style={{ textAlign: 'right', fontWeight: 800, color: 'var(--danger)' }}>
+                          ₹{(selectedInvoiceForView.balanceDue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Statutory Compliance Bar */}
+                  <div style={{ 
+                    background: 'var(--surface2, #f8fafc)', 
+                    borderRadius: 8, 
+                    padding: '10px 14px', 
+                    border: '1px solid var(--border)', 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    flexWrap: 'wrap', 
+                    gap: 10,
+                    fontSize: 11
+                  }}>
+                    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                      <div><strong>BIS License:</strong> HM/C-7592841</div>
+                      <div><strong>HSN Code:</strong> 7113 (Gold Jewellery)</div>
+                      <div><strong>GST Composition:</strong> 3% Composite / Hallmarked</div>
+                      <div><strong>Reverse Charge:</strong> No</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button 
+                        type="button" 
+                        className="btn btn-xs btn-outline"
+                        onClick={() => setShowTaxInvoiceModal(selectedInvoiceForView)}
+                      >
+                        <FileText size={11} /> GST Tax Invoice
+                      </button>
+                      <button 
+                        type="button" 
+                        className="btn btn-xs btn-outline"
+                        onClick={() => {
+                          const firstPay = (selectedInvoiceForView.payments || [])[0] || {
+                            id: 'p1',
+                            receiptNo: 'PAY-2026-00001',
+                            date: '15 Nov 2026',
+                            mode: 'Cash',
+                            amount: 10000
+                          };
+                          setSelectedReceiptFor80mm({ receipt: firstPay, order: selectedInvoiceForView });
+                        }}
+                      >
+                        <Printer size={11} /> 80mm Receipt
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Collect Payment Box */}
               <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 14, marginBottom: 16 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: 'var(--graphite)' }}>
@@ -3089,27 +3241,31 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
 
               {/* Jewellery Block */}
               <div style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', marginBottom: 2 }}>
-                  JEWELLERY
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', marginBottom: 4 }}>
+                  JEWELLERY ITEMS ({(selectedReceiptFor80mm.order.items || []).length})
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '3px 8px', fontSize: 11 }}>
-                  <div>Item</div>
-                  <div style={{ fontWeight: 800 }}>
-                    {selectedReceiptFor80mm.order.items[0]?.itemName || 'Gold Chain 22K Rope'}
+                {(selectedReceiptFor80mm.order.items || []).map((it, itIdx) => (
+                  <div key={it.id || itIdx} style={{ marginBottom: itIdx > 0 ? 6 : 4, borderTop: itIdx > 0 ? '1px dotted #ccc' : 'none', paddingTop: itIdx > 0 ? 4 : 0 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '3px 8px', fontSize: 11 }}>
+                      <div>Item</div>
+                      <div style={{ fontWeight: 800 }}>{it.itemName}</div>
+                    </div>
+                    <div style={{ fontSize: 10, color: '#333', marginTop: 2, paddingLeft: 2 }}>
+                      SKU {it.itemCode} · {it.metalType || 'Gold'} {it.purityKarat || '22K'} · Gross {it.grossWeight?.toFixed(3)}g · Net {it.netWeight?.toFixed(3)}g
+                      {it.stoneWeight && it.stoneWeight > 0 ? ` · Stone ${it.stoneWeight.toFixed(3)}g` : ''}
+                      {it.wastagePct ? ` · Wastage ${it.wastagePct}%` : ''}
+                    </div>
+                    {it.huid && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '3px 8px', fontSize: 11, marginTop: 2 }}>
+                        <div>HUID</div>
+                        <div style={{ fontWeight: 700 }}>{it.huid}</div>
+                      </div>
+                    )}
+                    <div style={{ fontSize: 10, color: '#333', marginTop: 2, paddingLeft: 2 }}>
+                      Making @ Rs {it.makingRate || 450}/g {it.makingMode === 'PER_GROSS_GRAM' ? 'gross' : 'net'} = Rs {(it.makingAmount || (it.netWeight * (it.makingRate || 450))).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </div>
                   </div>
-                </div>
-                <div style={{ fontSize: 10, color: '#333', marginTop: 2, paddingLeft: 2 }}>
-                  SKU {selectedReceiptFor80mm.order.items[0]?.itemCode || 'SBJCH-01'} · Gold 22K (916) · Gross {selectedReceiptFor80mm.order.items[0]?.grossWeight?.toFixed(3) || '12.350'} g · Net {selectedReceiptFor80mm.order.items[0]?.netWeight?.toFixed(3) || '12.350'} g
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '3px 8px', fontSize: 11, marginTop: 3 }}>
-                  <div>HUID</div>
-                  <div style={{ fontWeight: 700 }}>
-                    {selectedReceiptFor80mm.order.items[0]?.huid || 'ZX98YU'}
-                  </div>
-                </div>
-                <div style={{ fontSize: 10, color: '#333', marginTop: 2, paddingLeft: 2 }}>
-                  Making @ Rs {selectedReceiptFor80mm.order.items[0]?.makingRate || 450}/g net = Rs {selectedReceiptFor80mm.order.items[0]?.makingAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || '5,557.50'}
-                </div>
+                ))}
               </div>
 
               <div style={{ borderTop: '1px dashed #777', margin: '8px 0' }} />
@@ -3118,7 +3274,7 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
               <div style={{ fontSize: 11, marginBottom: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
                   <span>Order value</span>
-                  <span>₹{(selectedReceiptFor80mm.order.totalAmount || 196532).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span>₹{(selectedReceiptFor80mm.order.grandTotal ?? selectedReceiptFor80mm.order.totalAmount ?? 196532).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
                   <span>Previous payments</span>
@@ -3159,7 +3315,7 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                   <span>Balance pending</span>
                   <span>
                     ₹{(() => {
-                      const ordTotal = selectedReceiptFor80mm.order.totalAmount || 196532;
+                      const ordTotal = selectedReceiptFor80mm.order.grandTotal ?? selectedReceiptFor80mm.order.totalAmount ?? 196532;
                       const allP = selectedReceiptFor80mm.order.payments || [];
                       const curId = selectedReceiptFor80mm.receipt.id || selectedReceiptFor80mm.receipt.receiptNo;
                       let tot = 0;
@@ -3322,22 +3478,30 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <div style={{ width: 280, background: 'var(--bg)', borderRadius: 8, padding: 12 }}>
+                <div style={{ width: 320, background: 'var(--bg)', borderRadius: 8, padding: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
                     <span>Taxable Amount:</span>
-                    <span>₹{(showTaxInvoiceModal.taxableAmount || 190808).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span>₹{(showTaxInvoiceModal.taxableAmount ?? showTaxInvoiceModal.subtotal ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
                     <span>CGST (1.5%):</span>
-                    <span>₹{(showTaxInvoiceModal.cgstTotal || 2862).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span>₹{(showTaxInvoiceModal.cgstTotal ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
                     <span>SGST (1.5%):</span>
-                    <span>₹{(showTaxInvoiceModal.sgstTotal || 2862).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span>₹{(showTaxInvoiceModal.sgstTotal ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 800, borderTop: '1px solid var(--border)', paddingTop: 6, color: 'var(--primary)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 800, borderTop: '1px solid var(--border)', paddingTop: 6, color: 'var(--primary)' }}>
                     <span>Grand Total:</span>
-                    <span>₹{(showTaxInvoiceModal.totalAmount || 196532).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span>₹{(showTaxInvoiceModal.grandTotal ?? showTaxInvoiceModal.totalAmount ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 4, color: 'var(--success)' }}>
+                    <span>Amount Paid:</span>
+                    <span style={{ fontWeight: 700 }}>₹{(showTaxInvoiceModal.paidAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 4, color: (showTaxInvoiceModal.balanceDue || 0) > 0 ? 'var(--danger)' : 'var(--muted)' }}>
+                    <span style={{ fontWeight: 700 }}>Balance Due:</span>
+                    <span style={{ fontWeight: 800 }}>₹{(showTaxInvoiceModal.balanceDue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
               </div>
