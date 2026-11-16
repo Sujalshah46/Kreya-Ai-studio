@@ -203,14 +203,37 @@ body {
 .btn {
   line-height: normal;
   min-height: 38px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .btn-xs {
   min-height: 28px;
+  height: 28px;
+  font-size: 11.5px;
+  font-weight: 600;
   line-height: normal;
+  padding: 4px 9px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .btn-sm {
   min-height: 32px;
+  height: 32px;
+  font-size: 12.5px;
+  font-weight: 600;
   line-height: normal;
+  padding: 6px 12px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .card {
@@ -227,11 +250,215 @@ thead th {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   padding: 11px 13px;
+  background-color: var(--thead);
+  color: var(--muted);
 }
 
 td,
 tbody td {
   font-size: 13px;
   padding: 12px 13px;
+  color: var(--text);
+  line-height: 1.55;
 }
+
+/* ==========================================================================
+   Module 2 Parity: Customers & Payments Styles
+   Matches: https://dom-app-developer-495779.run.colosoft.com/
+   ========================================================================== */
+
+.page {
+  max-width: 1480px;
+  padding: 24px 28px 28px;
+  width: 100%;
+}
+
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border2, #d5dad4);
+  border-radius: 10px;
+  width: 380px;
+  height: 38px;
+}
+
+.search-box input {
+  font-size: 13.5px;
+  font-weight: 400;
+  border: none;
+  background: transparent;
+  color: var(--text, #202522);
+  outline: none;
+  width: 100%;
+  line-height: normal;
+}
+
+/* Filter pills */
+.filter-pill {
+  height: 28px;
+  padding: 4px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid var(--border2, #d5dad4);
+  background: var(--surface, #ffffff);
+  color: var(--muted, #626b65);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: all 0.15s ease;
+}
+
+.filter-pill.active,
+.filter-pill:hover {
+  background: var(--primary, #237a57);
+  color: #ffffff;
+  border-color: var(--primary, #237a57);
+}
+
+/* Modals */
+.modal-lg {
+  max-width: 880px !important;
+  width: 100%;
+  border-radius: 20px;
+  box-shadow: 0 18px 44px rgba(23, 28, 25, 0.14), 0 4px 12px rgba(23, 28, 25, 0.06);
+}
+
+.modal-md {
+  max-width: 640px !important;
+  width: 100%;
+  border-radius: 20px;
+}
+
+.modal-sm {
+  max-width: 460px !important;
+  width: 100%;
+  border-radius: 20px;
+}
+
+.modal-head h3 {
+  font-size: 16.5px;
+  font-weight: 650;
+}
+
+.modal label.label,
+.modal .label {
+  font-size: 12.5px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text2, #3f4742);
+}
+
+.modal input.input,
+.modal select.input {
+  height: 40px;
+  font-size: 13.5px;
+  border-radius: 10px;
+  border: 1px solid var(--border2, #d5dad4);
+}
+
+/* Sum Grid & Stat Cards */
+.sum-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.sum-box {
+  padding: 13px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #e5e8e4);
+  background: var(--surface2, #fbfbf9);
+}
+
+.sum-val {
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 29.45px;
+}
+
+.sum-lbl {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--muted, #626b65);
+  margin-top: 3px;
+  text-transform: uppercase;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border, #e5e8e4);
+  background: var(--surface, #ffffff);
+  box-shadow: 0 1px 2px rgba(23, 28, 25, 0.04);
+}
+
+.stat-val {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 19.55px;
+}
+
+.stat-lbl {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted, #626b65);
+  margin-top: 3px;
+}
+
+/* Pay modes */
+.pay-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pay-chip {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid var(--border2, #d5dad4);
+  background: var(--surface, #ffffff);
+  color: var(--text, #202522);
+  cursor: pointer;
+  line-height: normal;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.pay-chip.sel,
+.pay-chip:hover {
+  background: var(--primary, #237a57);
+  color: #ffffff;
+  border-color: var(--primary, #237a57);
+}
+
+/* Zebra Striping */
+.table-zebra tbody tr:nth-child(even),
+table[data-zebra="on"] tbody tr:nth-child(even),
+.tbl-wrap table tbody tr:nth-child(even) {
+  background: var(--zebra, #fafaf8);
+}
+
 

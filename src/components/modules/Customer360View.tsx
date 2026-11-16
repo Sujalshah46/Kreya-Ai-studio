@@ -221,6 +221,7 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [customerFilter, setCustomerFilter] = useState<'all' | 'balance' | 'zero' | 'retail' | 'wholesale'>('all');
 
   // Pagination for customers directory
   const [pageSize, setPageSize] = useState<number>(25);
@@ -292,15 +293,19 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
   const [newVisitSalesperson, setNewVisitSalesperson] = useState('Counter 1 (Rajesh)');
   const [newVisitNotes, setNewVisitNotes] = useState('');
 
-  // Customer Account Profile Drawer Tabs: Overview, Ledger, KYC & Documents, Family & Dates
-  const [customerDrawerTab, setCustomerDrawerTab] = useState<'overview' | 'ledger' | 'kyc' | 'family'>('overview');
+  // Customer Account Profile Drawer Tabs: Overview, Invoices, Payments, Ledger, Loans, Repairs, KYC, Family
+  const [customerDrawerTab, setCustomerDrawerTab] = useState<'overview' | 'invoices' | 'payments' | 'ledger' | 'loans' | 'repairs' | 'kyc' | 'family'>('overview');
   const [showProfileDrawer, setShowProfileDrawer] = useState<Customer | null>(null);
   const [activeDossierTab, setActiveDossierTab] = useState<string>('orders');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const [balanceFilter, setBalanceFilter] = useState<'all' | 'due' | 'zero' | 'advance'>('all');
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, isError = false) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+    setToastType(isError ? 'error' : 'success');
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -482,73 +487,84 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
 
     if (!formName.trim() || !formMobile.trim()) {
       setActiveModalTab('basic');
-      alert('Name and mobile are required');
+      showToast('Name and mobile are required', true);
       return;
     }
 
     if (liveMobileError) {
       setActiveModalTab('basic');
-      alert(liveMobileError);
+      showToast(liveMobileError, true);
+      return;
+    }
+
+    // Duplicate phone validation matching original ERP
+    const cleanPhone = cleanMobile(formMobile);
+    const dupCustomer = customerList.find(
+      c => c.id !== formId && cleanMobile(c.mobile || c.phone || '') === cleanPhone
+    );
+    if (dupCustomer) {
+      setActiveModalTab('basic');
+      showToast(`Mobile ${cleanPhone} already belongs to ${dupCustomer.name} (${dupCustomer.code}). Open that customer instead of creating a new one.`, true);
       return;
     }
 
     if (liveAltMobileError) {
       setActiveModalTab('basic');
-      alert(liveAltMobileError);
+      showToast(liveAltMobileError, true);
       return;
     }
 
     if (liveEmailError) {
       setActiveModalTab('basic');
-      alert(liveEmailError);
+      showToast(liveEmailError, true);
       return;
     }
 
     if (Number(formOpeningBalance) < 0) {
       setActiveModalTab('basic');
-      alert('Opening balance cannot be negative');
+      showToast('Opening balance cannot be negative', true);
       return;
     }
 
     if (Number(formCreditLimit) < 0) {
       setActiveModalTab('basic');
-      alert('Credit limit cannot be negative');
+      showToast('Credit limit cannot be negative', true);
       return;
     }
 
-    if (livePincodeError) {
+    if (livePincodeError && formPincode.trim().length > 0) {
       setActiveModalTab('address');
-      alert(livePincodeError);
+      showToast(livePincodeError, true);
       return;
     }
 
-    if (liveAadhaarError) {
+    if (liveAadhaarError && formAadhaar.trim().length > 0) {
       setActiveModalTab('kyc');
-      alert(liveAadhaarError);
+      showToast(liveAadhaarError, true);
       return;
     }
 
-    if (livePanError) {
+    if (livePanError && formPan.trim().length > 0) {
       setActiveModalTab('kyc');
-      alert(livePanError);
+      showToast(livePanError, true);
       return;
     }
 
-    if (liveGstError) {
+    if (liveGstError && formGst.trim().length > 0) {
       setActiveModalTab('kyc');
-      alert(liveGstError);
+      showToast(liveGstError, true);
       return;
     }
 
-    if (liveDobError) {
+    if (liveDobError && formDob.trim().length > 0) {
       setActiveModalTab('kyc');
-      alert(liveDobError);
+      showToast(liveDobError, true);
       return;
     }
 
-    if (liveAnniversaryError) {
+    if (liveAnniversaryError && formAnniversary.trim().length > 0) {
       setActiveModalTab('kyc');
-      alert(liveAnniversaryError);
+      showToast(liveAnniversaryError, true);
       return;
     }
 
@@ -561,11 +577,13 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
       [formDaughterMobile, "Daughter's mobile"]
     ];
     for (const [mob, lbl] of familyMobiles) {
-      const err = validateMobile(mob, lbl);
-      if (err) {
-        setActiveModalTab('family');
-        alert(err);
-        return;
+      if (mob.trim()) {
+        const err = validateMobile(mob, lbl);
+        if (err) {
+          setActiveModalTab('family');
+          showToast(err, true);
+          return;
+        }
       }
     }
 
@@ -632,20 +650,40 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
     setShowCustomerModal(false);
   };
 
+  const handleDeleteCustomer = (cust: Customer) => {
+    const updated = customerList.filter(c => c.id !== cust.id);
+    setCustomerList(updated);
+    onUpdateCustomers?.(updated);
+    setCustomerToDelete(null);
+    if (selectedCustomerId === cust.id) setSelectedCustomerId(null);
+    if (showProfileDrawer?.id === cust.id) setShowProfileDrawer(null);
+    showToast('Customer deleted');
+  };
+
   const selectedCustomer = customerList.find(c => c.id === selectedCustomerId) || null;
 
-  // Filtered customer list for search
+  // Filtered customer list for search and balance filter
   const filteredCustomers = useMemo(() => {
-    if (!searchQuery.trim()) return customerList;
+    let list = customerList;
+    if (balanceFilter === 'due') {
+      list = list.filter(c => (c.outstandingBalance || (c as any).opening_balance || 0) > 0);
+    } else if (balanceFilter === 'zero') {
+      list = list.filter(c => (c.outstandingBalance || (c as any).opening_balance || 0) === 0);
+    } else if (balanceFilter === 'advance') {
+      list = list.filter(c => (c.outstandingBalance || (c as any).opening_balance || 0) < 0 || ((c as any).store_credit || 0) > 0);
+    }
+
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase().trim();
-    return customerList.filter(c => 
+    return list.filter(c => 
       c.name.toLowerCase().includes(q) ||
       (c.mobile || c.phone || '').includes(q) ||
       (c.code || '').toLowerCase().includes(q) ||
+      (c.city || '').toLowerCase().includes(q) ||
       ((c as any).aadhar_no || c.aadhaarNumber || '').includes(q) ||
       ((c as any).pan_no || c.pan || '').toLowerCase().includes(q)
     );
-  }, [customerList, searchQuery]);
+  }, [customerList, searchQuery, balanceFilter]);
 
   // Selected customer's specific records
   const custOrders = useMemo(() => {
@@ -894,11 +932,35 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
   let runningLedgerBal = 0;
 
   return (
-    <div>
+    <div className="page" id="main">
       {/* Toast Notification */}
       {toastMessage && (
-        <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 18px', boxShadow: '0 4px 14px rgba(0,0,0,.15)', fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>
-          ✓ {toastMessage}
+        <div 
+          className="kj-toast"
+          style={{ 
+            position: 'fixed', 
+            top: 20, 
+            right: 20, 
+            zIndex: 9999, 
+            background: toastType === 'error' ? 'var(--danger-l, #fef2f2)' : 'var(--surface)', 
+            border: `1px solid ${toastType === 'error' ? 'var(--danger, #ef4444)' : 'var(--border)'}`, 
+            borderRadius: 8, 
+            padding: '10px 18px', 
+            boxShadow: '0 4px 14px rgba(0,0,0,.15)', 
+            fontWeight: 600, 
+            fontSize: 13, 
+            color: toastType === 'error' ? 'var(--danger, #b91c1c)' : 'var(--text)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8
+          }}
+        >
+          {toastType === 'error' ? (
+            <span style={{ color: 'var(--danger)', fontWeight: 700 }}>✕</span>
+          ) : (
+            <span style={{ color: 'var(--primary)', fontWeight: 700 }}>✓</span>
+          )}
+          <span>{toastMessage}</span>
         </div>
       )}
 
@@ -964,6 +1026,28 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                     }}
                   />
                 </div>
+                {/* Balance Filter Chips */}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginRight: 4 }}>Filter:</span>
+                  {[
+                    { id: 'all', label: 'All' },
+                    { id: 'due', label: 'With Balance' },
+                    { id: 'zero', label: 'Zero Balance' },
+                    { id: 'advance', label: 'Advance' }
+                  ].map(bf => (
+                    <button
+                      key={bf.id}
+                      type="button"
+                      className={`filter-pill ${balanceFilter === bf.id ? 'active' : ''}`}
+                      onClick={() => {
+                        setBalanceFilter(bf.id as any);
+                        setCurrentPage(1);
+                      }}
+                    >
+                      {bf.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Desktop Table View */}
@@ -1001,7 +1085,12 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                         const bookingsCount = parseInt(String(c.openBookingsCount || (c as any).open_bookings || 0), 10);
 
                         return (
-                          <tr key={c.id}>
+                          <tr 
+                            key={c.id}
+                            onClick={() => setShowProfileDrawer(c)}
+                            style={{ cursor: 'pointer' }}
+                            title="Click to view Customer 360 profile drawer"
+                          >
                             <td>
                               <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted)' }}>
                                 {formatCustomerCode(c.code, idx)}
@@ -1038,9 +1127,9 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                               {outBal > 0 ? (
                                 <span className="amt-red" style={{ display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
                                   <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="11" width="11" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
-                                    <line x1="12" y1="9" x2="12" y2="13"></line>
-                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
                                   </svg>
                                   {formatCurrency(outBal)}
                                 </span>
@@ -1070,7 +1159,7 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                               )}
                             </td>
                             <td>
-                              <div style={{ display: 'flex', gap: 4 }}>
+                              <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
                                 <button
                                   type="button"
                                   className="btn btn-xs btn-primary"
@@ -1079,23 +1168,10 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                                   style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
                                 >
                                   <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="11" width="11" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                                    <polyline points="15 3 21 3 21 9"></polyline>
-                                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
                                   </svg>
                                   Account
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn btn-xs btn-outline"
-                                  onClick={() => {
-                                    setSelectedCustomerId(c.id);
-                                    setShowProfileDrawer(c);
-                                  }}
-                                  title="Customer Profile Drawer"
-                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                >
-                                  Drawer
                                 </button>
                                 <button
                                   type="button"
@@ -1105,6 +1181,18 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                                 >
                                   <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="11" width="11" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                                  </svg>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-xs btn-outline"
+                                  onClick={() => setCustomerToDelete(c)}
+                                  title="Delete customer"
+                                  style={{ color: 'var(--danger)' }}
+                                >
+                                  <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="11" width="11" xmlns="http://www.w3.org/2000/svg">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                                   </svg>
                                 </button>
                               </div>
@@ -2733,7 +2821,7 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
           ========================================================================= */}
       {showCustomerModal && (
         <div className="overlay" onClick={() => setShowCustomerModal(false)}>
-          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700 }}>
+          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h3 style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
                 <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="15" width="15" xmlns="http://www.w3.org/2000/svg">
@@ -3221,14 +3309,17 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
               </button>
             </div>
 
-            {/* Profile Drawer Tabs: Overview, Ledger, KYC & Documents, Family & Dates */}
-            <div style={{ borderBottom: '1px solid var(--border)', padding: '0 16px' }}>
+            {/* Profile Drawer Tabs: Overview, Invoices, Payments, Ledger, Loans, Repairs, KYC */}
+            <div style={{ borderBottom: '1px solid var(--border)', padding: '0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
               <div className="tabs" style={{ margin: 0 }}>
                 {[
                   ['overview', 'Overview'],
+                  ['invoices', `Invoices (${invoices.filter(i => i.customer?.id === showProfileDrawer.id || i.customer?.name === showProfileDrawer.name).length})`],
+                  ['payments', 'Payments'],
                   ['ledger', 'Ledger'],
-                  ['kyc', 'KYC & Documents'],
-                  ['family', 'Family & Dates']
+                  ['loans', `Loans (${loans.filter(l => l.customer?.id === showProfileDrawer.id || l.customer?.name === showProfileDrawer.name).length})`],
+                  ['repairs', `Repairs (${repairs.filter(r => r.customer?.id === showProfileDrawer.id || r.customer?.name === showProfileDrawer.name).length})`],
+                  ['kyc', 'KYC & Info']
                 ].map(([tabKey, tabLabel]) => (
                   <button
                     key={tabKey}
@@ -3240,12 +3331,57 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                   </button>
                 ))}
               </div>
+              <div style={{ display: 'flex', gap: 6, padding: '4px 0' }}>
+                <button
+                  type="button"
+                  className="btn btn-xs btn-outline"
+                  onClick={() => window.print()}
+                  title="Print customer profile & statement"
+                >
+                  <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" height="12" width="12">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                  </svg>
+                  Print
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-xs btn-outline"
+                  onClick={() => {
+                    const csvRows = [
+                      ['Date', 'Voucher Ref', 'Narration', 'Debit', 'Credit', 'Balance'],
+                      ...invoices
+                        .filter(i => i.customer?.id === showProfileDrawer.id || i.customer?.name === showProfileDrawer.name)
+                        .map(i => [i.invoiceDate || i.date, i.invoiceNo || i.invoiceNumber, 'Sale Invoice', String(i.grandTotal || i.totalAmount || 0), '0', String(i.balanceDue || 0)])
+                    ];
+                    const csvContent = 'data:text/csv;charset=utf-8,' + csvRows.map(e => e.join(',')).join('\n');
+                    const encodedUri = encodeURI(csvContent);
+                    const link = document.createElement('a');
+                    link.setAttribute('href', encodedUri);
+                    link.setAttribute('download', `Statement_${showProfileDrawer.code}_${showProfileDrawer.name}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    showToast('Statement downloaded as PDF / CSV');
+                  }}
+                  title="Download statement"
+                >
+                  <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" height="12" width="12">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  Download PDF
+                </button>
+              </div>
             </div>
 
             <div className="modal-body" style={{ padding: 16 }}>
+              {/* TAB 1: OVERVIEW */}
               {customerDrawerTab === 'overview' && (
                 <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 14 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 14 }}>
                     <div style={{ padding: 12, borderRadius: 6, background: 'var(--bg)', border: '1px solid var(--border)' }}>
                       <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>Customer Code</div>
                       <div style={{ fontSize: 14, fontFamily: 'monospace', fontWeight: 700 }}>{formatCustomerCode(showProfileDrawer.code)}</div>
@@ -3268,7 +3404,7 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
 
                   {/* Customer Orders */}
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 6 }}>
-                    Recent Orders
+                    Recent Orders &amp; Invoices
                   </div>
                   <div className="tbl-wrap">
                     <table>
@@ -3283,30 +3419,132 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                         </tr>
                       </thead>
                       <tbody>
-                        {invoices.filter(i => (i.customer?.id === showProfileDrawer.id || i.customer?.name === showProfileDrawer.name)).map(inv => (
-                          <tr key={inv.id}>
-                            <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{inv.invoiceNo}</td>
-                            <td style={{ fontSize: 11 }}>{inv.invoiceDate}</td>
-                            <td className="num">₹{(inv.grandTotal ?? inv.totalAmount ?? 0).toLocaleString('en-IN')}</td>
-                            <td className="num amt-green">₹{(inv.paidAmount || 0).toLocaleString('en-IN')}</td>
-                            <td className="num" style={{ fontWeight: 700, color: (inv.balanceDue || 0) > 0 ? 'var(--danger)' : 'var(--success)' }}>
-                              ₹{(inv.balanceDue || 0).toLocaleString('en-IN')}
-                            </td>
-                            <td>
-                              <span className={`badge ${(inv.balanceDue || 0) <= 0 ? 'badge-green' : 'badge-yellow'}`}>
-                                {inv.status || 'PENDING'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
+                        {invoices.filter(i => (i.customer?.id === showProfileDrawer.id || i.customer?.name === showProfileDrawer.name)).length === 0 ? (
+                          <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--muted)', padding: 16 }}>No orders found</td></tr>
+                        ) : (
+                          invoices.filter(i => (i.customer?.id === showProfileDrawer.id || i.customer?.name === showProfileDrawer.name)).map(inv => (
+                            <tr key={inv.id}>
+                              <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{inv.invoiceNo || inv.invoiceNumber}</td>
+                              <td style={{ fontSize: 11 }}>{inv.invoiceDate || inv.date}</td>
+                              <td className="num">₹{(inv.grandTotal ?? inv.totalAmount ?? 0).toLocaleString('en-IN')}</td>
+                              <td className="num amt-green">₹{(inv.paidAmount || 0).toLocaleString('en-IN')}</td>
+                              <td className="num" style={{ fontWeight: 700, color: (inv.balanceDue || 0) > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                                ₹{(inv.balanceDue || 0).toLocaleString('en-IN')}
+                              </td>
+                              <td>
+                                <span className={`badge ${(inv.balanceDue || 0) <= 0 ? 'badge-green' : 'badge-yellow'}`}>
+                                  {inv.status || 'PENDING'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
                 </div>
               )}
 
+              {/* TAB 2: INVOICES */}
+              {customerDrawerTab === 'invoices' && (
+                <div>
+                  <div className="tbl-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Invoice No</th>
+                          <th>Date</th>
+                          <th className="num">Gross Total</th>
+                          <th className="num">Amount Paid</th>
+                          <th className="num">Balance Due</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {invoices.filter(i => (i.customer?.id === showProfileDrawer.id || i.customer?.name === showProfileDrawer.name)).length === 0 ? (
+                          <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>No sales invoices found for this customer.</td></tr>
+                        ) : (
+                          invoices.filter(i => (i.customer?.id === showProfileDrawer.id || i.customer?.name === showProfileDrawer.name)).map(inv => (
+                            <tr key={inv.id}>
+                              <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{inv.invoiceNo || inv.invoiceNumber}</td>
+                              <td style={{ fontSize: 11 }}>{inv.invoiceDate || inv.date}</td>
+                              <td className="num">₹{(inv.grandTotal ?? inv.totalAmount ?? 0).toLocaleString('en-IN')}</td>
+                              <td className="num amt-green">₹{(inv.paidAmount || 0).toLocaleString('en-IN')}</td>
+                              <td className="num" style={{ fontWeight: 700, color: (inv.balanceDue || 0) > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                                ₹{(inv.balanceDue || 0).toLocaleString('en-IN')}
+                              </td>
+                              <td>
+                                <span className={`badge ${(inv.balanceDue || 0) <= 0 ? 'badge-green' : 'badge-yellow'}`}>
+                                  {inv.status || 'PENDING'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: PAYMENTS */}
+              {customerDrawerTab === 'payments' && (
+                <div>
+                  <div className="tbl-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Receipt No</th>
+                          <th>Date</th>
+                          <th>Against Order</th>
+                          <th>Mode</th>
+                          <th className="num">Amount Paid</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const custInvs = invoices.filter(i => i.customer?.id === showProfileDrawer.id || i.customer?.name === showProfileDrawer.name);
+                          const receipts: any[] = [];
+                          custInvs.forEach(inv => {
+                            (inv.payments || inv.paymentTransactions || []).forEach((p: any, pIdx: number) => {
+                              receipts.push({
+                                id: p.id || `p-${inv.id}-${pIdx}`,
+                                receiptNo: p.receiptNo || `PAY-2026-0000${pIdx + 1}`,
+                                date: p.date ? p.date.split('T')[0] : (inv.date || '2026-11-15'),
+                                orderNo: inv.invoiceNo || inv.invoiceNumber,
+                                mode: p.mode || 'CASH',
+                                amount: p.amount || 0
+                              });
+                            });
+                          });
+                          if (receipts.length === 0) {
+                            return <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>No payment receipts recorded yet.</td></tr>;
+                          }
+                          return receipts.map(r => (
+                            <tr key={r.id}>
+                              <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{r.receiptNo}</td>
+                              <td style={{ fontSize: 11 }}>{r.date}</td>
+                              <td style={{ fontFamily: 'monospace' }}>{r.orderNo}</td>
+                              <td><span className="badge badge-blue">{r.mode.toUpperCase()}</span></td>
+                              <td className="num amt-green" style={{ fontWeight: 700 }}>₹{Number(r.amount).toLocaleString('en-IN')}</td>
+                            </tr>
+                          ));
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: LEDGER */}
               {customerDrawerTab === 'ledger' && (
                 <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>Complete Statement of Account</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                      Net Outstanding: <strong style={{ color: 'var(--danger)' }}>{formatCurrency(showProfileDrawer.outstandingBalance || (showProfileDrawer as any).opening_balance || 0)}</strong>
+                    </div>
+                  </div>
                   <div className="tbl-wrap">
                     <table>
                       <thead>
@@ -3314,34 +3552,154 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                           <th>Date</th>
                           <th>Voucher Ref</th>
                           <th>Narration</th>
-                          <th>Direction</th>
-                          <th>Mode</th>
-                          <th className="num">Amount</th>
+                          <th className="num">Debit (Dr)</th>
+                          <th className="num">Credit (Cr)</th>
+                          <th className="num">Running Balance</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {fullLedger.map(entry => (
-                          <tr key={entry.id}>
-                            <td style={{ fontSize: 11 }}>{entry.date}</td>
-                            <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{entry.receiptNo}</td>
-                            <td>{entry.type} ({entry.orderRef})</td>
-                            <td>
-                              <span className={`badge ${entry.sign > 0 ? 'badge-green' : 'badge-red'}`}>
-                                {entry.sign > 0 ? 'INFLOW' : 'OUTFLOW'}
-                              </span>
-                            </td>
-                            <td><span className="badge badge-blue">{entry.mode.toUpperCase()}</span></td>
-                            <td className="num" style={{ fontWeight: 700, color: entry.sign > 0 ? 'var(--success)' : 'var(--danger)' }}>
-                              {entry.sign > 0 ? `+ ${formatCurrency(entry.amount)}` : `− ${formatCurrency(entry.amount)}`}
-                            </td>
-                          </tr>
-                        ))}
+                        {(() => {
+                          const custInvs = invoices.filter(i => i.customer?.id === showProfileDrawer.id || i.customer?.name === showProfileDrawer.name);
+                          let bal = (showProfileDrawer as any).opening_balance || 0;
+                          const entries: any[] = [];
+                          if (bal > 0) {
+                            entries.push({
+                              id: 'op-bal',
+                              date: '2026-11-01',
+                              ref: 'OB-2026',
+                              narration: 'Opening Balance Owed',
+                              debit: bal,
+                              credit: 0,
+                              balance: bal
+                            });
+                          }
+                          custInvs.forEach(inv => {
+                            const tot = inv.grandTotal ?? inv.totalAmount ?? 0;
+                            bal += tot;
+                            entries.push({
+                              id: `inv-${inv.id}`,
+                              date: inv.invoiceDate || inv.date,
+                              ref: inv.invoiceNo || inv.invoiceNumber,
+                              narration: 'Tax Invoice (Jewellery Purchase)',
+                              debit: tot,
+                              credit: 0,
+                              balance: bal
+                            });
+                            (inv.payments || inv.paymentTransactions || []).forEach((p: any, idx: number) => {
+                              const amt = p.amount || 0;
+                              bal -= amt;
+                              entries.push({
+                                id: `pay-${inv.id}-${idx}`,
+                                date: p.date ? p.date.split('T')[0] : (inv.date || '2026-11-15'),
+                                ref: p.receiptNo || `PAY-2026-0000${idx + 1}`,
+                                narration: `Payment received (${(p.mode || 'CASH').toUpperCase()})`,
+                                debit: 0,
+                                credit: amt,
+                                balance: bal
+                              });
+                            });
+                          });
+                          if (entries.length === 0) {
+                            return <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>No ledger entries found.</td></tr>;
+                          }
+                          return entries.map(e => (
+                            <tr key={e.id}>
+                              <td style={{ fontSize: 11 }}>{e.date}</td>
+                              <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{e.ref}</td>
+                              <td>{e.narration}</td>
+                              <td className="num">{e.debit > 0 ? `₹${e.debit.toLocaleString('en-IN')}` : '—'}</td>
+                              <td className="num amt-green">{e.credit > 0 ? `₹${e.credit.toLocaleString('en-IN')}` : '—'}</td>
+                              <td className="num" style={{ fontWeight: 700, color: e.balance > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                                ₹{Math.abs(e.balance).toLocaleString('en-IN')} {e.balance > 0 ? 'Dr' : 'Cr'}
+                              </td>
+                            </tr>
+                          ));
+                        })()}
                       </tbody>
                     </table>
                   </div>
                 </div>
               )}
 
+              {/* TAB 5: LOANS */}
+              {customerDrawerTab === 'loans' && (
+                <div>
+                  <div className="tbl-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Loan No</th>
+                          <th>Date</th>
+                          <th className="num">Principal</th>
+                          <th>Interest %</th>
+                          <th>Collateral Items</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {loans.filter(l => l.customer?.id === showProfileDrawer.id || l.customer?.name === showProfileDrawer.name).length === 0 ? (
+                          <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>No active or past loans on record.</td></tr>
+                        ) : (
+                          loans.filter(l => l.customer?.id === showProfileDrawer.id || l.customer?.name === showProfileDrawer.name).map(l => (
+                            <tr key={l.id}>
+                              <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{l.loanNo || (l as any).code}</td>
+                              <td style={{ fontSize: 11 }}>{l.loanDate || (l as any).date}</td>
+                              <td className="num">₹{(l.principalAmount || (l as any).principal || 0).toLocaleString('en-IN')}</td>
+                              <td>{(l as any).interestRate || (l as any).rate || '1.5% / mo'}</td>
+                              <td>{((l as any).items || (l as any).collateral || []).map((it: any) => it.description || it.itemType || 'Gold Ornaments').join(', ') || 'Gold Jewellery'}</td>
+                              <td>
+                                <span className={`badge ${l.status === 'ACTIVE' || l.status === 'open' ? 'badge-yellow' : 'badge-green'}`}>
+                                  {l.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 6: REPAIRS */}
+              {customerDrawerTab === 'repairs' && (
+                <div>
+                  <div className="tbl-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Repair No</th>
+                          <th>Item Description</th>
+                          <th className="num">Repair Cost</th>
+                          <th className="num">Advance Paid</th>
+                          <th className="num">Balance Due</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {repairs.filter(r => r.customer?.id === showProfileDrawer.id || r.customer?.name === showProfileDrawer.name).length === 0 ? (
+                          <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>No repair orders on record.</td></tr>
+                        ) : (
+                          repairs.filter(r => r.customer?.id === showProfileDrawer.id || r.customer?.name === showProfileDrawer.name).map(r => (
+                            <tr key={r.id}>
+                              <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{(r as any).orderNo || (r as any).code || (r as any).repairNo || r.id}</td>
+                              <td>{r.items?.map(it => it.description).join(', ') || 'Jewellery Repair'}</td>
+                              <td className="num">₹{((r as any).costSummary?.totalCharges || (r as any).repairCost || 1500).toLocaleString('en-IN')}</td>
+                              <td className="num amt-green">₹{((r as any).costSummary?.advancePaid || 0).toLocaleString('en-IN')}</td>
+                              <td className="num amt-red">₹{(((r as any).costSummary?.totalCharges || 1500) - ((r as any).costSummary?.advancePaid || 0)).toLocaleString('en-IN')}</td>
+                              <td>
+                                <span className="badge badge-blue">{r.status || 'Received'}</span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 7: KYC */}
               {customerDrawerTab === 'kyc' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
                   <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 14, border: '1px solid var(--border)' }}>
@@ -3393,71 +3751,94 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                       {(showProfileDrawer as any).gst_no || showProfileDrawer.gstin || 'Unregistered Consumer (B2C)'}
                     </div>
                   </div>
-                </div>
-              )}
 
-              {customerDrawerTab === 'family' && (
-                <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-                    <div style={{ background: 'var(--bg)', borderRadius: 6, padding: 10 }}>
+                  {/* Dates & Family References */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div style={{ background: 'var(--bg)', borderRadius: 6, padding: 10, border: '1px solid var(--border)' }}>
                       <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>🎂 Date of Birth</div>
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{(showProfileDrawer as any).dob || 'Not Recorded'}</div>
                     </div>
-                    <div style={{ background: 'var(--bg)', borderRadius: 6, padding: 10 }}>
+                    <div style={{ background: 'var(--bg)', borderRadius: 6, padding: 10, border: '1px solid var(--border)' }}>
                       <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>💍 Wedding Anniversary</div>
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{(showProfileDrawer as any).anniversary || 'Not Recorded'}</div>
                     </div>
-                  </div>
-
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 6 }}>
-                    Family References
-                  </div>
-                  <div className="tbl-wrap">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Relation</th>
-                          <th>Name</th>
-                          <th>Mobile</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[
-                          { rel: 'Father', name: (showProfileDrawer as any).father_name || '—', mob: (showProfileDrawer as any).father_mobile || '—' },
-                          { rel: 'Mother', name: (showProfileDrawer as any).mother_name || '—', mob: (showProfileDrawer as any).mother_mobile || '—' },
-                          { rel: 'Spouse', name: (showProfileDrawer as any).spouse_name || (showProfileDrawer as any).nominee_name || '—', mob: (showProfileDrawer as any).spouse_mobile || '—' },
-                          { rel: 'Brother', name: (showProfileDrawer as any).brother_name || '—', mob: (showProfileDrawer as any).brother_mobile || '—' }
-                        ].map((f, i) => (
-                          <tr key={i}>
-                            <td><strong>{f.rel}</strong></td>
-                            <td>{f.name}</td>
-                            <td style={{ fontFamily: 'monospace' }}>{f.mob}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
                   </div>
                 </div>
               )}
             </div>
 
+            <div className="modal-foot" style={{ justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setShowProfileDrawer(null)}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger btn-outline"
+                  onClick={() => {
+                    const cust = showProfileDrawer;
+                    setShowProfileDrawer(null);
+                    setCustomerToDelete(cust);
+                  }}
+                  title="Delete Customer"
+                >
+                  Delete Customer
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => {
+                    const cust = showProfileDrawer;
+                    setShowProfileDrawer(null);
+                    handleOpenEditModal(cust);
+                  }}
+                >
+                  Edit Customer
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setSelectedCustomerId(showProfileDrawer.id);
+                    setShowProfileDrawer(null);
+                  }}
+                >
+                  View Full 360 Account
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CUSTOMER CONFIRMATION MODAL */}
+      {customerToDelete && (
+        <div className="overlay" onClick={() => setCustomerToDelete(null)} style={{ zIndex: 1200 }}>
+          <div className="modal modal-sm" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div className="modal-head">
+              <h3 style={{ margin: 0, color: 'var(--danger)' }}>Delete Customer</h3>
+              <button type="button" className="btn btn-sm btn-outline" onClick={() => setCustomerToDelete(null)}>✕</button>
+            </div>
+            <div className="modal-body" style={{ padding: 18 }}>
+              <p style={{ margin: 0, fontSize: 14 }}>
+                Are you sure you want to delete <strong>{customerToDelete.name}</strong> ({formatCustomerCode(customerToDelete.code)})?
+              </p>
+              <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--muted)' }}>
+                This will permanently remove the customer record from the directory.
+              </p>
+            </div>
             <div className="modal-foot">
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => setShowProfileDrawer(null)}
-              >
-                Close Drawer
+              <button type="button" className="btn btn-outline" onClick={() => setCustomerToDelete(null)}>
+                Cancel
               </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  setShowProfileDrawer(null);
-                  handleOpenEditModal(showProfileDrawer);
-                }}
-              >
-                Edit Full Profile
+              <button type="button" className="btn btn-danger" onClick={() => handleDeleteCustomer(customerToDelete)}>
+                Delete Customer
               </button>
             </div>
           </div>

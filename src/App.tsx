@@ -109,6 +109,8 @@ export function App() {
   const [users, setUsers] = useState<UserAccount[]>(mockUsers);
 
   const getModuleFromPath = (path: string): string => {
+    if (path.startsWith('/customers')) return 'customers';
+    if (path.startsWith('/payments')) return 'payments-pending';
     switch (path) {
       case '/daily-rates': return 'daily-rates';
       case '/customers': return 'customers';

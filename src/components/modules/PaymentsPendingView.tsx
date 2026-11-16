@@ -68,8 +68,8 @@ const MODE_ICONS: Record<string, string> = {
 
 const formatCurrency = (val: number | string | undefined): string => {
   const num = typeof val === 'string' ? parseFloat(val) : (val ?? 0);
-  if (isNaN(num)) return '₹0.00';
-  return '₹' + num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (isNaN(num)) return '₹0';
+  return '₹' + num.toLocaleString('en-IN', { maximumFractionDigits: 2 });
 };
 
 export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
@@ -77,7 +77,7 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
   customers = [],
   onRecordPayment
 }) => {
-  const [activeTab, setActiveTab] = useState<'pending' | 'overdue' | 'today' | 'payments' | 'outflows'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'overdue' | 'today' | 'payments' | 'outflows'>('payments');
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
   const [modeFilter, setModeFilter] = useState<string>('');
@@ -399,31 +399,17 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
       <div className="tabs">
         <button
           type="button"
-          className={`tab ${activeTab === 'pending' ? 'active' : ''}`}
-          onClick={() => setActiveTab('pending')}
-        >
-          All Pending ({pendingInvoices.length})
-        </button>
-        <button
-          type="button"
-          className={`tab ${activeTab === 'overdue' ? 'active' : ''}`}
-          onClick={() => setActiveTab('overdue')}
-        >
-          Overdue ({overdueInvoices.length})
-        </button>
-        <button
-          type="button"
-          className={`tab ${activeTab === 'today' ? 'active' : ''}`}
-          onClick={() => setActiveTab('today')}
-        >
-          Collected Today ({todaysReceipts.length})
-        </button>
-        <button
-          type="button"
           className={`tab ${activeTab === 'payments' ? 'active' : ''}`}
           onClick={() => setActiveTab('payments')}
         >
-          All Receipts ({filteredReceipts.length})
+          All Receipts
+        </button>
+        <button
+          type="button"
+          className={`tab ${activeTab === 'pending' ? 'active' : ''}`}
+          onClick={() => setActiveTab('pending')}
+        >
+          Outstanding Dues ({pendingInvoices.length})
         </button>
         <button
           type="button"
@@ -782,8 +768,13 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
                             {formatCurrency(inv.paidAmount || 0)}
                           </td>
                           <td className="num">
-                            <span className="amt-red" style={{ display: 'flex', alignItems: 'center', gap: 3, justifyContent: 'flex-end', fontWeight: 800, fontSize: 14 }}>
-                              ⚠️ {formatCurrency(inv.balanceDue || 0)}
+                            <span className="amt-red" style={{ display: 'flex', alignItems: 'center', gap: 3, justifyContent: 'flex-end', fontWeight: 700 }}>
+                              <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="11" width="11" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                              </svg>
+                              {formatCurrency(inv.balanceDue || 0)}
                             </span>
                           </td>
                           <td>
@@ -794,7 +785,7 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
                           <td style={{ textAlign: 'right' }}>
                             <button
                               type="button"
-                              className="btn btn-sm btn-primary"
+                              className="btn btn-xs btn-primary"
                               onClick={() => openCollectModal(inv)}
                             >
                               Record Payment
