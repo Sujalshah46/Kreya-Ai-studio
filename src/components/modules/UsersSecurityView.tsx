@@ -259,7 +259,7 @@ export const UsersSecurityView: React.FC<UsersSecurityViewProps> = ({
 
       {/* Controls Card */}
       <div className="card" style={{ marginBottom: 14 }}>
-        <div className="card-body" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '14px 18px' }}>
+        <div className="card-body" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '16px 18px' }}>
           <div className="search-box">
             <Search size={14} />
             <input 
@@ -313,8 +313,8 @@ export const UsersSecurityView: React.FC<UsersSecurityViewProps> = ({
                 <th>Roles</th>
                 <th>Status</th>
                 <th>Last sign-in</th>
-                <th>Sessions</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <th className="num">Sessions</th>
+                <th className="num">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -366,15 +366,15 @@ export const UsersSecurityView: React.FC<UsersSecurityViewProps> = ({
                       )}
                     </td>
 
-                    <td style={{ fontSize: 12.5 }}>{formatDate(u.last_login_at)}</td>
+                    <td>{formatDate(u.last_login_at)}</td>
 
-                    <td>
+                    <td className="num">
                       <button className="btn btn-xs btn-outline" onClick={() => setSessionsUser(u)}>
                         <Monitor size={11} style={{ display: 'inline', marginRight: 2 }} /> {u.active_sessions}
                       </button>
                     </td>
 
-                    <td>
+                    <td className="num">
                       <div className="btn-group" style={{ justifyContent: 'flex-end' }}>
                         <button className="btn btn-xs btn-outline" title="Edit" onClick={() => setEditingUser(u)}>
                           <Edit size={11} />
@@ -786,7 +786,8 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
                       key={r.id} 
                       className="card" 
                       style={{ 
-                        padding: '10px 12px', 
+                        padding: '16px 18px', 
+                        borderRadius: 14,
                         cursor: 'pointer',
                         borderColor: isChecked ? 'var(--primary)' : undefined 
                       }}

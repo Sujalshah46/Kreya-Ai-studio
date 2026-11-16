@@ -297,15 +297,15 @@ export const ShopSettingsView: React.FC<ShopSettingsViewProps> = ({
       </div>
 
       {saveSuccess && (
-        <div className="card" style={{ marginBottom: 14, background: '#ecfdf5', borderColor: '#10b981', color: '#065f46', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="card" style={{ marginBottom: 14, background: '#ecfdf5', borderColor: '#10b981', color: '#065f46', padding: '16px 18px', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
             <CheckCircle2 size={16} style={{ color: '#10b981' }} />
             <span>{saveSuccess}</span>
           </div>
           <button 
             type="button" 
+            className="btn btn-xs btn-outline"
             onClick={() => setSaveSuccess(null)} 
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#065f46', fontWeight: 700 }}
           >
             ✕
           </button>
@@ -315,7 +315,7 @@ export const ShopSettingsView: React.FC<ShopSettingsViewProps> = ({
       {saveError && (
         <div className="alert alert-danger" style={{ marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{saveError}</span>
-          <button type="button" onClick={() => setSaveError(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>✕</button>
+          <button type="button" className="btn btn-xs btn-outline" onClick={() => setSaveError(null)}>✕</button>
         </div>
       )}
 
@@ -728,7 +728,7 @@ export const ShopSettingsView: React.FC<ShopSettingsViewProps> = ({
       {activeTab === 'users' && (
         <div>
           <div className="card" style={{ marginBottom: 14 }}>
-            <div className="card-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, padding: '12px 16px' }}>
+            <div className="card-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, padding: '16px 18px' }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700 }}>Forgot-password email</div>
                 <div className="helper">
@@ -767,8 +767,8 @@ export const ShopSettingsView: React.FC<ShopSettingsViewProps> = ({
                     <th>Roles</th>
                     <th>Status</th>
                     <th>Last Sign-In</th>
-                    <th>Sessions</th>
-                    <th>Actions</th>
+                    <th className="num">Sessions</th>
+                    <th className="num">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -788,14 +788,14 @@ export const ShopSettingsView: React.FC<ShopSettingsViewProps> = ({
                           {usr.isActive ? 'Active' : 'Disabled'}
                         </span>
                       </td>
-                      <td style={{ fontSize: 12 }}>{usr.lastLogin || '—'}</td>
-                      <td>
+                      <td>{usr.lastLogin || '—'}</td>
+                      <td className="num">
                         <button type="button" className="btn btn-xs btn-outline">
                           {usr.role === 'ADMIN' ? '5' : '0'}
                         </button>
                       </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
+                      <td className="num">
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                           <button 
                             type="button" 
                             className="btn btn-xs btn-outline"
@@ -829,7 +829,7 @@ export const ShopSettingsView: React.FC<ShopSettingsViewProps> = ({
           <a 
             href="/admin/theme" 
             className="export-card" 
-            style={{ display: 'flex', flexDirection: 'column', padding: 18, border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)', textDecoration: 'none', color: 'inherit' }}
+            style={{ display: 'flex', flexDirection: 'column', padding: '16px 18px', border: '1px solid var(--border)', borderRadius: 14, background: 'var(--surface)', textDecoration: 'none', color: 'inherit' }}
             onClick={(e) => { e.preventDefault(); if (onNavigate) onNavigate('theme-layout'); }}
           >
             <Palette size={22} color="var(--primary)" style={{ marginBottom: 8 }} />
@@ -840,7 +840,7 @@ export const ShopSettingsView: React.FC<ShopSettingsViewProps> = ({
           <a 
             href="/admin/login-page" 
             className="export-card" 
-            style={{ display: 'flex', flexDirection: 'column', padding: 18, border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)', textDecoration: 'none', color: 'inherit' }}
+            style={{ display: 'flex', flexDirection: 'column', padding: '16px 18px', border: '1px solid var(--border)', borderRadius: 14, background: 'var(--surface)', textDecoration: 'none', color: 'inherit' }}
             onClick={(e) => { e.preventDefault(); if (onNavigate) onNavigate('login-page'); }}
           >
             <LogIn size={22} color="var(--primary)" style={{ marginBottom: 8 }} />
@@ -851,7 +851,7 @@ export const ShopSettingsView: React.FC<ShopSettingsViewProps> = ({
           <a 
             href="/admin/roles" 
             className="export-card" 
-            style={{ display: 'flex', flexDirection: 'column', padding: 18, border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)', textDecoration: 'none', color: 'inherit' }}
+            style={{ display: 'flex', flexDirection: 'column', padding: '16px 18px', border: '1px solid var(--border)', borderRadius: 14, background: 'var(--surface)', textDecoration: 'none', color: 'inherit' }}
             onClick={(e) => { e.preventDefault(); if (onNavigate) onNavigate('roles-permissions'); }}
           >
             <ShieldCheck size={22} color="var(--primary)" style={{ marginBottom: 8 }} />
@@ -862,7 +862,7 @@ export const ShopSettingsView: React.FC<ShopSettingsViewProps> = ({
           <a 
             href="/admin/users" 
             className="export-card" 
-            style={{ display: 'flex', flexDirection: 'column', padding: 18, border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)', textDecoration: 'none', color: 'inherit' }}
+            style={{ display: 'flex', flexDirection: 'column', padding: '16px 18px', border: '1px solid var(--border)', borderRadius: 14, background: 'var(--surface)', textDecoration: 'none', color: 'inherit' }}
             onClick={(e) => { e.preventDefault(); if (onNavigate) onNavigate('users'); }}
           >
             <Users size={22} color="var(--primary)" style={{ marginBottom: 8 }} />
@@ -873,7 +873,7 @@ export const ShopSettingsView: React.FC<ShopSettingsViewProps> = ({
           <a 
             href="/admin/security" 
             className="export-card" 
-            style={{ display: 'flex', flexDirection: 'column', padding: 18, border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)', textDecoration: 'none', color: 'inherit' }}
+            style={{ display: 'flex', flexDirection: 'column', padding: '16px 18px', border: '1px solid var(--border)', borderRadius: 14, background: 'var(--surface)', textDecoration: 'none', color: 'inherit' }}
             onClick={(e) => { e.preventDefault(); if (onNavigate) onNavigate('security'); }}
           >
             <Lock size={22} color="var(--primary)" style={{ marginBottom: 8 }} />
@@ -884,7 +884,7 @@ export const ShopSettingsView: React.FC<ShopSettingsViewProps> = ({
           <a 
             href="/admin/license" 
             className="export-card" 
-            style={{ display: 'flex', flexDirection: 'column', padding: 18, border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)', textDecoration: 'none', color: 'inherit' }}
+            style={{ display: 'flex', flexDirection: 'column', padding: '16px 18px', border: '1px solid var(--border)', borderRadius: 14, background: 'var(--surface)', textDecoration: 'none', color: 'inherit' }}
             onClick={(e) => { e.preventDefault(); if (onNavigate) onNavigate('licence'); }}
           >
             <Award size={22} color="var(--primary)" style={{ marginBottom: 8 }} />

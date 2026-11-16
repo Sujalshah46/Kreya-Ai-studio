@@ -363,12 +363,12 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = () => {
       </div>
 
       {toastMessage && (
-        <div className="card" style={{ marginBottom: 14, background: '#ecfdf5', borderColor: '#10b981', color: '#065f46', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="card" style={{ marginBottom: 14, background: '#ecfdf5', borderColor: '#10b981', color: '#065f46', padding: '16px 18px', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
             <CheckCircle2 size={16} style={{ color: '#10b981' }} />
             <span>{toastMessage}</span>
           </div>
-          <button type="button" onClick={() => setToastMessage(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#065f46', fontWeight: 700 }}>✕</button>
+          <button type="button" className="btn btn-xs btn-outline" onClick={() => setToastMessage(null)}>✕</button>
         </div>
       )}
 
@@ -440,7 +440,7 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = () => {
                 )}
               </div>
 
-              <div className="card-body" style={{ padding: '10px 16px' }}>
+              <div className="card-body" style={{ padding: '16px 18px' }}>
                 {c.keys.map(k => (
                   <div key={k.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
                     <div className="mono" style={{ fontSize: 12 }}>
@@ -513,7 +513,7 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = () => {
               </div>
 
               {w.lastDelivery && (
-                <div className="card-body" style={{ padding: '8px 16px', fontSize: 12, color: 'var(--muted)' }}>
+                <div className="card-body" style={{ padding: '16px 18px', fontSize: 12, color: 'var(--muted)' }}>
                   Last delivery: <span className="badge badge-green" style={{ fontSize: 10 }}>HTTP {w.lastDelivery.status}</span> at {w.lastDelivery.at}
                 </div>
               )}
@@ -1388,7 +1388,7 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = () => {
                       <th>Status</th>
                       <th>Event</th>
                       <th>Time</th>
-                      <th>Duration</th>
+                      <th className="num">Duration</th>
                       <th>Payload ID</th>
                     </tr>
                   </thead>
@@ -1397,21 +1397,21 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = () => {
                       <td><span className="badge badge-green">HTTP 200</span></td>
                       <td className="mono">order.paid</td>
                       <td>16 Nov 2026, 12:40 pm</td>
-                      <td>142 ms</td>
+                      <td className="num">142 ms</td>
                       <td className="mono">evt_90812938120</td>
                     </tr>
                     <tr>
                       <td><span className="badge badge-green">HTTP 200</span></td>
                       <td className="mono">payment.received</td>
                       <td>16 Nov 2026, 11:15 am</td>
-                      <td>98 ms</td>
+                      <td className="num">98 ms</td>
                       <td className="mono">evt_90812938119</td>
                     </tr>
                     <tr>
                       <td><span className="badge badge-green">HTTP 200</span></td>
                       <td className="mono">inventory.updated</td>
                       <td>15 Nov 2026, 06:22 pm</td>
-                      <td>110 ms</td>
+                      <td className="num">110 ms</td>
                       <td className="mono">evt_90812938102</td>
                     </tr>
                   </tbody>

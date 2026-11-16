@@ -131,15 +131,15 @@ export const LicenceView: React.FC<LicenceViewProps> = ({ store = mockStore }) =
       </div>
 
       {refreshSuccess && (
-        <div className="card" style={{ marginBottom: 14, background: '#ecfdf5', borderColor: '#10b981', color: '#065f46', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="card" style={{ marginBottom: 14, background: '#ecfdf5', borderColor: '#10b981', color: '#065f46', padding: '16px 18px', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
             <CheckCircle2 size={16} style={{ color: '#10b981' }} />
             <span>{refreshSuccess}</span>
           </div>
           <button 
             type="button" 
+            className="btn btn-xs btn-outline"
             onClick={() => setRefreshSuccess(null)} 
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#065f46', fontWeight: 700 }}
           >
             ✕
           </button>
@@ -271,7 +271,7 @@ export const LicenceView: React.FC<LicenceViewProps> = ({ store = mockStore }) =
                 <th>STATUS</th>
                 <th>EXPIRY DATE</th>
                 <th>LAST VERIFIED</th>
-                <th style={{ textAlign: 'right' }}>ACTIONS</th>
+                <th className="num">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -295,10 +295,10 @@ export const LicenceView: React.FC<LicenceViewProps> = ({ store = mockStore }) =
                   <td style={{ fontWeight: 600 }}>
                     {key.expiresOn}
                   </td>
-                  <td style={{ fontSize: 12.5 }}>
+                  <td>
                     {key.lastVerifiedAt}
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td className="num">
                     <button 
                       type="button" 
                       className="btn btn-xs btn-outline"

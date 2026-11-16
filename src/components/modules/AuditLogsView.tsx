@@ -504,7 +504,7 @@ export const AuditLogsView: React.FC<{ store?: StoreProfile; onNavigate?: (modul
 
                   return (
                     <tr key={item.id}>
-                      <td style={{ whiteSpace: 'nowrap', fontSize: 12.5 }}>
+                      <td style={{ whiteSpace: 'nowrap' }}>
                         {formatTimestamp(item.at)}
                       </td>
                       <td>
@@ -515,7 +515,7 @@ export const AuditLogsView: React.FC<{ store?: StoreProfile; onNavigate?: (modul
                           {item.action}
                         </span>
                       </td>
-                      <td style={{ fontSize: 12.5 }}>
+                      <td>
                         <span>{item.entity}</span>
                         {item.entity_id ? ` #${item.entity_id}` : ''}
                         {item.ref_no ? ` · ${item.ref_no}` : ''}
@@ -529,11 +529,9 @@ export const AuditLogsView: React.FC<{ store?: StoreProfile; onNavigate?: (modul
                         {detailsJson ? (
                           <button
                             type="button"
+                            className="btn btn-xs btn-ghost mono"
                             onClick={() => setInspectingDetails(item)}
-                            className="mono"
                             style={{
-                              background: 'none',
-                              border: 'none',
                               padding: 0,
                               cursor: 'pointer',
                               textAlign: 'left',
@@ -661,7 +659,7 @@ export const AuditLogsView: React.FC<{ store?: StoreProfile; onNavigate?: (modul
                 {JSON.stringify(inspectingDetails.details, null, 2)}
               </pre>
             </div>
-            <div className="card-footer" style={{ padding: '10px 16px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)' }}>
+            <div className="card-footer" style={{ padding: '16px 18px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)' }}>
               <button 
                 type="button" 
                 className="btn btn-outline btn-sm" 

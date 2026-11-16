@@ -224,7 +224,7 @@ export const ErrorLogView: React.FC<{ onNavigate?: (mod: string) => void }> = ()
                 <th>Message</th>
                 <th className="num">Times</th>
                 <th>Reference</th>
-                <th></th>
+                <th className="num"></th>
               </tr>
             </thead>
             <tbody>
@@ -237,7 +237,7 @@ export const ErrorLogView: React.FC<{ onNavigate?: (mod: string) => void }> = ()
 
                 return (
                   <tr key={err.id}>
-                    <td style={{ whiteSpace: 'nowrap', fontSize: 12.5 }}>
+                    <td style={{ whiteSpace: 'nowrap' }}>
                       {formatTimestamp(err.last_seen_at)}
                     </td>
                     <td>
@@ -279,7 +279,7 @@ export const ErrorLogView: React.FC<{ onNavigate?: (mod: string) => void }> = ()
                         {err.request_id || '—'}
                       </button>
                     </td>
-                    <td>
+                    <td className="num">
                       {err.status !== 'resolved' && (
                         <button
                           type="button"
@@ -310,7 +310,7 @@ export const ErrorLogView: React.FC<{ onNavigate?: (mod: string) => void }> = ()
         </div>
 
         {/* Pagination Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end', padding: '10px 14px', flexWrap: 'wrap', borderTop: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end', padding: '16px 18px', flexWrap: 'wrap', borderTop: '1px solid var(--border)' }}>
           <span className="helper" style={{ margin: 0 }}>
             {filteredErrors.length} errors
           </span>
@@ -410,7 +410,7 @@ export const ErrorLogView: React.FC<{ onNavigate?: (mod: string) => void }> = ()
                 </pre>
               </div>
             </div>
-            <div className="card-footer" style={{ padding: '10px 16px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)' }}>
+            <div className="card-footer" style={{ padding: '16px 18px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)' }}>
               <button 
                 type="button" 
                 className="btn btn-outline btn-sm" 

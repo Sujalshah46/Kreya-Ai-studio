@@ -396,7 +396,7 @@ export const SecurityView: React.FC<SecurityViewProps> = ({ onNavigate }) => {
               <tbody>
                 {filteredLogs.map(log => (
                   <tr key={log.id}>
-                    <td style={{ whiteSpace: "nowrap", fontSize: 12.5 }}>
+                    <td style={{ whiteSpace: "nowrap" }}>
                       {formatDate(log.at)}
                     </td>
                     <td>
@@ -407,7 +407,7 @@ export const SecurityView: React.FC<SecurityViewProps> = ({ onNavigate }) => {
                         {log.action}
                       </span>
                     </td>
-                    <td style={{ fontSize: 12.5 }}>
+                    <td>
                       {log.entity}
                       {log.entity_id ? ` #${log.entity_id}` : ''}
                       {log.ref_no ? ` · ${log.ref_no}` : ''}
@@ -415,7 +415,7 @@ export const SecurityView: React.FC<SecurityViewProps> = ({ onNavigate }) => {
                         <div className="helper">Reason: {log.reason}</div>
                       )}
                     </td>
-                    <td style={{ fontSize: 12 }}>
+                    <td>
                       {Object.entries(log.details).map(([k, v]) => (
                         <span key={k} style={{ marginRight: 6 }}>
                           <span style={{ color: 'var(--muted)' }}>{k}:</span>{' '}
