@@ -562,7 +562,7 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
       {/* SHIPMENT DETAIL & TRACKING MODAL */}
       {selectedShipment && (
         <div className="overlay" onClick={() => setSelectedShipment(null)}>
-          <div className="modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+          <div className="modal modal-md" onClick={e => e.stopPropagation()}>
             <div className="modal-head">
               <h3>{selectedShipment.shipmentNo} &bull; {selectedShipment.order_no}</h3>
               <button type="button" className="btn btn-sm btn-outline" onClick={() => setSelectedShipment(null)}>
@@ -731,7 +731,7 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
       {/* NEW SHIPMENT MODAL */}
       {showNewModal && (
         <div className="overlay" onClick={() => setShowNewModal(false)}>
-          <div className="modal" style={{ maxWidth: 620 }} onClick={e => e.stopPropagation()}>
+          <div className="modal modal-md" onClick={e => e.stopPropagation()}>
             <div className="modal-head">
               <h3>New shipment</h3>
               <button type="button" className="btn btn-sm btn-outline" onClick={() => setShowNewModal(false)}>
@@ -915,7 +915,7 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
       {/* DISPATCH NOTE / RECEIPT PRINT MODAL */}
       {printReceiptShipment && (
         <div className="overlay" onClick={() => setPrintReceiptShipment(null)}>
-          <div className="modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
+          <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
             <div className="modal-head">
               <h3>Valuables Cargo Dispatch Receipt</h3>
               <button type="button" className="btn btn-sm btn-outline" onClick={() => setPrintReceiptShipment(null)}>

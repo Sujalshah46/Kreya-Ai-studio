@@ -242,7 +242,7 @@ export const MetalAdvanceBookingView: React.FC<MetalAdvanceBookingViewProps> = (
       <div className="page-hdr">
         <div className="page-hdr-left">
           <h1>Advance Bookings</h1>
-          <p>{bookingsList.length} advance rate-fixed bookings · Forward Rate-Lock & Metal Deposits</p>
+          <p>{bookingsList.length} bookings</p>
         </div>
 
         <div className="btn-group">
@@ -906,7 +906,7 @@ export const MetalAdvanceBookingView: React.FC<MetalAdvanceBookingViewProps> = (
                 </div>
               </div>
 
-              <div style={{ paddingTop: 14, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>
+              <div className="modal-foot" style={{ marginTop: 14 }}>
                 <button
                   type="button"
                   onClick={() => setShowNewModal(false)}

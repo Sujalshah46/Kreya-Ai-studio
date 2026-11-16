@@ -222,13 +222,13 @@ export const CashRegisterView: React.FC<CashRegisterViewProps> = ({
   ];
 
   return (
-    <div className="page" style={{ padding: 0 }}>
+    <div className="page">
       {/* Exact Header */}
       <div className="page-hdr">
         <div className="page-hdr-left">
-          <h1>Cash Register</h1>
-          <p>Daily cash drawer reconciliation for active counter</p>
-          </div>
+          <h1>Cash register</h1>
+          <p>Open → receipts & payouts attach automatically → count notes & coins → close. A closed day is locked.</p>
+        </div>
         <div className="btn-group" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button 
             type="button"
@@ -720,7 +720,7 @@ export const CashRegisterView: React.FC<CashRegisterViewProps> = ({
       {/* Denomination Counter Modal (2000, 500, 200, 100, 50, 20, 10, coins) */}
       {showDenomModal && (
         <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowDenomModal(false); }}>
-          <div className="modal modal-md">
+          <div className="modal modal-lg">
             <div className="modal-head">
               <div>
                 <span className="card-title">Physical Cash Denomination Count</span>

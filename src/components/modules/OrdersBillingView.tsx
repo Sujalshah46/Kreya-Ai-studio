@@ -950,7 +950,7 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
     : [];
 
   return (
-    <div>
+    <div className="page">
       {/* Hidden print iframe */}
       <iframe ref={printIframeRef} style={{ display: 'none' }} title="print-invoice-frame" />
 
@@ -958,7 +958,7 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
       <div className="page-hdr">
         <div className="page-hdr-left">
           <h1>Orders & Billing</h1>
-          <p>{invoicesList.length} orders · Point of Sale & Invoicing</p>
+          <p>{invoicesList.length} orders</p>
         </div>
         <div className="btn-group">
           <button 
@@ -1109,7 +1109,7 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button 
                           type="button" 
-                          className="btn btn-xs btn-outline"
+                          className="btn btn-xs btn-primary"
                           title="View Invoice & Print"
                           onClick={() => setSelectedInvoiceForView(inv)}
                         >
@@ -1118,7 +1118,7 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                         {(inv.balanceDue || 0) > 0.01 && !isCancelled && (
                           <button 
                             type="button" 
-                            className="btn btn-xs btn-primary"
+                            className="btn btn-xs btn-gold"
                             title="Collect balance payment"
                             onClick={() => {
                               setSelectedInvoiceForView(inv);

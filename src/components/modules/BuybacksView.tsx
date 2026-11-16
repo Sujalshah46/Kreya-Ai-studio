@@ -718,7 +718,7 @@ export const BuybacksView: React.FC<BuybacksViewProps> = ({
       {/* DETAIL MODAL (Matching Kreya x Component) */}
       {selectedBuyback && (
         <div className="overlay" onClick={() => setSelectedBuyback(null)}>
-          <div className="modal" style={{ maxWidth: 680 }} onClick={e => e.stopPropagation()}>
+          <div className="modal modal-md" onClick={e => e.stopPropagation()}>
             <div className="modal-head">
               <h3>{selectedBuyback.buyback_no} &bull; {selectedBuyback.customer_name}</h3>
               <button type="button" className="btn btn-sm btn-outline" onClick={() => setSelectedBuyback(null)}>
@@ -827,7 +827,7 @@ export const BuybacksView: React.FC<BuybacksViewProps> = ({
       {/* NEW BUY-BACK MODAL (Matching Kreya h Component) */}
       {showNewModal && (
         <div className="overlay" onClick={() => setShowNewModal(false)}>
-          <div className="modal" style={{ maxWidth: 780 }} onClick={e => e.stopPropagation()}>
+          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
             <div className="modal-head">
               <h3>New buy-back / return</h3>
               <button type="button" className="btn btn-sm btn-outline" onClick={() => setShowNewModal(false)}>
