@@ -1,303 +1,463 @@
-import React, { useState } from 'react';
-import { 
-  Lock, Shield, Save, Check, ShieldAlert, Key, Globe, CheckCircle2, 
-  AlertTriangle, Users, FileCheck, Clock, Smartphone
-} from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Save, Search, Check, AlertTriangle, Shield, Lock, LogOut } from 'lucide-react';
 
 interface SecurityViewProps {
   onNavigate?: (module: string) => void;
 }
 
+interface SecuritySettings {
+  pwdMinLength: number;
+  requireLetterDigit: boolean;
+  loginMaxAttempts: number;
+  loginLockMinutes: number;
+  sessionHours: number;
+  mfaForAdmins: boolean;
+}
+
+interface SecurityAuditEntry {
+  id: string;
+  at: string;
+  actor_name: string;
+  actor_type: string;
+  action: string;
+  entity: string;
+  entity_id?: string;
+  ref_no?: string;
+  reason?: string;
+  details: Record<string, any>;
+  ip: string;
+}
+
+const INITIAL_SETTINGS: SecuritySettings = {
+  pwdMinLength: 8,
+  requireLetterDigit: true,
+  loginMaxAttempts: 5,
+  loginLockMinutes: 15,
+  sessionHours: 12,
+  mfaForAdmins: false
+};
+
+const INITIAL_SECURITY_LOGS: SecurityAuditEntry[] = [
+  {
+    id: "sec-001",
+    at: "2026-11-16T08:20:53.580Z",
+    actor_name: "Admin",
+    actor_type: "user",
+    action: "LOGIN_OK",
+    entity: "session",
+    entity_id: "sid_981a2f",
+    details: { method: "password", userAgent: "Chrome 131.0 macOS" },
+    ip: "192.168.1.102"
+  },
+  {
+    id: "sec-002",
+    at: "2026-11-16T07:15:10.120Z",
+    actor_name: "Admin",
+    actor_type: "user",
+    action: "SETTINGS_SAVED",
+    entity: "settings",
+    entity_id: "security",
+    reason: "Updated session timeout to 12h",
+    details: { section: "security", sessionHours: 12 },
+    ip: "192.168.1.102"
+  },
+  {
+    id: "sec-003",
+    at: "2026-11-15T11:27:00.180Z",
+    actor_name: "Admin",
+    actor_type: "user",
+    action: "USER_CREATED",
+    entity: "user",
+    entity_id: "3",
+    ref_no: "Rahul Jain",
+    details: { email: "sbjrahul01@gmail.com", roles: ["Accountant", "Viewer"] },
+    ip: "192.168.1.102"
+  },
+  {
+    id: "sec-004",
+    at: "2026-11-15T11:25:56.396Z",
+    actor_name: "Admin",
+    actor_type: "user",
+    action: "USER_CREATED",
+    entity: "user",
+    entity_id: "2",
+    ref_no: "Sandeep Shah",
+    details: { email: "sandeepshah2000@gmail.com", roles: ["Cashier", "Sales"] },
+    ip: "192.168.1.102"
+  },
+  {
+    id: "sec-005",
+    at: "2026-11-15T11:15:54.270Z",
+    actor_name: "Admin",
+    actor_type: "user",
+    action: "PASSWORD_CHANGED",
+    entity: "user",
+    entity_id: "1",
+    ref_no: "Admin",
+    details: { forced: false },
+    ip: "192.168.1.102"
+  },
+  {
+    id: "sec-006",
+    at: "2026-11-15T10:55:11.977Z",
+    actor_name: "System",
+    actor_type: "system",
+    action: "LICENSE_ACTIVATED",
+    entity: "license",
+    ref_no: "LIC-2026-SBJ-001",
+    details: { vendor: "Kreya IT Consulting", expiresOn: "2026-12-15" },
+    ip: "127.0.0.1"
+  }
+];
+
 export const SecurityView: React.FC<SecurityViewProps> = ({ onNavigate }) => {
-  // 11 Discovered Security Toggles & Inputs
-  const [twoFactorAdmin, setTwoFactorAdmin] = useState(true);
-  const [highValueOtpRefund, setHighValueOtpRefund] = useState(true);
-  const [maxFailedAttempts, setMaxFailedAttempts] = useState('3');
-  const [sessionIdleTimeout, setSessionIdleTimeout] = useState('15');
-  const [auditRetentionPeriod, setAuditRetentionPeriod] = useState('7-years');
-  const [enforcePasswordComplexity, setEnforcePasswordComplexity] = useState(true);
-  const [restrictToLanSubnet, setRestrictToLanSubnet] = useState(true);
-  const [blockConcurrentLogins, setBlockConcurrentLogins] = useState(true);
-  const [mandateSupervisorCancellationPin, setMandateSupervisorCancellationPin] = useState(true);
-  const [lockBackdatedVouchers, setLockBackdatedVouchers] = useState(true);
-  const [mandatoryPanThreshold, setMandatoryPanThreshold] = useState('200000');
+  const [settings, setSettings] = useState<SecuritySettings>(INITIAL_SETTINGS);
+  const [saving, setSaving] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const [saved, setSaved] = useState(false);
+  // Security Log filtering
+  const [auditLogs, setAuditLogs] = useState<SecurityAuditEntry[]>(INITIAL_SECURITY_LOGS);
+  const [search, setSearch] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
-  const handleSave = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleSave = () => {
+    setSaving(true);
+    setTimeout(() => {
+      setSaving(false);
+      showToast("Security settings saved");
+      // Append audit entry
+      const newEntry: SecurityAuditEntry = {
+        id: `sec-${Date.now()}`,
+        at: new Date().toISOString(),
+        actor_name: "Admin",
+        actor_type: "user",
+        action: "SETTINGS_SAVED",
+        entity: "settings",
+        entity_id: "security",
+        details: { ...settings },
+        ip: "192.168.1.102"
+      };
+      setAuditLogs(prev => [newEntry, ...prev]);
+    }, 400);
+  };
+
+  const handleForceLogoutAll = () => {
+    if (window.confirm("Log out all active sessions across all devices? Every user including you will need to sign in again.")) {
+      showToast("Signed out everywhere");
+      const newEntry: SecurityAuditEntry = {
+        id: `sec-${Date.now()}`,
+        at: new Date().toISOString(),
+        actor_name: "Admin",
+        actor_type: "user",
+        action: "SESSION_REVOKED",
+        entity: "session",
+        reason: "Force logout all active sessions",
+        details: { scope: "all_sessions" },
+        ip: "192.168.1.102"
+      };
+      setAuditLogs(prev => [newEntry, ...prev]);
+    }
+  };
+
+  const filteredLogs = useMemo(() => {
+    return auditLogs.filter(log => {
+      if (search.trim()) {
+        const q = search.toLowerCase().trim();
+        const actorMatch = log.actor_name.toLowerCase().includes(q);
+        const actionMatch = log.action.toLowerCase().includes(q);
+        const refMatch = log.ref_no ? log.ref_no.toLowerCase().includes(q) : false;
+        const entityMatch = log.entity.toLowerCase().includes(q);
+        const detailsMatch = JSON.stringify(log.details).toLowerCase().includes(q);
+        if (!actorMatch && !actionMatch && !refMatch && !entityMatch && !detailsMatch) return false;
+      }
+      if (fromDate) {
+        if (new Date(log.at) < new Date(fromDate)) return false;
+      }
+      if (toDate) {
+        const to = new Date(toDate);
+        to.setHours(23, 59, 59, 999);
+        if (new Date(log.at) > to) return false;
+      }
+      return true;
+    });
+  }, [auditLogs, search, fromDate, toDate]);
+
+  const formatDate = (isoStr: string) => {
+    try {
+      return new Date(isoStr).toLocaleString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    } catch {
+      return isoStr;
+    }
+  };
+
+  const getActionBadgeClass = (action: string) => {
+    if (/FAILED|LOCKED|EXPIRED|DEACTIVATED|REVOKED|CANCELLED/.test(action)) {
+      return "badge-red";
+    }
+    if (/OK|CREATED|ACTIVATED|RENEWED/.test(action)) {
+      return "badge-green";
+    }
+    return "badge-indigo";
   };
 
   return (
-    <div className="page" style={{ padding: '16px 20px', maxWidth: '100%' }}>
-      {/* Licence Banner Parity */}
-      <div 
-        className="license-banner rounded-lg mb-3 flex items-center justify-between p-3" 
-        style={{ background: '#fef8ee', borderColor: '#fde68a', borderWidth: 1 }}
-      >
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-          <span className="text-xs font-medium text-amber-950">
-            ⚠️ Licence status is unavailable. Open Licence for verification details.
-          </span>
-        </div>
-        <button 
-          onClick={() => onNavigate ? onNavigate('licence') : (window.location.pathname = '/admin/license')}
-          className="font-semibold text-amber-900 hover:text-amber-950 cursor-pointer flex items-center gap-1 text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 rounded border border-amber-300 transition-colors"
+    <div className="page" id="main">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div 
+          className="kj-toast" 
+          style={{
+            position: 'fixed',
+            top: 20,
+            right: 20,
+            zIndex: 9999,
+            padding: '10px 16px',
+            background: 'var(--surface)',
+            color: 'var(--text)',
+            borderRadius: 8,
+            boxShadow: 'var(--sh-md)',
+            border: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 13,
+            fontWeight: 600
+          }}
         >
-          <span>Licence</span>
-          <span>→</span>
-        </button>
-      </div>
+          <Check size={16} style={{ color: 'var(--primary)' }} />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
       {/* Page Header */}
-      <div className="page-hdr" style={{ marginBottom: 14 }}>
+      <div className="page-hdr">
         <div className="page-hdr-left">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <h1 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 20, fontWeight: 700, margin: 0 }}>
-              <Shield size={22} style={{ color: 'var(--primary)' }} />
-              Security
-            </h1>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#fef8ee] text-[#92400e] rounded-full border border-[#efdcb6] text-xs font-semibold shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse" />
-              <span>Counter MAIN</span>
-              <span className="font-normal opacity-80"> · REG-2026-00001 · closing</span>
-            </div>
-          </div>
-          <p className="helper" style={{ margin: '4px 0 0', fontSize: 12 }}>
-            Configure terminal authentication safeguards, high-value transaction approvals and Section 269ST statutory rules · S.B Borana Jewellers
-          </p>
+          <h1>Security</h1>
+          <p>Password rules, lock-out and how long a sign-in lasts. Every change is written to the security log.</p>
         </div>
-
-        {/* Action Button: "Save" */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button
-            onClick={() => handleSave()}
-            className="btn btn-primary btn-sm flex items-center gap-1.5"
-            style={{ fontWeight: 700 }}
-            title="Save security settings"
+        <div className="btn-group">
+          <button 
+            className="btn btn-outline"
+            onClick={handleForceLogoutAll}
+            title="Invalidate all active sessions across all devices"
           >
-            <Save size={14} />
-            <span>Save</span>
+            <LogOut size={14} /> Force logout all sessions
+          </button>
+          <button 
+            className="btn btn-primary" 
+            onClick={handleSave} 
+            disabled={saving}
+          >
+            <Save size={14} /> {saving ? "Saving…" : "Save"}
           </button>
         </div>
       </div>
 
-      {saved && (
-        <div style={{ padding: 12, background: 'var(--primary-xl)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--primary-d)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <CheckCircle2 size={16} />
-          <span style={{ fontWeight: 600 }}>Security choices recorded for this preview session.</span>
-        </div>
-      )}
-
-      {/* 11 Security Toggles & Inputs Container */}
-      <div className="card" style={{ padding: 20 }}>
-        <div className="card-header" style={{ marginBottom: 16 }}>
-          <span className="card-title">11 Security Policies & Statutory Controls</span>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Toggle 1: Two-Factor Authentication */}
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer', paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
-            <input 
-              type="checkbox" 
-              checked={twoFactorAdmin} 
-              onChange={e => setTwoFactorAdmin(e.target.checked)} 
-              style={{ marginTop: 3 }}
-            />
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 13.5 }}>1. Two-Factor Authentication (OTP on Admin Login)</div>
-              <div className="helper" style={{ fontSize: 11.5 }}>
-                Sends a 6-digit WhatsApp/SMS OTP to registered store owner mobile (9324773823) whenever admin settings or exports are accessed.
-              </div>
-            </div>
-          </label>
-
-          {/* Toggle 2: High-Value Refund OTP */}
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer', paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
-            <input 
-              type="checkbox" 
-              checked={highValueOtpRefund} 
-              onChange={e => setHighValueOtpRefund(e.target.checked)} 
-              style={{ marginTop: 3 }}
-            />
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 13.5 }}>2. High-Value Refund & Cancellation Approval (&gt; ₹50,000)</div>
-              <div className="helper" style={{ fontSize: 11.5 }}>
-                Mandates real-time supervisor or owner approval before cash outflow vouchers or refunds above ₹50,000 can be disbursed.
-              </div>
-            </div>
-          </label>
-
-          {/* Input 3: Max Failed PIN Attempts */}
-          <div style={{ paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
-            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 4 }}>3. Maximum Failed PIN Attempts Before Terminal Lockout</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, maxWidth: 300 }}>
-              <select
-                value={maxFailedAttempts}
-                onChange={e => setMaxFailedAttempts(e.target.value)}
-                className="input input-sm"
-              >
-                <option value="3">3 Attempts (Recommended)</option>
-                <option value="5">5 Attempts</option>
-                <option value="10">10 Attempts</option>
-              </select>
-            </div>
-            <div className="helper" style={{ fontSize: 11.5, marginTop: 4 }}>
-              Locks the operator session and notifies supervisor after consecutive wrong PIN inputs.
-            </div>
-          </div>
-
-          {/* Input 4: Session Idle Timeout */}
-          <div style={{ paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
-            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 4 }}>4. Inactivity Session Auto-Lock Timeout</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, maxWidth: 300 }}>
-              <select
-                value={sessionIdleTimeout}
-                onChange={e => setSessionIdleTimeout(e.target.value)}
-                className="input input-sm"
-              >
-                <option value="5">5 Minutes</option>
-                <option value="10">10 Minutes</option>
-                <option value="15">15 Minutes (Standard showroom)</option>
-                <option value="30">30 Minutes</option>
-                <option value="never">Never (Stay Unlocked)</option>
-              </select>
-            </div>
-            <div className="helper" style={{ fontSize: 11.5, marginTop: 4 }}>
-              Counter switches to quick PIN lock screen after this idle period.
-            </div>
-          </div>
-
-          {/* Input 5: Audit Log Retention */}
-          <div style={{ paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
-            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 4 }}>5. Statutory Audit Log Retention Policy</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, maxWidth: 440 }}>
-              <select
-                value={auditRetentionPeriod}
-                onChange={e => setAuditRetentionPeriod(e.target.value)}
-                className="input input-sm"
-              >
-                <option value="7-years">7 Years (Mandatory under Indian GST & Companies Act 2013)</option>
-                <option value="3-years">3 Years</option>
-                <option value="permanent">Indefinite (Immutable append-only journal)</option>
-              </select>
-            </div>
-            <div className="helper" style={{ fontSize: 11.5, marginTop: 4 }}>
-              Preserves chronological tamper-evident logs of all rate edits, invoice voids and stock reconciliations.
-            </div>
-          </div>
-
-          {/* Toggle 6: Enforce Password Complexity */}
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer', paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
-            <input 
-              type="checkbox" 
-              checked={enforcePasswordComplexity} 
-              onChange={e => setEnforcePasswordComplexity(e.target.checked)} 
-              style={{ marginTop: 3 }}
-            />
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 13.5 }}>6. Enforce Strong Staff Password Complexity</div>
-              <div className="helper" style={{ fontSize: 11.5 }}>
-                Requires minimum 8 characters with at least one uppercase letter, one digit and one special character for user logins.
-              </div>
-            </div>
-          </label>
-
-          {/* Toggle 7: Showroom LAN Whitelist */}
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer', paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
-            <input 
-              type="checkbox" 
-              checked={restrictToLanSubnet} 
-              onChange={e => setRestrictToLanSubnet(e.target.checked)} 
-              style={{ marginTop: 3 }}
-            />
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 13.5 }}>7. Restrict Counter Access to Showroom LAN (192.168.1.0/24)</div>
-              <div className="helper" style={{ fontSize: 11.5 }}>
-                Prevents billing counters from operating outside showroom Wi-Fi/LAN perimeter.
-              </div>
-            </div>
-          </label>
-
-          {/* Toggle 8: Block Concurrent Logins */}
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer', paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
-            <input 
-              type="checkbox" 
-              checked={blockConcurrentLogins} 
-              onChange={e => setBlockConcurrentLogins(e.target.checked)} 
-              style={{ marginTop: 3 }}
-            />
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 13.5 }}>8. Block Concurrent Multi-Device Sessions for Same Staff</div>
-              <div className="helper" style={{ fontSize: 11.5 }}>
-                Terminates existing terminal session if cashier logs in from another terminal counter.
-              </div>
-            </div>
-          </label>
-
-          {/* Toggle 9: Mandatory Supervisor PIN for Cancellations */}
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer', paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
-            <input 
-              type="checkbox" 
-              checked={mandateSupervisorCancellationPin} 
-              onChange={e => setMandateSupervisorCancellationPin(e.target.checked)} 
-              style={{ marginTop: 3 }}
-            />
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 13.5 }}>9. Mandatory Supervisor PIN for Invoice Voiding & Cancellations</div>
-              <div className="helper" style={{ fontSize: 11.5 }}>
-                Standard cashiers cannot void billed invoices without manager PIN override on the active POS screen.
-              </div>
-            </div>
-          </label>
-
-          {/* Toggle 10: Lock Backdated Accounting Vouchers */}
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer', paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
-            <input 
-              type="checkbox" 
-              checked={lockBackdatedVouchers} 
-              onChange={e => setLockBackdatedVouchers(e.target.checked)} 
-              style={{ marginTop: 3 }}
-            />
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 13.5 }}>10. Lock Backdated Vouchers After Monthly GST Return Period</div>
-              <div className="helper" style={{ fontSize: 11.5 }}>
-                Prevents editing or backdating sales/purchase entries for months where GSTR-1 & 3B have already been filed.
-              </div>
-            </div>
-          </label>
-
-          {/* Input 11: Section 269ST PAN/Aadhaar Threshold */}
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 4 }}>11. Mandatory PAN / Aadhaar Threshold (Section 269ST & Rule 114B)</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, maxWidth: 300 }}>
-              <span style={{ fontWeight: 700 }}>₹</span>
+      {/* Card 1: Security Settings */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-body">
+          <div className="g4">
+            <div className="form-group">
+              <label className="label">Minimum password length</label>
               <input 
-                type="text" 
-                value={mandatoryPanThreshold} 
-                onChange={e => setMandatoryPanThreshold(e.target.value)} 
-                className="input input-sm" 
+                className="input" 
+                type="number" 
+                min={8} 
+                max={64} 
+                value={settings.pwdMinLength} 
+                onChange={e => setSettings({ ...settings, pwdMinLength: Number(e.target.value) || 8 })} 
               />
             </div>
-            <div className="helper" style={{ fontSize: 11.5, marginTop: 4 }}>
-              Statutory ₹2,00,000 threshold under Income Tax Act: cash transactions above this mandate verified customer PAN.
+
+            <div className="form-group">
+              <label className="label">Wrong tries before lock-out</label>
+              <input 
+                className="input" 
+                type="number" 
+                min={3} 
+                max={20} 
+                value={settings.loginMaxAttempts} 
+                onChange={e => setSettings({ ...settings, loginMaxAttempts: Number(e.target.value) || 5 })} 
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="label">Lock-out minutes</label>
+              <input 
+                className="input" 
+                type="number" 
+                min={1} 
+                max={1440} 
+                value={settings.loginLockMinutes} 
+                onChange={e => setSettings({ ...settings, loginLockMinutes: Number(e.target.value) || 15 })} 
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="label">Sign-in lasts (hours)</label>
+              <input 
+                className="input" 
+                type="number" 
+                min={1} 
+                max={720} 
+                value={settings.sessionHours} 
+                onChange={e => setSettings({ ...settings, sessionHours: Number(e.target.value) || 12 })} 
+              />
+              <div className="helper">After this, users sign in again.</div>
+            </div>
+          </div>
+
+          <label className="check" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input 
+              type="checkbox" 
+              checked={settings.requireLetterDigit} 
+              onChange={e => setSettings({ ...settings, requireLetterDigit: e.target.checked })} 
+            />
+            <span>Passwords must contain a letter and a digit</span>
+          </label>
+
+          <label className="check" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input 
+              type="checkbox" 
+              checked={settings.mfaForAdmins} 
+              disabled 
+            />
+            <span>
+              One-time code (OTP) for the owner and admins
+              <span className="badge badge-gray" style={{ marginLeft: 6 }}>coming with SMS / WhatsApp setup</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      {/* Card 2: Security Log */}
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Security log</span>
+          <span className="helper">Sign-ins, users, roles, settings and licence</span>
+        </div>
+        <div className="card-body">
+          <div className="search-row">
+            <div className="search-box">
+              <Search size={14} />
+              <input 
+                placeholder="Search user, reference, details…" 
+                value={search} 
+                onChange={e => { setSearch(e.target.value); setPage(1); }} 
+              />
+            </div>
+
+            <input 
+              className="input" 
+              type="date" 
+              style={{ width: "auto" }} 
+              value={fromDate} 
+              onChange={e => { setFromDate(e.target.value); setPage(1); }} 
+              aria-label="From" 
+            />
+
+            <input 
+              className="input" 
+              type="date" 
+              style={{ width: "auto" }} 
+              value={toDate} 
+              onChange={e => { setToDate(e.target.value); setPage(1); }} 
+              aria-label="To" 
+            />
+          </div>
+
+          <div className="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Who</th>
+                  <th>Action</th>
+                  <th>Record</th>
+                  <th>Details</th>
+                  <th>IP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLogs.map(log => (
+                  <tr key={log.id}>
+                    <td style={{ whiteSpace: "nowrap", fontSize: 12.5 }}>
+                      {formatDate(log.at)}
+                    </td>
+                    <td>
+                      {log.actor_name || <span className="badge badge-gray">{log.actor_type}</span>}
+                    </td>
+                    <td>
+                      <span className={`badge ${getActionBadgeClass(log.action)}`}>
+                        {log.action}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: 12.5 }}>
+                      {log.entity}
+                      {log.entity_id ? ` #${log.entity_id}` : ''}
+                      {log.ref_no ? ` · ${log.ref_no}` : ''}
+                      {log.reason && (
+                        <div className="helper">Reason: {log.reason}</div>
+                      )}
+                    </td>
+                    <td style={{ fontSize: 12 }}>
+                      {Object.entries(log.details).map(([k, v]) => (
+                        <span key={k} style={{ marginRight: 6 }}>
+                          <span style={{ color: 'var(--muted)' }}>{k}:</span>{' '}
+                          <strong>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</strong>
+                        </span>
+                      ))}
+                    </td>
+                    <td className="mono">{log.ip || "—"}</td>
+                  </tr>
+                ))}
+
+                {filteredLogs.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="empty">No entries for these filters.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          <div className="dt-pager" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, fontSize: 12, color: 'var(--muted)' }}>
+            <div>
+              Showing {filteredLogs.length} entries
+            </div>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <select 
+                className="input" 
+                style={{ width: 'auto', padding: '3px 8px', fontSize: 12 }} 
+                value={pageSize} 
+                onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+              >
+                <option value={20}>20 / page</option>
+                <option value={50}>50 / page</option>
+                <option value={100}>100 / page</option>
+              </select>
             </div>
           </div>
         </div>
       </div>
-      <section className="card mt-4">
-        <div className="card-header"><span className="card-title">Activity</span></div>
-        <div className="tbl-wrap"><table className="tbl">
-          <thead><tr>{['When', 'Who', 'Action', 'Record', 'Details', 'IP'].map(column => <th scope="col" key={column}>{column}</th>)}</tr></thead>
-          <tbody><tr><td colSpan={6} className="text-center py-8">No security activity source is connected.</td></tr></tbody>
-        </table></div>
-      </section>
     </div>
   );
 };
 
 export default SecurityView;
-

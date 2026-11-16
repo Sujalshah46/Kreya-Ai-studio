@@ -1,1559 +1,681 @@
-import React, { useState } from 'react';
-import { KeyRound, Shield, Save, Check, Users, Lock, Search, Filter, Copy, CheckCircle2, AlertTriangle, Plus, X } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { Plus, Save, Search, Lock, Copy, Trash2, Check } from 'lucide-react';
 
 interface RolesPermissionsViewProps {
   onNavigate?: (module: string) => void;
 }
 
-interface PermissionDef {
+interface PermissionItem {
   key: string;
-  module: string;
   action: string;
   description: string;
 }
 
-interface RoleDef {
-  id: string;
-  name: string;
-  description: string;
-  isSystem: boolean;
-  systemKey: string;
-  permissions: string[];
+interface ModulePermissions {
+  module: string;
+  label: string;
+  permissions: PermissionItem[];
 }
 
-// Permissions count: 95
-const PERMISSIONS_DATA: PermissionDef[] = [
-  {
-    "key": "dashboard.view",
-    "module": "dashboard",
-    "action": "view",
-    "description": "Dashboard: view"
-  },
-  {
-    "key": "customers.view",
-    "module": "customers",
-    "action": "view",
-    "description": "Customers: view"
-  },
-  {
-    "key": "customers.create",
-    "module": "customers",
-    "action": "create",
-    "description": "Customers: create"
-  },
-  {
-    "key": "sales.discount_above_limit",
-    "module": "sales",
-    "action": "discount_above_limit",
-    "description": "Sales orders: discount above limit"
-  },
-  {
-    "key": "sales.cancel",
-    "module": "sales",
-    "action": "cancel",
-    "description": "Sales orders: cancel"
-  },
-  {
-    "key": "sales.deliver",
-    "module": "sales",
-    "action": "deliver",
-    "description": "Sales orders: deliver"
-  },
-  {
-    "key": "sales.print",
-    "module": "sales",
-    "action": "print",
-    "description": "Sales orders: print"
-  },
-  {
-    "key": "sales.view_margin",
-    "module": "sales",
-    "action": "view_margin",
-    "description": "Sales orders: view margin"
-  },
-  {
-    "key": "payments.collect",
-    "module": "payments",
-    "action": "collect",
-    "description": "Payments: collect"
-  },
-  {
-    "key": "payments.void",
-    "module": "payments",
-    "action": "void",
-    "description": "Payments: void"
-  },
-  {
-    "key": "payments.view",
-    "module": "payments",
-    "action": "view",
-    "description": "Payments: view"
-  },
-  {
-    "key": "bookings.view",
-    "module": "bookings",
-    "action": "view",
-    "description": "Metal advance booking: view"
-  },
-  {
-    "key": "bookings.create",
-    "module": "bookings",
-    "action": "create",
-    "description": "Metal advance booking: create"
-  },
-  {
-    "key": "bookings.settle",
-    "module": "bookings",
-    "action": "settle",
-    "description": "Metal advance booking: settle"
-  },
-  {
-    "key": "bookings.refund",
-    "module": "bookings",
-    "action": "refund",
-    "description": "Metal advance booking: refund"
-  },
-  {
-    "key": "buyback.view",
-    "module": "buyback",
-    "action": "view",
-    "description": "Returns / Buy-back: view"
-  },
-  {
-    "key": "buyback.create",
-    "module": "buyback",
-    "action": "create",
-    "description": "Returns / Buy-back: create"
-  },
-  {
-    "key": "repairs.view",
-    "module": "repairs",
-    "action": "view",
-    "description": "Repairs: view"
-  },
-  {
-    "key": "repairs.create",
-    "module": "repairs",
-    "action": "create",
-    "description": "Repairs: create"
-  },
-  {
-    "key": "repairs.edit",
-    "module": "repairs",
-    "action": "edit",
-    "description": "Repairs: edit"
-  },
-  {
-    "key": "register.open",
-    "module": "register",
-    "action": "open",
-    "description": "Cash register: open"
-  },
-  {
-    "key": "register.close",
-    "module": "register",
-    "action": "close",
-    "description": "Cash register: close"
-  },
-  {
-    "key": "register.cash_entries",
-    "module": "register",
-    "action": "cash_entries",
-    "description": "Cash register: cash entries"
-  },
-  {
-    "key": "register.reopen",
-    "module": "register",
-    "action": "reopen",
-    "description": "Cash register: reopen"
-  },
-  {
-    "key": "register.approve_difference",
-    "module": "register",
-    "action": "approve_difference",
-    "description": "Cash register: approve difference"
-  },
-  {
-    "key": "register.attach",
-    "module": "register",
-    "action": "attach",
-    "description": "Cash register: attach"
-  },
-  {
-    "key": "reports.sales",
-    "module": "reports",
-    "action": "sales",
-    "description": "Reports: sales"
-  },
-  {
-    "key": "reports.purchase",
-    "module": "reports",
-    "action": "purchase",
-    "description": "Reports: purchase"
-  },
-  {
-    "key": "reports.stock",
-    "module": "reports",
-    "action": "stock",
-    "description": "Reports: stock"
-  },
-  {
-    "key": "reports.margin",
-    "module": "reports",
-    "action": "margin",
-    "description": "Reports: margin"
-  },
-  {
-    "key": "reports.gst",
-    "module": "reports",
-    "action": "gst",
-    "description": "Reports: gst"
-  },
-  {
-    "key": "settings.shop",
-    "module": "settings",
-    "action": "shop",
-    "description": "Settings: shop"
-  },
-  {
-    "key": "settings.gst_invoice",
-    "module": "settings",
-    "action": "gst_invoice",
-    "description": "Settings: gst invoice"
-  },
-  {
-    "key": "settings.theme",
-    "module": "settings",
-    "action": "theme",
-    "description": "Settings: theme"
-  },
-  {
-    "key": "settings.login_page",
-    "module": "settings",
-    "action": "login_page",
-    "description": "Settings: login page"
-  },
-  {
-    "key": "settings.security",
-    "module": "settings",
-    "action": "security",
-    "description": "Settings: security"
-  },
-  {
-    "key": "settings.integrations",
-    "module": "settings",
-    "action": "integrations",
-    "description": "Settings: integrations"
-  },
-  {
-    "key": "settings.tags",
-    "module": "settings",
-    "action": "tags",
-    "description": "Settings: tags"
-  },
-  {
-    "key": "users.view",
-    "module": "users",
-    "action": "view",
-    "description": "Users: view"
-  },
-  {
-    "key": "users.create",
-    "module": "users",
-    "action": "create",
-    "description": "Users: create"
-  },
-  {
-    "key": "users.edit",
-    "module": "users",
-    "action": "edit",
-    "description": "Users: edit"
-  },
-  {
-    "key": "users.disable",
-    "module": "users",
-    "action": "disable",
-    "description": "Users: disable"
-  },
-  {
-    "key": "users.reset_password",
-    "module": "users",
-    "action": "reset_password",
-    "description": "Users: reset password"
-  },
-  {
-    "key": "roles.manage",
-    "module": "roles",
-    "action": "manage",
-    "description": "Roles: manage"
-  },
-  {
-    "key": "integrations.api_keys",
-    "module": "integrations",
-    "action": "api_keys",
-    "description": "Integrations: api keys"
-  },
-  {
-    "key": "integrations.webhooks",
-    "module": "integrations",
-    "action": "webhooks",
-    "description": "Integrations: webhooks"
-  },
-  {
-    "key": "logs.view_audit",
-    "module": "logs",
-    "action": "view_audit",
-    "description": "Logs: view audit"
-  },
-  {
-    "key": "customers.edit",
-    "module": "customers",
-    "action": "edit",
-    "description": "Customers: edit"
-  },
-  {
-    "key": "customers.view_kyc",
-    "module": "customers",
-    "action": "view_kyc",
-    "description": "Customers: view kyc"
-  },
-  {
-    "key": "customers.export",
-    "module": "customers",
-    "action": "export",
-    "description": "Customers: export"
-  },
-  {
-    "key": "rates.view",
-    "module": "rates",
-    "action": "view",
-    "description": "Daily rates: view"
-  },
-  {
-    "key": "rates.edit",
-    "module": "rates",
-    "action": "edit",
-    "description": "Daily rates: edit"
-  },
-  {
-    "key": "inventory.view",
-    "module": "inventory",
-    "action": "view",
-    "description": "Inventory: view"
-  },
-  {
-    "key": "repairs.collect",
-    "module": "repairs",
-    "action": "collect",
-    "description": "Repairs: collect"
-  },
-  {
-    "key": "loans.view",
-    "module": "loans",
-    "action": "view",
-    "description": "Gold / silver loans: view"
-  },
-  {
-    "key": "loans.create",
-    "module": "loans",
-    "action": "create",
-    "description": "Gold / silver loans: create"
-  },
-  {
-    "key": "loans.collect",
-    "module": "loans",
-    "action": "collect",
-    "description": "Gold / silver loans: collect"
-  },
-  {
-    "key": "loans.close",
-    "module": "loans",
-    "action": "close",
-    "description": "Gold / silver loans: close"
-  },
-  {
-    "key": "loans.waive",
-    "module": "loans",
-    "action": "waive",
-    "description": "Gold / silver loans: waive"
-  },
-  {
-    "key": "loans.return_item",
-    "module": "loans",
-    "action": "return_item",
-    "description": "Gold / silver loans: return item"
-  },
-  {
-    "key": "oldgold.view",
-    "module": "oldgold",
-    "action": "view",
-    "description": "Old gold: view"
-  },
-  {
-    "key": "oldgold.create",
-    "module": "oldgold",
-    "action": "create",
-    "description": "Old gold: create"
-  },
-  {
-    "key": "oldgold.settle",
-    "module": "oldgold",
-    "action": "settle",
-    "description": "Old gold: settle"
-  },
-  {
-    "key": "oldgold.undo_exchange",
-    "module": "oldgold",
-    "action": "undo_exchange",
-    "description": "Old gold: undo exchange"
-  },
-  {
-    "key": "metalstock.move",
-    "module": "metalstock",
-    "action": "move",
-    "description": "Old metal stock: move"
-  },
-  {
-    "key": "suppliers.view",
-    "module": "suppliers",
-    "action": "view",
-    "description": "Suppliers: view"
-  },
-  {
-    "key": "suppliers.edit",
-    "module": "suppliers",
-    "action": "edit",
-    "description": "Suppliers: edit"
-  },
-  {
-    "key": "suppliers.activate",
-    "module": "suppliers",
-    "action": "activate",
-    "description": "Suppliers: activate"
-  },
-  {
-    "key": "po.view",
-    "module": "po",
-    "action": "view",
-    "description": "Purchase orders: view"
-  },
-  {
-    "key": "po.create",
-    "module": "po",
-    "action": "create",
-    "description": "Purchase orders: create"
-  },
-  {
-    "key": "po.approve",
-    "module": "po",
-    "action": "approve",
-    "description": "Purchase orders: approve"
-  },
-  {
-    "key": "po.cancel_close",
-    "module": "po",
-    "action": "cancel_close",
-    "description": "Purchase orders: cancel close"
-  },
-  {
-    "key": "po.price_override",
-    "module": "po",
-    "action": "price_override",
-    "description": "Purchase orders: price override"
-  },
-  {
-    "key": "grn.post",
-    "module": "grn",
-    "action": "post",
-    "description": "Goods receipt: post"
-  },
-  {
-    "key": "grn.reverse",
-    "module": "grn",
-    "action": "reverse",
-    "description": "Goods receipt: reverse"
-  },
-  {
-    "key": "bills.view",
-    "module": "bills",
-    "action": "view",
-    "description": "Supplier bills: view"
-  },
-  {
-    "key": "bills.edit",
-    "module": "bills",
-    "action": "edit",
-    "description": "Supplier bills: edit"
-  },
-  {
-    "key": "bills.post",
-    "module": "bills",
-    "action": "post",
-    "description": "Supplier bills: post"
-  },
-  {
-    "key": "bills.cancel",
-    "module": "bills",
-    "action": "cancel",
-    "description": "Supplier bills: cancel"
-  },
-  {
-    "key": "bills.documents",
-    "module": "bills",
-    "action": "documents",
-    "description": "Supplier bills: documents"
-  },
-  {
-    "key": "supplier_payments.create",
-    "module": "supplier_payments",
-    "action": "create",
-    "description": "Supplier payments: create"
-  },
-  {
-    "key": "supplier_payments.void",
-    "module": "supplier_payments",
-    "action": "void",
-    "description": "Supplier payments: void"
-  },
-  {
-    "key": "logs.view_errors",
-    "module": "logs",
-    "action": "view_errors",
-    "description": "Logs: view errors"
-  },
-  {
-    "key": "inventory.create",
-    "module": "inventory",
-    "action": "create",
-    "description": "Inventory: create"
-  },
-  {
-    "key": "inventory.edit",
-    "module": "inventory",
-    "action": "edit",
-    "description": "Inventory: edit"
-  },
-  {
-    "key": "inventory.edit_others",
-    "module": "inventory",
-    "action": "edit_others",
-    "description": "Inventory: edit others"
-  },
-  {
-    "key": "inventory.adjust",
-    "module": "inventory",
-    "action": "adjust",
-    "description": "Inventory: adjust"
-  },
-  {
-    "key": "inventory.import",
-    "module": "inventory",
-    "action": "import",
-    "description": "Inventory: import"
-  },
-  {
-    "key": "inventory.view_cost",
-    "module": "inventory",
-    "action": "view_cost",
-    "description": "Inventory: view cost"
-  },
-  {
-    "key": "inventory.images",
-    "module": "inventory",
-    "action": "images",
-    "description": "Inventory: images"
-  },
-  {
-    "key": "inventory.verify",
-    "module": "inventory",
-    "action": "verify",
-    "description": "Inventory: verify"
-  },
-  {
-    "key": "tags.print",
-    "module": "tags",
-    "action": "print",
-    "description": "Tags: print"
-  },
-  {
-    "key": "sales.view",
-    "module": "sales",
-    "action": "view",
-    "description": "Sales orders: view"
-  },
-  {
-    "key": "sales.create",
-    "module": "sales",
-    "action": "create",
-    "description": "Sales orders: create"
-  },
-  {
-    "key": "sales.edit",
-    "module": "sales",
-    "action": "edit",
-    "description": "Sales orders: edit"
-  }
-];
-const INITIAL_ROLES_DATA: RoleDef[] = [
-  {
-    "id": "8",
-    "name": "Viewer",
-    "description": "Read-only.",
-    "isSystem": true,
-    "systemKey": "viewer",
-    "permissions": [
-      "dashboard.view",
-      "customers.view",
-      "rates.view",
-      "inventory.view",
-      "sales.view",
-      "payments.view",
-      "bookings.view",
-      "buyback.view",
-      "repairs.view",
-      "loans.view",
-      "oldgold.view",
-      "suppliers.view",
-      "po.view",
-      "bills.view",
-      "users.view"
+interface RoleItem {
+  id: number;
+  name: string;
+  description: string;
+  is_system: boolean;
+  system_key: string;
+  row_version: number;
+  permissions: string[];
+  users: number;
+}
+
+const ALL_MODULES_PERMISSIONS: ModulePermissions[] = [
+  {
+    module: "dashboard",
+    label: "Dashboard",
+    permissions: [{ key: "dashboard.view", action: "view", description: "Dashboard: view" }]
+  },
+  {
+    module: "customers",
+    label: "Customers",
+    permissions: [
+      { key: "customers.view", action: "view", description: "Customers: view" },
+      { key: "customers.create", action: "create", description: "Customers: create" },
+      { key: "customers.edit", action: "edit", description: "Customers: edit" },
+      { key: "customers.view_kyc", action: "view_kyc", description: "Customers: view kyc" },
+      { key: "customers.export", action: "export", description: "Customers: export" }
     ]
   },
   {
-    "id": "1",
-    "name": "Owner",
-    "description": "Shop owner (Master Admin). Holds every permission. Protected.",
-    "isSystem": true,
-    "systemKey": "owner",
-    "permissions": [
-      "dashboard.view",
-      "customers.view",
-      "customers.create",
-      "customers.edit",
-      "customers.view_kyc",
-      "customers.export",
-      "rates.view",
-      "rates.edit",
-      "inventory.view",
-      "inventory.create",
-      "inventory.edit",
-      "inventory.edit_others",
-      "inventory.adjust",
-      "inventory.import",
-      "inventory.view_cost",
-      "inventory.images",
-      "inventory.verify",
-      "tags.print",
-      "sales.view",
-      "sales.create",
-      "sales.edit",
-      "sales.discount_above_limit",
-      "sales.cancel",
-      "sales.deliver",
-      "sales.print",
-      "sales.view_margin",
-      "payments.collect",
-      "payments.void",
-      "payments.view",
-      "bookings.view",
-      "bookings.create",
-      "bookings.settle",
-      "bookings.refund",
-      "buyback.view",
-      "buyback.create",
-      "repairs.view",
-      "repairs.create",
-      "repairs.edit",
-      "repairs.collect",
-      "loans.view",
-      "loans.create",
-      "loans.collect",
-      "loans.close",
-      "loans.waive",
-      "loans.return_item",
-      "oldgold.view",
-      "oldgold.create",
-      "oldgold.settle",
-      "oldgold.undo_exchange",
-      "metalstock.move",
-      "suppliers.view",
-      "suppliers.edit",
-      "suppliers.activate",
-      "po.view",
-      "po.create",
-      "po.approve",
-      "po.cancel_close",
-      "po.price_override",
-      "grn.post",
-      "grn.reverse",
-      "bills.view",
-      "bills.edit",
-      "bills.post",
-      "bills.cancel",
-      "bills.documents",
-      "supplier_payments.create",
-      "supplier_payments.void",
-      "register.open",
-      "register.close",
-      "register.cash_entries",
-      "register.reopen",
-      "register.approve_difference",
-      "register.attach",
-      "reports.sales",
-      "reports.purchase",
-      "reports.stock",
-      "reports.margin",
-      "reports.gst",
-      "settings.shop",
-      "settings.gst_invoice",
-      "settings.theme",
-      "settings.login_page",
-      "settings.security",
-      "settings.integrations",
-      "settings.tags",
-      "users.view",
-      "users.create",
-      "users.edit",
-      "users.disable",
-      "users.reset_password",
-      "roles.manage",
-      "integrations.api_keys",
-      "integrations.webhooks",
-      "logs.view_audit",
-      "logs.view_errors"
+    module: "rates",
+    label: "Daily rates",
+    permissions: [
+      { key: "rates.view", action: "view", description: "Daily rates: view" },
+      { key: "rates.edit", action: "edit", description: "Daily rates: edit" }
     ]
   },
   {
-    "id": "2",
-    "name": "Admin",
-    "description": "Full access to the shop, including users and settings.",
-    "isSystem": true,
-    "systemKey": "admin",
-    "permissions": [
-      "dashboard.view",
-      "customers.view",
-      "customers.create",
-      "customers.edit",
-      "customers.view_kyc",
-      "customers.export",
-      "rates.view",
-      "rates.edit",
-      "inventory.view",
-      "inventory.create",
-      "inventory.edit",
-      "inventory.edit_others",
-      "inventory.adjust",
-      "inventory.import",
-      "inventory.view_cost",
-      "inventory.images",
-      "inventory.verify",
-      "tags.print",
-      "sales.view",
-      "sales.create",
-      "sales.edit",
-      "sales.discount_above_limit",
-      "sales.cancel",
-      "sales.deliver",
-      "sales.print",
-      "sales.view_margin",
-      "payments.collect",
-      "payments.void",
-      "payments.view",
-      "bookings.view",
-      "bookings.create",
-      "bookings.settle",
-      "bookings.refund",
-      "buyback.view",
-      "buyback.create",
-      "repairs.view",
-      "repairs.create",
-      "repairs.edit",
-      "repairs.collect",
-      "loans.view",
-      "loans.create",
-      "loans.collect",
-      "loans.close",
-      "loans.waive",
-      "loans.return_item",
-      "oldgold.view",
-      "oldgold.create",
-      "oldgold.settle",
-      "oldgold.undo_exchange",
-      "metalstock.move",
-      "suppliers.view",
-      "suppliers.edit",
-      "suppliers.activate",
-      "po.view",
-      "po.create",
-      "po.approve",
-      "po.cancel_close",
-      "po.price_override",
-      "grn.post",
-      "grn.reverse",
-      "bills.view",
-      "bills.edit",
-      "bills.post",
-      "bills.cancel",
-      "bills.documents",
-      "supplier_payments.create",
-      "supplier_payments.void",
-      "register.open",
-      "register.close",
-      "register.cash_entries",
-      "register.reopen",
-      "register.approve_difference",
-      "register.attach",
-      "reports.sales",
-      "reports.purchase",
-      "reports.stock",
-      "reports.margin",
-      "reports.gst",
-      "settings.shop",
-      "settings.gst_invoice",
-      "settings.theme",
-      "settings.login_page",
-      "settings.security",
-      "settings.integrations",
-      "settings.tags",
-      "users.view",
-      "users.create",
-      "users.edit",
-      "users.disable",
-      "users.reset_password",
-      "roles.manage",
-      "integrations.api_keys",
-      "integrations.webhooks",
-      "logs.view_audit",
-      "logs.view_errors"
+    module: "inventory",
+    label: "Inventory",
+    permissions: [
+      { key: "inventory.view", action: "view", description: "Inventory: view" },
+      { key: "inventory.create", action: "create", description: "Inventory: create" },
+      { key: "inventory.edit", action: "edit", description: "Inventory: edit" },
+      { key: "inventory.edit_others", action: "edit_others", description: "Inventory: edit others" },
+      { key: "inventory.adjust", action: "adjust", description: "Inventory: adjust" },
+      { key: "inventory.import", action: "import", description: "Inventory: import" },
+      { key: "inventory.view_cost", action: "view_cost", description: "Inventory: view cost" },
+      { key: "inventory.images", action: "images", description: "Inventory: images" },
+      { key: "inventory.verify", action: "verify", description: "Inventory: verify" }
     ]
   },
   {
-    "id": "3",
-    "name": "Manager",
-    "description": "Runs the shop day to day. No security, integrations or role editing.",
-    "isSystem": true,
-    "systemKey": "manager",
-    "permissions": [
-      "dashboard.view",
-      "customers.view",
-      "customers.create",
-      "customers.edit",
-      "customers.view_kyc",
-      "customers.export",
-      "rates.view",
-      "rates.edit",
-      "inventory.view",
-      "inventory.create",
-      "inventory.edit",
-      "inventory.edit_others",
-      "inventory.adjust",
-      "inventory.import",
-      "inventory.view_cost",
-      "inventory.images",
-      "inventory.verify",
-      "tags.print",
-      "sales.view",
-      "sales.create",
-      "sales.edit",
-      "sales.discount_above_limit",
-      "sales.cancel",
-      "sales.deliver",
-      "sales.print",
-      "sales.view_margin",
-      "payments.collect",
-      "payments.void",
-      "payments.view",
-      "bookings.view",
-      "bookings.create",
-      "bookings.settle",
-      "bookings.refund",
-      "buyback.view",
-      "buyback.create",
-      "repairs.view",
-      "repairs.create",
-      "repairs.edit",
-      "repairs.collect",
-      "loans.view",
-      "loans.create",
-      "loans.collect",
-      "loans.close",
-      "loans.waive",
-      "loans.return_item",
-      "oldgold.view",
-      "oldgold.create",
-      "oldgold.settle",
-      "oldgold.undo_exchange",
-      "metalstock.move",
-      "suppliers.view",
-      "suppliers.edit",
-      "suppliers.activate",
-      "po.view",
-      "po.create",
-      "po.approve",
-      "po.cancel_close",
-      "po.price_override",
-      "grn.post",
-      "grn.reverse",
-      "bills.view",
-      "bills.edit",
-      "bills.post",
-      "bills.cancel",
-      "bills.documents",
-      "supplier_payments.create",
-      "supplier_payments.void",
-      "register.open",
-      "register.close",
-      "register.cash_entries",
-      "register.reopen",
-      "register.approve_difference",
-      "register.attach",
-      "reports.sales",
-      "reports.purchase",
-      "reports.stock",
-      "reports.margin",
-      "reports.gst",
-      "settings.shop",
-      "settings.gst_invoice",
-      "settings.theme",
-      "settings.login_page",
-      "settings.tags",
-      "users.view",
-      "users.create",
-      "users.edit",
-      "users.disable",
-      "logs.view_audit"
+    module: "tags",
+    label: "Tags",
+    permissions: [{ key: "tags.print", action: "print", description: "Tags: print" }]
+  },
+  {
+    module: "sales",
+    label: "Sales orders",
+    permissions: [
+      { key: "sales.view", action: "view", description: "Sales orders: view" },
+      { key: "sales.create", action: "create", description: "Sales orders: create" },
+      { key: "sales.edit", action: "edit", description: "Sales orders: edit" },
+      { key: "sales.discount_above_limit", action: "discount_above_limit", description: "Sales orders: discount above limit" },
+      { key: "sales.cancel", action: "cancel", description: "Sales orders: cancel" },
+      { key: "sales.deliver", action: "deliver", description: "Sales orders: deliver" },
+      { key: "sales.print", action: "print", description: "Sales orders: print" },
+      { key: "sales.view_margin", action: "view_margin", description: "Sales orders: view margin" }
     ]
   },
   {
-    "id": "4",
-    "name": "Cashier",
-    "description": "Counter billing, receipts and the cash register.",
-    "isSystem": true,
-    "systemKey": "cashier",
-    "permissions": [
-      "dashboard.view",
-      "customers.view",
-      "customers.create",
-      "rates.view",
-      "inventory.view",
-      "sales.view",
-      "sales.create",
-      "sales.print",
-      "sales.deliver",
-      "payments.collect",
-      "payments.view",
-      "bookings.view",
-      "bookings.create",
-      "repairs.view",
-      "repairs.collect",
-      "loans.view",
-      "loans.collect",
-      "loans.return_item",
-      "oldgold.view",
-      "register.open",
-      "register.close",
-      "register.cash_entries",
-      "tags.print"
+    module: "payments",
+    label: "Payments",
+    permissions: [
+      { key: "payments.view", action: "view", description: "Payments: view" },
+      { key: "payments.collect", action: "collect", description: "Payments: collect" },
+      { key: "payments.void", action: "void", description: "Payments: void" }
     ]
   },
   {
-    "id": "5",
-    "name": "Sales",
-    "description": "Sales staff: customers, orders, bookings, repairs, old gold. (Legacy \"staff\" users get this role.)",
-    "isSystem": true,
-    "systemKey": "sales",
-    "permissions": [
-      "dashboard.view",
-      "customers.view",
-      "customers.create",
-      "customers.edit",
-      "rates.view",
-      "inventory.view",
-      "inventory.create",
-      "inventory.edit",
-      "inventory.edit_others",
-      "inventory.images",
-      "inventory.verify",
-      "tags.print",
-      "sales.view",
-      "sales.create",
-      "sales.edit",
-      "sales.deliver",
-      "sales.print",
-      "payments.collect",
-      "payments.view",
-      "bookings.view",
-      "bookings.create",
-      "bookings.settle",
-      "bookings.refund",
-      "buyback.view",
-      "repairs.view",
-      "repairs.create",
-      "repairs.edit",
-      "repairs.collect",
-      "loans.view",
-      "loans.create",
-      "loans.collect",
-      "loans.return_item",
-      "oldgold.view",
-      "oldgold.create",
-      "oldgold.settle",
-      "register.open",
-      "register.cash_entries"
+    module: "bookings",
+    label: "Metal advance booking",
+    permissions: [
+      { key: "bookings.view", action: "view", description: "Metal advance booking: view" },
+      { key: "bookings.create", action: "create", description: "Metal advance booking: create" },
+      { key: "bookings.settle", action: "settle", description: "Metal advance booking: settle" },
+      { key: "bookings.refund", action: "refund", description: "Metal advance booking: refund" }
     ]
   },
   {
-    "id": "6",
-    "name": "Accountant",
-    "description": "Views everything, runs reports and exports, handles bills and supplier payments.",
-    "isSystem": true,
-    "systemKey": "accountant",
-    "permissions": [
-      "dashboard.view",
-      "customers.view",
-      "rates.view",
-      "inventory.view",
-      "sales.view",
-      "payments.view",
-      "bookings.view",
-      "buyback.view",
-      "repairs.view",
-      "loans.view",
-      "oldgold.view",
-      "suppliers.view",
-      "po.view",
-      "bills.view",
-      "users.view",
-      "bills.edit",
-      "bills.post",
-      "bills.cancel",
-      "bills.documents",
-      "supplier_payments.create",
-      "supplier_payments.void",
-      "reports.sales",
-      "reports.purchase",
-      "reports.stock",
-      "reports.margin",
-      "reports.gst",
-      "customers.export",
-      "inventory.view_cost",
-      "sales.print",
-      "sales.view_margin",
-      "logs.view_audit"
+    module: "buyback",
+    label: "Returns / Buy-back",
+    permissions: [
+      { key: "buyback.view", action: "view", description: "Returns / Buy-back: view" },
+      { key: "buyback.create", action: "create", description: "Returns / Buy-back: create" }
     ]
   },
   {
-    "id": "7",
-    "name": "Stock Manager",
-    "description": "Inventory only: adds stock items and edits the items he added. Items added by others open read-only.",
-    "isSystem": true,
-    "systemKey": "stock_manager",
-    "permissions": [
-      "inventory.view",
-      "inventory.create",
-      "inventory.edit",
-      "inventory.adjust",
-      "inventory.images",
-      "inventory.verify",
-      "tags.print"
+    module: "repairs",
+    label: "Repairs",
+    permissions: [
+      { key: "repairs.view", action: "view", description: "Repairs: view" },
+      { key: "repairs.create", action: "create", description: "Repairs: create" },
+      { key: "repairs.edit", action: "edit", description: "Repairs: edit" },
+      { key: "repairs.collect", action: "collect", description: "Repairs: collect" }
+    ]
+  },
+  {
+    module: "loans",
+    label: "Gold / silver loans",
+    permissions: [
+      { key: "loans.view", action: "view", description: "Gold / silver loans: view" },
+      { key: "loans.create", action: "create", description: "Gold / silver loans: create" },
+      { key: "loans.collect", action: "collect", description: "Gold / silver loans: collect" },
+      { key: "loans.return_item", action: "return_item", description: "Gold / silver loans: return item" },
+      { key: "loans.close", action: "close", description: "Gold / silver loans: close" },
+      { key: "loans.waive", action: "waive", description: "Gold / silver loans: waive" }
+    ]
+  },
+  {
+    module: "oldgold",
+    label: "Old gold",
+    permissions: [
+      { key: "oldgold.view", action: "view", description: "Old gold: view" },
+      { key: "oldgold.create", action: "create", description: "Old gold: create" },
+      { key: "oldgold.settle", action: "settle", description: "Old gold: settle" },
+      { key: "oldgold.undo_exchange", action: "undo_exchange", description: "Old gold: undo exchange" }
+    ]
+  },
+  {
+    module: "metalstock",
+    label: "Old metal stock",
+    permissions: [{ key: "metalstock.move", action: "move", description: "Old metal stock: move" }]
+  },
+  {
+    module: "suppliers",
+    label: "Suppliers",
+    permissions: [
+      { key: "suppliers.view", action: "view", description: "Suppliers: view" },
+      { key: "suppliers.edit", action: "edit", description: "Suppliers: edit" },
+      { key: "suppliers.activate", action: "activate", description: "Suppliers: activate" }
+    ]
+  },
+  {
+    module: "po",
+    label: "Purchase orders",
+    permissions: [
+      { key: "po.view", action: "view", description: "Purchase orders: view" },
+      { key: "po.create", action: "create", description: "Purchase orders: create" },
+      { key: "po.approve", action: "approve", description: "Purchase orders: approve" },
+      { key: "po.price_override", action: "price_override", description: "Purchase orders: price override" },
+      { key: "po.cancel_close", action: "cancel_close", description: "Purchase orders: cancel close" }
+    ]
+  },
+  {
+    module: "grn",
+    label: "Goods receipt",
+    permissions: [
+      { key: "grn.post", action: "post", description: "Goods receipt: post" },
+      { key: "grn.reverse", action: "reverse", description: "Goods receipt: reverse" }
+    ]
+  },
+  {
+    module: "bills",
+    label: "Supplier bills",
+    permissions: [
+      { key: "bills.view", action: "view", description: "Supplier bills: view" },
+      { key: "bills.post", action: "post", description: "Supplier bills: post" },
+      { key: "bills.edit", action: "edit", description: "Supplier bills: edit" },
+      { key: "bills.cancel", action: "cancel", description: "Supplier bills: cancel" },
+      { key: "bills.documents", action: "documents", description: "Supplier bills: documents" }
+    ]
+  },
+  {
+    module: "supplier_payments",
+    label: "Supplier payments",
+    permissions: [
+      { key: "supplier_payments.create", action: "create", description: "Supplier payments: create" },
+      { key: "supplier_payments.void", action: "void", description: "Supplier payments: void" }
+    ]
+  },
+  {
+    module: "register",
+    label: "Cash register",
+    permissions: [
+      { key: "register.open", action: "open", description: "Cash register: open" },
+      { key: "register.close", action: "close", description: "Cash register: close" },
+      { key: "register.reopen", action: "reopen", description: "Cash register: reopen" },
+      { key: "register.cash_entries", action: "cash_entries", description: "Cash register: cash entries" },
+      { key: "register.attach", action: "attach", description: "Cash register: attach" },
+      { key: "register.approve_difference", action: "approve_difference", description: "Cash register: approve difference" }
+    ]
+  },
+  {
+    module: "reports",
+    label: "Reports",
+    permissions: [
+      { key: "reports.sales", action: "sales", description: "Reports: sales" },
+      { key: "reports.margin", action: "margin", description: "Reports: margin" },
+      { key: "reports.stock", action: "stock", description: "Reports: stock" },
+      { key: "reports.gst", action: "gst", description: "Reports: gst" },
+      { key: "reports.purchase", action: "purchase", description: "Reports: purchase" }
+    ]
+  },
+  {
+    module: "settings",
+    label: "Settings",
+    permissions: [
+      { key: "settings.shop", action: "shop", description: "Settings: shop" },
+      { key: "settings.gst_invoice", action: "gst_invoice", description: "Settings: gst invoice" },
+      { key: "settings.tags", action: "tags", description: "Settings: tags" },
+      { key: "settings.theme", action: "theme", description: "Settings: theme" },
+      { key: "settings.login_page", action: "login_page", description: "Settings: login page" },
+      { key: "settings.security", action: "security", description: "Settings: security" },
+      { key: "settings.integrations", action: "integrations", description: "Settings: integrations" }
+    ]
+  },
+  {
+    module: "users",
+    label: "Users",
+    permissions: [
+      { key: "users.view", action: "view", description: "Users: view" },
+      { key: "users.create", action: "create", description: "Users: create" },
+      { key: "users.edit", action: "edit", description: "Users: edit" },
+      { key: "users.disable", action: "disable", description: "Users: disable" },
+      { key: "users.reset_password", action: "reset_password", description: "Users: reset password" }
+    ]
+  },
+  {
+    module: "roles",
+    label: "Roles",
+    permissions: [{ key: "roles.manage", action: "manage", description: "Roles: manage" }]
+  },
+  {
+    module: "integrations",
+    label: "Integrations",
+    permissions: [
+      { key: "integrations.api_keys", action: "api_keys", description: "Integrations: api keys" },
+      { key: "integrations.webhooks", action: "webhooks", description: "Integrations: webhooks" }
+    ]
+  },
+  {
+    module: "logs",
+    label: "Logs",
+    permissions: [
+      { key: "logs.view_audit", action: "view_audit", description: "Logs: view audit" },
+      { key: "logs.view_errors", action: "view_errors", description: "Logs: view errors" }
     ]
   }
 ];
 
+const INITIAL_ROLES: RoleItem[] = [
+  {
+    id: 1,
+    name: "Owner",
+    description: "Shop owner (Master Admin). Holds every permission. Protected.",
+    is_system: true,
+    system_key: "owner",
+    row_version: 1,
+    permissions: ALL_MODULES_PERMISSIONS.flatMap(m => m.permissions.map(p => p.key)),
+    users: 1
+  },
+  {
+    id: 2,
+    name: "Admin",
+    description: "Full access to the shop, including users and settings.",
+    is_system: true,
+    system_key: "admin",
+    row_version: 1,
+    permissions: ALL_MODULES_PERMISSIONS.flatMap(m => m.permissions.map(p => p.key)),
+    users: 1
+  },
+  {
+    id: 3,
+    name: "Manager",
+    description: "Runs the shop day to day. No security, integrations or role editing.",
+    is_system: true,
+    system_key: "manager",
+    row_version: 1,
+    permissions: [
+      "bills.cancel","bills.documents","bills.edit","bills.post","bills.view","bookings.create","bookings.refund","bookings.settle","bookings.view","buyback.create","buyback.view","customers.create","customers.edit","customers.export","customers.view","customers.view_kyc","dashboard.view","grn.post","grn.reverse","inventory.adjust","inventory.create","inventory.edit","inventory.edit_others","inventory.images","inventory.import","inventory.verify","inventory.view","inventory.view_cost","loans.close","loans.collect","loans.create","loans.return_item","loans.view","loans.waive","logs.view_audit","metalstock.move","oldgold.create","oldgold.settle","oldgold.undo_exchange","oldgold.view","payments.collect","payments.view","payments.void","po.approve","po.cancel_close","po.create","po.price_override","po.view","rates.edit","rates.view","register.approve_difference","register.attach","register.cash_entries","register.close","register.open","register.reopen","repairs.collect","repairs.create","repairs.edit","repairs.view","reports.gst","reports.margin","reports.purchase","reports.sales","reports.stock","sales.cancel","sales.create","sales.deliver","sales.discount_above_limit","sales.edit","sales.print","sales.view","sales.view_margin","settings.gst_invoice","settings.login_page","settings.shop","settings.tags","settings.theme","supplier_payments.create","supplier_payments.void","suppliers.activate","suppliers.edit","suppliers.view","tags.print","users.create","users.disable","users.edit","users.view"
+    ],
+    users: 0
+  },
+  {
+    id: 4,
+    name: "Cashier",
+    description: "Counter billing, receipts and the cash register.",
+    is_system: true,
+    system_key: "cashier",
+    row_version: 1,
+    permissions: [
+      "bookings.create","bookings.view","customers.create","customers.view","dashboard.view","inventory.view","loans.collect","loans.return_item","loans.view","oldgold.view","payments.collect","payments.view","rates.view","register.cash_entries","register.close","register.open","repairs.collect","repairs.view","sales.create","sales.deliver","sales.print","sales.view","tags.print"
+    ],
+    users: 1
+  },
+  {
+    id: 5,
+    name: "Sales",
+    description: "Sales staff: customers, orders, bookings, repairs, old gold. (Legacy \"staff\" users get this role.)",
+    is_system: true,
+    system_key: "sales",
+    row_version: 1,
+    permissions: [
+      "bookings.create","bookings.refund","bookings.settle","bookings.view","buyback.view","customers.create","customers.edit","customers.view","dashboard.view","inventory.create","inventory.edit","inventory.edit_others","inventory.images","inventory.verify","inventory.view","loans.collect","loans.create","loans.return_item","loans.view","oldgold.create","oldgold.settle","oldgold.view","payments.collect","payments.view","rates.view","register.cash_entries","register.open","repairs.collect","repairs.create","repairs.edit","repairs.view","sales.create","sales.deliver","sales.edit","sales.print","sales.view","tags.print"
+    ],
+    users: 1
+  },
+  {
+    id: 6,
+    name: "Accountant",
+    description: "Views everything, runs reports and exports, handles bills and supplier payments.",
+    is_system: true,
+    system_key: "accountant",
+    row_version: 1,
+    permissions: [
+      "bills.cancel","bills.documents","bills.edit","bills.post","bills.view","bookings.view","buyback.view","customers.export","customers.view","dashboard.view","inventory.view","inventory.view_cost","loans.view","logs.view_audit","oldgold.view","payments.view","po.view","rates.view","repairs.view","reports.gst","reports.margin","reports.purchase","reports.sales","reports.stock","sales.print","sales.view","sales.view_margin","supplier_payments.create","supplier_payments.void","suppliers.view","users.view"
+    ],
+    users: 1
+  },
+  {
+    id: 8,
+    name: "Viewer",
+    description: "Read-only.",
+    is_system: true,
+    system_key: "viewer",
+    row_version: 1,
+    permissions: [
+      "bills.view","bookings.view","buyback.view","customers.view","dashboard.view","inventory.view","loans.view","oldgold.view","payments.view","po.view","rates.view","repairs.view","sales.view","suppliers.view","users.view"
+    ],
+    users: 1
+  },
+  {
+    id: 7,
+    name: "Stock Manager",
+    description: "Inventory only: adds stock items and edits the items he added. Items added by others open read-only.",
+    is_system: true,
+    system_key: "stock_manager",
+    row_version: 1,
+    permissions: [
+      "inventory.adjust","inventory.create","inventory.edit","inventory.images","inventory.verify","inventory.view","tags.print"
+    ],
+    users: 0
+  }
+];
 
 export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({ onNavigate }) => {
-  const [roles, setRoles] = useState<RoleDef[]>(INITIAL_ROLES_DATA);
-  const [selectedRole, setSelectedRole] = useState<RoleDef>(INITIAL_ROLES_DATA[1] || INITIAL_ROLES_DATA[0]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedModule, setSelectedModule] = useState('ALL');
-  const [saved, setSaved] = useState(false);
-  const [isCloning, setIsCloning] = useState(false);
-  const [clonedRoleName, setClonedRoleName] = useState('');
-  const [isCreatingRole, setIsCreatingRole] = useState(false);
-  const [newRoleName, setNewRoleName] = useState('');
-  const [newRoleDesc, setNewRoleDesc] = useState('');
-  const [viewMode, setViewMode] = useState<'single' | 'matrix'>('matrix');
+  const [roles, setRoles] = useState<RoleItem[]>(INITIAL_ROLES);
+  const [search, setSearch] = useState('');
+  const [pendingChanges, setPendingChanges] = useState<{ [roleId: number]: Set<string> }>({});
+  const [saving, setSaving] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const modules = Array.from(new Set(PERMISSIONS_DATA.map(p => p.module))).sort();
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
-  const filteredPermissions = PERMISSIONS_DATA.filter(p => {
-    const matchesSearch = p.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          p.key.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesModule = selectedModule === 'ALL' || p.module === selectedModule;
-    return matchesSearch && matchesModule;
-  });
+  // The Owner is not shown in the columns
+  const visibleRoles = useMemo(() => {
+    return roles.filter(r => r.system_key !== 'owner');
+  }, [roles]);
 
-  const handleTogglePermission = (roleId: string, permKey: string) => {
-    setRoles(prev => prev.map(r => {
-      if (r.id !== roleId) return r;
-      const hasPerm = r.permissions.includes(permKey);
-      const newPerms = hasPerm 
-        ? r.permissions.filter(k => k !== permKey) 
-        : [...r.permissions, permKey];
-      return { ...r, permissions: newPerms };
-    }));
+  const getRolePerms = (role: RoleItem): Set<string> => {
+    return pendingChanges[role.id] || new Set(role.permissions);
+  };
 
-    if (selectedRole.id === roleId) {
-      setSelectedRole(prev => {
-        const hasPerm = prev.permissions.includes(permKey);
-        const newPerms = hasPerm 
-          ? prev.permissions.filter(k => k !== permKey) 
-          : [...prev.permissions, permKey];
-        return { ...prev, permissions: newPerms };
-      });
+  const hasChanges = Object.keys(pendingChanges).length > 0;
+
+  const filteredModules = useMemo(() => {
+    if (!search.trim()) return ALL_MODULES_PERMISSIONS;
+    const q = search.toLowerCase().trim();
+    return ALL_MODULES_PERMISSIONS.map(m => ({
+      ...m,
+      permissions: m.permissions.filter(p => 
+        p.description.toLowerCase().includes(q) || 
+        p.key.toLowerCase().includes(q) ||
+        p.action.toLowerCase().includes(q)
+      )
+    })).filter(m => m.permissions.length > 0);
+  }, [search]);
+
+  const handleToggleRolePerm = (role: RoleItem, permKey: string) => {
+    if (role.is_system) return;
+    const current = new Set(getRolePerms(role));
+    if (current.has(permKey)) {
+      current.delete(permKey);
+    } else {
+      current.add(permKey);
     }
+    setPendingChanges(prev => ({
+      ...prev,
+      [role.id]: current
+    }));
   };
 
-  const handleCloneRole = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!clonedRoleName.trim()) return;
-    const newRole: RoleDef = {
-      id: `custom-${Date.now()}`,
-      name: clonedRoleName.trim(),
-      description: `Custom role cloned from ${selectedRole.name}`,
-      isSystem: false,
-      systemKey: clonedRoleName.toLowerCase().replace(/\s+/g, '_'),
-      permissions: [...selectedRole.permissions]
+  const handleToggleModuleForRole = (role: RoleItem, mod: ModulePermissions) => {
+    if (role.is_system) return;
+    const current = new Set(getRolePerms(role));
+    const modPermKeys = mod.permissions.map(p => p.key);
+    const allPresent = modPermKeys.every(k => current.has(k));
+
+    if (allPresent) {
+      modPermKeys.forEach(k => current.delete(k));
+    } else {
+      modPermKeys.forEach(k => current.add(k));
+    }
+
+    setPendingChanges(prev => ({
+      ...prev,
+      [role.id]: current
+    }));
+  };
+
+  const handleNewRole = () => {
+    const roleName = window.prompt("Name for the new role (e.g. Senior Cashier)");
+    if (!roleName || !roleName.trim()) return;
+
+    const newRole: RoleItem = {
+      id: Date.now(),
+      name: roleName.trim(),
+      description: `Custom role: ${roleName.trim()}`,
+      is_system: false,
+      system_key: roleName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+      row_version: 1,
+      permissions: ['dashboard.view'],
+      users: 0
     };
+
     setRoles(prev => [...prev, newRole]);
-    setSelectedRole(newRole);
-    setIsCloning(false);
-    setClonedRoleName('');
+    showToast("Role created — tick its permissions");
   };
 
-  const handleCreateNewRole = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newRoleName.trim()) return;
-    const newRole: RoleDef = {
-      id: `custom-${Date.now()}`,
-      name: newRoleName.trim(),
-      description: newRoleDesc.trim() || 'Custom Showroom Role',
-      isSystem: false,
-      systemKey: newRoleName.toLowerCase().replace(/\s+/g, '_'),
-      permissions: ['dashboard.view', 'pos.view']
+  const handleCloneRole = (role: RoleItem) => {
+    const newName = window.prompt("Name for the new role", `${role.name} (custom)`);
+    if (!newName || !newName.trim()) return;
+
+    const cloned: RoleItem = {
+      id: Date.now(),
+      name: newName.trim(),
+      description: `Custom role cloned from ${role.name}`,
+      is_system: false,
+      system_key: newName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+      row_version: 1,
+      permissions: [...getRolePerms(role)],
+      users: 0
     };
-    setRoles(prev => [...prev, newRole]);
-    setSelectedRole(newRole);
-    setIsCreatingRole(false);
-    setNewRoleName('');
-    setNewRoleDesc('');
+
+    setRoles(prev => [...prev, cloned]);
+    showToast("Role created");
   };
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  const handleDeleteRole = (role: RoleItem) => {
+    if (role.is_system) return;
+    if (!window.confirm(`Delete role "${role.name}"?`)) return;
+
+    setRoles(prev => prev.filter(r => r.id !== role.id));
+    setPendingChanges(prev => {
+      const copy = { ...prev };
+      delete copy[role.id];
+      return copy;
+    });
+    showToast("Role deleted");
+  };
+
+  const handleSaveChanges = () => {
+    setSaving(true);
+    setTimeout(() => {
+      setRoles(prev => prev.map(r => {
+        if (pendingChanges[r.id]) {
+          return {
+            ...r,
+            permissions: Array.from(pendingChanges[r.id]),
+            row_version: r.row_version + 1
+          };
+        }
+        return r;
+      }));
+      setPendingChanges({});
+      setSaving(false);
+      showToast("Permissions saved. Users get the change within a few seconds.");
+    }, 500);
   };
 
   return (
-    <div className="page">
-      {/* Licence Banner Parity */}
-      <div 
-        className="license-banner rounded-lg mb-3 flex items-center justify-between p-3" 
-        style={{ background: '#fef8ee', borderColor: '#fde68a', borderWidth: 1 }}
-      >
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-          <span className="text-xs font-medium text-amber-950">
-            ⚠️ Licence status is unavailable. Open Licence for verification details.
-          </span>
-        </div>
-        <button 
-          onClick={() => onNavigate ? onNavigate('licence') : (window.location.pathname = '/admin/license')}
-          className="font-semibold text-amber-900 hover:text-amber-950 cursor-pointer flex items-center gap-1 text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 rounded border border-amber-300 transition-colors"
+    <div className="page" id="main">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div 
+          className="kj-toast" 
+          style={{
+            position: 'fixed',
+            top: 20,
+            right: 20,
+            zIndex: 9999,
+            padding: '10px 16px',
+            background: 'var(--surface)',
+            color: 'var(--text)',
+            borderRadius: 8,
+            boxShadow: 'var(--sh-md)',
+            border: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 13,
+            fontWeight: 600
+          }}
         >
-          <span>Licence</span>
-          <span>→</span>
-        </button>
-      </div>
+          <Check size={16} style={{ color: 'var(--primary)' }} />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
       {/* Page Header */}
       <div className="page-hdr">
         <div className="page-hdr-left">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <h1 style={{ margin: 0 }}>Roles & Permissions</h1>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#fef8ee] text-[#92400e] rounded-full border border-[#efdcb6] text-xs font-semibold shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse" />
-              <span>Counter MAIN</span>
-              <span className="font-normal opacity-80"> · REG-2026-00001 · closing</span>
-            </div>
-          </div>
-          <p style={{ marginTop: 4 }}>
-            8 roles (Owner, Admin, Manager, Cashier, Sales, Accountant, Stock Manager, Viewer) × 95 granular permissions matrix · S.B Borana Jewellers
-          </p>
+          <h1>Roles & Permissions</h1>
+          <p>Tick what each role may do. System roles are read-only — clone one to customise it.</p>
         </div>
-
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <div className="tabs" style={{ marginBottom: 0, borderBottom: "none" }}>
-            <button
-              onClick={() => setViewMode('single')}
-              className={`tab ${viewMode === 'single' ? 'active' : ''}`}
-              style={{ padding: '6px 12px', fontSize: 12 }}
-            >
-              Role Inspector
-            </button>
-            <button
-              onClick={() => setViewMode('matrix')}
-              className={`tab ${viewMode === 'matrix' ? 'active' : ''}`}
-              style={{ padding: '6px 12px', fontSize: 12 }}
-            >
-              Full RBAC Matrix
-            </button>
-          </div>
-
-          <button
-            onClick={() => setIsCreatingRole(true)}
-            className="btn btn-outline btn-sm flex items-center gap-1.5"
-            title="Create a new custom role"
-          >
-            <Plus size={14} />
-            <span>New role</span>
+        <div className="btn-group">
+          <button className="btn btn-outline" onClick={handleNewRole}>
+            <Plus size={14} /> New role
           </button>
-
-          <button
-            onClick={handleSave}
-            className="btn btn-primary btn-sm flex items-center gap-1.5"
-            title="Save changes to role permissions"
+          <button 
+            className="btn btn-primary" 
+            onClick={handleSaveChanges} 
+            disabled={!hasChanges || saving}
           >
-            <Save size={14} />
-            <span>Save changes</span>
+            <Save size={14} /> {saving ? "Saving…" : "Save changes"}
           </button>
         </div>
       </div>
 
-      {saved && (
-        <div style={{ padding: 12, background: 'var(--primary-xl)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--primary-d)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <CheckCircle2 size={16} />
-          <span style={{ fontWeight: 600 }}>Permission changes recorded for this preview session.</span>
+      {/* Search Row */}
+      <div className="search-row">
+        <div className="search-box">
+          <Search size={14} />
+          <input 
+            placeholder="Find a permission…" 
+            value={search} 
+            onChange={e => setSearch(e.target.value)} 
+          />
         </div>
-      )}
-
-      {/* 8 Roles Navigation Strip */}
-      <div className="tabs" style={{ marginBottom: 16 }}>
-        {roles.map(r => (
-          <button
-            key={r.id}
-            onClick={() => setSelectedRole(r)}
-            className={`tab ${selectedRole.id === r.id ? 'active' : ''}`}
-            style={{ display: "flex", alignItems: "center", gap: 6 }}
-          >
-            <Shield size={13} />
-            <span>{r.name}</span>
-            <span className="badge badge-gray" style={{ fontSize: 10, padding: "1px 6px" }}>
-              {r.permissions.length}
-            </span>
-          </button>
-        ))}
+        <span className="helper">
+          The Owner always has every permission and is not shown.
+        </span>
       </div>
 
-      {viewMode === 'single' ? (
-        /* SINGLE ROLE INSPECTOR VIEW */
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Role Metadata Card */}
-          <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-xs space-y-3 md:col-span-1 h-fit">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Role Profile</span>
-                {selectedRole.isSystem && (
-                  <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono font-bold">
-                    System Role
-                  </span>
-                )}
-              </div>
-              <h2 className="text-base font-bold text-slate-900 mt-1 flex items-center gap-1.5">
-                <KeyRound className="w-4 h-4 text-emerald-700" />
-                {selectedRole.name}
-              </h2>
-              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                {selectedRole.description}
-              </p>
-            </div>
-
-            <div className="p-3 bg-slate-50 rounded border border-slate-200 text-xs space-y-1 font-mono">
-              <div className="flex justify-between text-slate-600">
-                <span>System Key:</span>
-                <span className="font-bold text-slate-800">{selectedRole.systemKey}</span>
-              </div>
-              <div className="flex justify-between text-slate-600">
-                <span>Granted Rights:</span>
-                <span className="font-bold text-emerald-800">{selectedRole.permissions.length} / {PERMISSIONS_DATA.length}</span>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-100">
-              {isCloning ? (
-                <form onSubmit={handleCloneRole} className="space-y-2">
-                  <label className="block text-[11px] font-bold text-slate-700">New Custom Role Name:</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Senior Cashier"
-                    value={clonedRoleName}
-                    onChange={(e) => setClonedRoleName(e.target.value)}
-                    className="w-full border border-slate-300 rounded px-2.5 py-1 text-xs"
-                  />
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="submit"
-                      className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded py-1 text-xs font-bold"
-                    >
-                      Save Clone
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsCloning(false)}
-                      className="bg-slate-200 text-slate-700 rounded py-1 px-2.5 text-xs font-bold"
-                    >
-                      Cancel
-                    </button>
+      {/* RBAC Matrix Card */}
+      <div className="matrix card">
+        <table>
+          <thead>
+            <tr>
+              <th className="mod">Permission</th>
+              {visibleRoles.map(role => (
+                <th key={role.id} style={{ textAlign: "center", minWidth: 120 }}>
+                  <div style={{ textTransform: "none", letterSpacing: 0, fontSize: 12.5, color: "var(--text)" }}>
+                    {role.is_system && (
+                      <Lock size={10} style={{ marginRight: 3, display: "inline" }} />
+                    )}
+                    {role.name}
                   </div>
-                </form>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsCloning(true)}
-                  className="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded border border-slate-300 flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Copy className="w-3.5 h-3.5 text-slate-600" />
-                  <span>Clone Role to Customise</span>
-                </button>
-              )}
-            </div>
-
-            {selectedRole.isSystem && (
-              <p className="text-[11px] text-amber-800 bg-amber-50 p-2 rounded border border-amber-200 leading-normal">
-                System roles are protected to preserve operational safety. Clone to tailor specific permissions.
-              </p>
-            )}
-          </div>
-
-          {/* Granular Permissions List */}
-          <div className="card">
-            <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 200 }}>
-                <Search size={14} style={{ color: "var(--muted)" }} />
-                <input
-                  type="text"
-                  placeholder="Search 95 permissions (e.g. view, discount, cancel, reports)..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="input input-sm"
-                  style={{ width: "100%", border: "none" }}
-                />
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <Filter size={14} style={{ color: "var(--muted)" }} />
-                <span className="label" style={{ margin: 0, fontSize: 12 }}>Module:</span>
-                <select
-                  value={selectedModule}
-                  onChange={(e) => setSelectedModule(e.target.value)}
-                  className="input input-sm"
-                >
-                  <option value="ALL">All Modules ({PERMISSIONS_DATA.length})</option>
-                  {modules.map(m => (
-                    <option key={m} value={m}>{m} ({PERMISSIONS_DATA.filter(p => p.module === m).length})</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            {/* Filter & Search Bar */}
-            <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                <Search className="w-3.5 h-3.5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search 95 permissions (e.g. view, discount, cancel, reports)..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded px-2.5 py-1 text-xs focus:outline-none"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Filter className="w-3.5 h-3.5 text-slate-500" />
-                <span className="font-semibold text-slate-700">Module:</span>
-                <select
-                  value={selectedModule}
-                  onChange={(e) => setSelectedModule(e.target.value)}
-                  className="bg-white border border-slate-300 rounded px-2 py-1 text-xs font-medium"
-                >
-                  <option value="ALL">All Modules ({PERMISSIONS_DATA.length})</option>
-                  {modules.map(m => (
-                    <option key={m} value={m}>{m} ({PERMISSIONS_DATA.filter(p => p.module === m).length})</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-              <table className="tbl">
-                <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-semibold text-[11px] uppercase tracking-wider sticky top-0 z-10">
-                  <tr>
-                    <th className="py-2 px-3 w-12 text-center">ALLOW</th>
-                    <th className="py-2 px-3">PERMISSION DESCRIPTION</th>
-                    <th className="py-2 px-3">SYSTEM KEY</th>
-                    <th className="py-2 px-3 text-right">MODULE</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredPermissions.map(p => {
-                    const isGranted = selectedRole.permissions.includes(p.key);
-                    return (
-                      <tr 
-                        key={p.key} 
-                        onClick={() => handleTogglePermission(selectedRole.id, p.key)}
-                        className="hover:bg-slate-50/70 cursor-pointer transition-colors"
+                  <div style={{ fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>
+                    {role.users} user{role.users === 1 ? '' : 's'}
+                  </div>
+                  <div style={{ display: "flex", gap: 4, justifyContent: "center", marginTop: 4 }}>
+                    <button 
+                      className="btn btn-xs btn-outline" 
+                      title="Clone" 
+                      onClick={() => handleCloneRole(role)}
+                    >
+                      <Copy size={10} />
+                    </button>
+                    {!role.is_system && (
+                      <button 
+                        className="btn btn-xs btn-danger-outline" 
+                        title="Delete" 
+                        onClick={() => handleDeleteRole(role)}
                       >
-                        <td className="py-2 px-3 text-center">
-                          <input
-                            type="checkbox"
-                            checked={isGranted}
-                            onChange={() => {}}
-                            className="rounded border-slate-300 text-emerald-700 focus:ring-emerald-600 cursor-pointer"
-                          />
-                        </td>
-                        <td className="py-2 px-3 font-medium text-slate-800">
-                          {p.description}
-                        </td>
-                        <td className="py-2 px-3 font-mono text-slate-500 text-[11px]">
-                          {p.key}
-                        </td>
-                        <td className="py-2 px-3 text-right">
-                          <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700 font-mono font-semibold uppercase">
-                            {p.module}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* FULL RBAC MATRIX VIEW */
-        <div className="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden">
-          <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <KeyRound className="w-4 h-4 text-slate-600" />
-              <span className="font-bold text-slate-800 uppercase tracking-wider">
-                Permissions by role
-              </span>
-            </div>
-            <span className="text-[11px] text-slate-500">Click checkbox to grant or revoke</span>
-          </div>
+                        <Trash2 size={10} />
+                      </button>
+                    )}
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filteredModules.map(mod => {
+              return (
+                <React.Fragment key={mod.module}>
+                  {/* Module Category Row */}
+                  <tr className="mod-row">
+                    <td className="perm">{mod.label}</td>
+                    {visibleRoles.map(role => {
+                      const perms = getRolePerms(role);
+                      const grantedCount = mod.permissions.filter(p => perms.has(p.key)).length;
+                      const isAll = grantedCount === mod.permissions.length;
 
-          <div className="overflow-x-auto max-h-[650px] overflow-y-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-50 text-slate-600 font-semibold text-[10px] uppercase tracking-wider border-b border-slate-200 sticky top-0 z-10">
-                <tr>
-                  <th className="py-2 px-3 sticky left-0 bg-slate-50 z-20 min-w-[240px] shadow-xs">PERMISSION</th>
-                  <th className="py-2 px-2 text-center">MODULE</th>
-                  {roles.map(r => (
-                    <th key={r.id} className="py-2 px-2 text-center min-w-[70px]">
-                      <div className="font-bold text-slate-900">{r.name}</div>
-                      <div className="text-[9px] text-slate-500 font-mono">({r.permissions.length})</div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredPermissions.map(p => (
-                  <tr key={p.key} className="hover:bg-slate-50/70">
-                    <td className="py-2 px-3 font-medium text-slate-800 sticky left-0 bg-white z-10 shadow-xs">
-                      <div>{p.description}</div>
-                      <div className="text-[10px] font-mono text-slate-400">{p.key}</div>
-                    </td>
-                    <td className="py-2 px-2 text-center">
-                      <span className="px-1.5 py-0.5 rounded text-[9px] bg-slate-100 text-slate-600 font-mono uppercase">
-                        {p.module}
-                      </span>
-                    </td>
-                    {roles.map(r => {
-                      const hasPerm = r.permissions.includes(p.key);
                       return (
-                        <td key={r.id} className="py-2 px-2 text-center">
-                          <input
-                            type="checkbox"
-                            aria-label={r.name + ": " + p.description}
-                            checked={hasPerm}
-                            onChange={() => handleTogglePermission(r.id, p.key)}
-                            className="rounded border-slate-300 text-emerald-700 focus:ring-emerald-600 cursor-pointer"
-                          />
+                        <td key={role.id} className="cell">
+                          {!role.is_system ? (
+                            <button 
+                              className="btn btn-xs btn-ghost" 
+                              onClick={() => handleToggleModuleForRole(role, mod)}
+                            >
+                              {isAll ? "None" : "All"}
+                            </button>
+                          ) : (
+                            <span style={{ fontWeight: 600 }}>
+                              {grantedCount}/{mod.permissions.length}
+                            </span>
+                          )}
                         </td>
                       );
                     })}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
-      {/* NEW ROLE MODAL */}
-      {isCreatingRole && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Shield className="w-5 h-5 text-emerald-700" />
-                <h3 className="font-bold text-slate-900 text-sm">Create New Role</h3>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setIsCreatingRole(false)} 
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateNewRole} className="p-5 space-y-4 text-xs">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">Role Title *</label>
-                <input
-                  type="text"
-                  required
-                  value={newRoleName}
-                  onChange={(e) => setNewRoleName(e.target.value)}
-                  placeholder="e.g. Senior Appraiser / Valuer"
-                  className="w-full p-2 border border-slate-300 rounded-lg focus:border-emerald-700 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">Role Description</label>
-                <textarea
-                  rows={3}
-                  value={newRoleDesc}
-                  onChange={(e) => setNewRoleDesc(e.target.value)}
-                  placeholder="Briefly describe responsibilities and authority level..."
-                  className="w-full p-2 border border-slate-300 rounded-lg focus:border-emerald-700 focus:outline-none"
-                />
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setIsCreatingRole(false)}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg text-xs shadow-xs cursor-pointer"
-                >
-                  Create Role
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+                  {/* Individual Permission Rows */}
+                  {mod.permissions.map(perm => (
+                    <tr key={perm.key}>
+                      <td className="perm">
+                        <div style={{ fontWeight: 500 }}>
+                          {perm.action.replace(/_/g, " ")}
+                        </div>
+                        <div className="mono" style={{ color: "var(--muted2)", fontSize: 11 }}>
+                          {perm.key}
+                        </div>
+                      </td>
+                      {visibleRoles.map(role => {
+                        const isChecked = getRolePerms(role).has(perm.key);
+                        return (
+                          <td key={role.id} className="cell">
+                            <input 
+                              type="checkbox" 
+                              aria-label={`${role.name}: ${perm.description}`}
+                              checked={isChecked}
+                              disabled={role.is_system}
+                              onChange={() => handleToggleRolePerm(role, perm.key)}
+                              style={{ 
+                                width: 17, 
+                                height: 17, 
+                                accentColor: "var(--primary)", 
+                                cursor: role.is_system ? "default" : "pointer" 
+                              }}
+                            />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
 
+export default RolesPermissionsView;
