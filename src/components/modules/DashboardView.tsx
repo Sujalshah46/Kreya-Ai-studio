@@ -194,7 +194,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* 1. Licence Expiration Warning Banner Matching Screenshot */}
       <div className="license-banner" role="status" style={{ background: '#fef8ee' }}>
         <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-        <span className="flex-1">Licence expires in 30 days (15-Dec-2026). Contact Kreya IT Consulting to renew.</span>
+        <span className="flex-1">Licence status is unavailable. Open Licence for verification details.</span>
         <button 
           onClick={() => onNavigate('licence')}
           className="font-semibold text-amber-900 hover:text-amber-950 cursor-pointer flex items-center gap-1 text-xs"

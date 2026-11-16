@@ -213,7 +213,7 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
         <div className="flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
           <span className="text-xs font-medium text-amber-950">
-            ⚠️ Licence expires in 30 days (15-Dec-2026). Contact Kreya IT Consulting to renew.
+            ⚠️ Licence status is unavailable. Open Licence for verification details.
           </span>
         </div>
         <button 

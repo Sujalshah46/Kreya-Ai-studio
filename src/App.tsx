@@ -328,8 +328,10 @@ export function App() {
     setCancellations(current => [cancellation, ...current]);
     if (memo) setCreditMemos(current => [memo, ...current]);
     if (restock) {
+      const retained = new Set(invoice.status === 'CANCELLED' ? [] : invoice.items.map(item => item.id));
+      const removed = original.items.filter(item => !retained.has(item.id));
       setInventory(current => current.map(stock => {
-        const count = original.items.filter(item => item.itemId ? item.itemId === stock.id : item.itemCode === stock.itemCode).length;
+        const count = removed.filter(item => item.itemId ? item.itemId === stock.id : item.itemCode === stock.itemCode).length;
         return count ? { ...stock, stockQty: stock.stockQty + count } : stock;
       }));
     }
@@ -546,6 +548,7 @@ export function App() {
               inventory={inventory}
               invoices={invoices}
               onSaveInvoice={handleSaveInvoice}
+              cancellations={cancellations}
               onCancelInvoice={handleCancelInvoice}
               onAddPayment={handleAddPayment}
             />

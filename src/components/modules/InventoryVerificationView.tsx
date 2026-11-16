@@ -174,8 +174,8 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
 
   const handleStartNewAudit = (e: React.FormEvent) => {
     e.preventDefault();
-    setAuditNo(`SV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
     if (!newAuditName.trim()) return;
+    setAuditNo(`SV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
     setAuditName(newAuditName.trim());
     setAuditInventory(initialInventory.filter(item => item.stockQty > 0));
     setStartedAt(new Date().toLocaleString('en-GB'));

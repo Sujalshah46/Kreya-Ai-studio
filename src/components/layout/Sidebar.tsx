@@ -27,6 +27,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   pendingReceivablesCount = 2
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const query = searchQuery.trim().toLowerCase();
+  const searchFilter = (title: string) => {
+    const hidden = !!query && !title.toLowerCase().includes(query);
+    return { title, hidden, style: hidden ? { display: 'none' } : undefined };
+  };
+  const selectScreen = (module: string) => {
+    setSearchQuery('');
+    onNavigate(module);
+  };
   const [collapsed, setCollapsed] = useState(false);
 
   // Group expansion states - all open by default as in the video
@@ -96,6 +105,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <input 
               type="text"
               value={searchQuery}
+              onKeyDown={event => { if (event.key === 'Escape') setSearchQuery(''); }}
               onChange={(e) => setSearchQuery(e.target.value)}
               aria-label="Find a screen"
               placeholder="Find a screen…"
@@ -125,12 +135,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="h-2" />
           )}
 
-          {(openSections.MAIN || collapsed) && (
+          {(openSections.MAIN || collapsed || query) && (
             <div className="space-y-0.5 mt-0.5">
               <button
-                onClick={() => onNavigate('dashboard')}
+                onClick={() => selectScreen('dashboard')}
                 className={navItemClass('dashboard')}
-                title="Dashboard"
+                {...searchFilter("Dashboard")}
               >
                 <div className="flex items-center space-x-2.5">
                   <LayoutDashboard className={`w-4 h-4 shrink-0 ${isNavActive('dashboard') ? 'text-[#10b981]' : 'text-slate-400 group-hover:text-slate-600'}`} />
@@ -139,9 +149,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('daily-rates')}
+                onClick={() => selectScreen('daily-rates')}
                 className={navItemClass('daily-rates')}
-                title="Daily Metal Rates"
+                {...searchFilter("Daily Metal Rates")}
               >
                 <div className="flex items-center space-x-2.5">
                   <TrendingUp className={`w-4 h-4 shrink-0 ${isNavActive('daily-rates') ? 'text-[#10b981]' : 'text-slate-400 group-hover:text-slate-600'}`} />
@@ -169,12 +179,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="h-2" />
           )}
 
-          {(openSections.CUSTOMERS || collapsed) && (
+          {(openSections.CUSTOMERS || collapsed || query) && (
             <div className="space-y-0.5 mt-0.5">
               <button
-                onClick={() => onNavigate('customers')}
+                onClick={() => selectScreen('customers')}
                 className={navItemClass('customers')}
-                title="Customers"
+                {...searchFilter("Customers")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Users className="w-4 h-4 shrink-0" />
@@ -183,9 +193,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('payments-pending')}
+                onClick={() => selectScreen('payments-pending')}
                 className={navItemClass('payments-pending')}
-                title="Payments & Pending"
+                {...searchFilter("Payments & Pending")}
               >
                 <div className="flex items-center space-x-2.5">
                   <CreditCard className="w-4 h-4 shrink-0" />
@@ -213,12 +223,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="h-2" />
           )}
 
-          {(openSections.SALES || collapsed) && (
+          {(openSections.SALES || collapsed || query) && (
             <div className="space-y-0.5 mt-0.5">
               <button
-                onClick={() => onNavigate('billing')}
+                onClick={() => selectScreen('billing')}
                 className={navItemClass('billing')}
-                title="Orders & Billing"
+                {...searchFilter("Orders & Billing")}
               >
                 <div className="flex items-center space-x-2.5">
                   <ShoppingCart className="w-4 h-4 shrink-0" />
@@ -227,9 +237,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('metal-booking')}
+                onClick={() => selectScreen('metal-booking')}
                 className={navItemClass('metal-booking')}
-                title="Metal Advance Booking"
+                {...searchFilter("Metal Advance Booking")}
               >
                 <div className="flex items-center space-x-2.5">
                   <CalendarClock className="w-4 h-4 shrink-0" />
@@ -238,9 +248,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('cancellations')}
+                onClick={() => selectScreen('cancellations')}
                 className={navItemClass('cancellations')}
-                title="Cancellations"
+                {...searchFilter("Cancellations")}
               >
                 <div className="flex items-center space-x-2.5">
                   <XCircle className="w-4 h-4 shrink-0" />
@@ -249,9 +259,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('cash-register')}
+                onClick={() => selectScreen('cash-register')}
                 className={navItemClass('cash-register')}
-                title="Cash Register"
+                {...searchFilter("Cash Register")}
               >
                 <div className="flex items-center space-x-2.5">
                   <DollarSign className="w-4 h-4 shrink-0" />
@@ -260,9 +270,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('buyback')}
+                onClick={() => selectScreen('buyback')}
                 className={navItemClass('buyback')}
-                title="Returns / Buy-back"
+                {...searchFilter("Returns / Buy-back")}
               >
                 <div className="flex items-center space-x-2.5">
                   <RotateCcw className="w-4 h-4 shrink-0" />
@@ -271,9 +281,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('shipments')}
+                onClick={() => selectScreen('shipments')}
                 className={navItemClass('shipments')}
-                title="Shipments"
+                {...searchFilter("Shipments")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Truck className="w-4 h-4 shrink-0" />
@@ -301,12 +311,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="h-2" />
           )}
 
-          {(openSections.SERVICES || collapsed) && (
+          {(openSections.SERVICES || collapsed || query) && (
             <div className="space-y-0.5 mt-0.5">
               <button
-                onClick={() => onNavigate('repairs')}
+                onClick={() => selectScreen('repairs')}
                 className={navItemClass('repairs')}
-                title="Repair Orders"
+                {...searchFilter("Repair Orders")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Wrench className="w-4 h-4 shrink-0" />
@@ -334,12 +344,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="h-2" />
           )}
 
-          {(openSections.FINANCE || collapsed) && (
+          {(openSections.FINANCE || collapsed || query) && (
             <div className="space-y-0.5 mt-0.5">
               <button
-                onClick={() => onNavigate('loans')}
+                onClick={() => selectScreen('loans')}
                 className={navItemClass('loans')}
-                title="Gold / Silver Loans"
+                {...searchFilter("Gold / Silver Loans")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Coins className="w-4 h-4 shrink-0" />
@@ -348,9 +358,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('old-metal')}
+                onClick={() => selectScreen('old-metal')}
                 className={navItemClass('old-metal')}
-                title="Old Gold/Silver Purchase"
+                {...searchFilter("Old Gold/Silver Purchase")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Flame className="w-4 h-4 shrink-0" />
@@ -359,9 +369,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('schemes')}
+                onClick={() => selectScreen('schemes')}
                 className={navItemClass('schemes')}
-                title="Savings Schemes"
+                {...searchFilter("Savings Schemes")}
               >
                 <div className="flex items-center space-x-2.5">
                   <PiggyBank className="w-4 h-4 shrink-0" />
@@ -370,9 +380,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('cash-outflows')}
+                onClick={() => selectScreen('cash-outflows')}
                 className={navItemClass('cash-outflows')}
-                title="Cash Outflows"
+                {...searchFilter("Cash Outflows")}
               >
                 <div className="flex items-center space-x-2.5">
                   <ArrowDownRight className="w-4 h-4 shrink-0" />
@@ -400,12 +410,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="h-2" />
           )}
 
-          {(openSections.STOCK || collapsed) && (
+          {(openSections.STOCK || collapsed || query) && (
             <div className="space-y-0.5 mt-0.5">
               <button
-                onClick={() => onNavigate('inventory')}
+                onClick={() => selectScreen('inventory')}
                 className={navItemClass('inventory')}
-                title="Inventory"
+                {...searchFilter("Inventory")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Package className="w-4 h-4 shrink-0" />
@@ -414,9 +424,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('valuation')}
+                onClick={() => selectScreen('valuation')}
                 className={navItemClass('valuation')}
-                title="Stock & Valuation"
+                {...searchFilter("Stock & Valuation")}
               >
                 <div className="flex items-center space-x-2.5">
                   <BarChart3 className="w-4 h-4 shrink-0" />
@@ -425,9 +435,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('tags')}
+                onClick={() => selectScreen('tags')}
                 className={navItemClass('tags')}
-                title="Stock Ledger & Tags"
+                {...searchFilter("Stock Ledger & Tags")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Tag className="w-4 h-4 shrink-0" />
@@ -436,9 +446,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('inventory-verification')}
+                onClick={() => selectScreen('inventory-verification')}
                 className={navItemClass('inventory-verification')}
-                title="Inventory Verification"
+                {...searchFilter("Inventory Verification")}
               >
                 <div className="flex items-center space-x-2.5">
                   <CheckSquare className="w-4 h-4 shrink-0" />
@@ -447,9 +457,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('old-metal-stock')}
+                onClick={() => selectScreen('old-metal-stock')}
                 className={navItemClass('old-metal-stock')}
-                title="Old Metal Stock"
+                {...searchFilter("Old Metal Stock")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Layers className="w-4 h-4 shrink-0" />
@@ -477,12 +487,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="h-2" />
           )}
 
-          {(openSections.SUPPLIERS || collapsed) && (
+          {(openSections.SUPPLIERS || collapsed || query) && (
             <div className="space-y-0.5 mt-0.5">
               <button
-                onClick={() => onNavigate('suppliers')}
+                onClick={() => selectScreen('suppliers')}
                 className={navItemClass('suppliers')}
-                title="Suppliers"
+                {...searchFilter("Suppliers")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Building2 className="w-4 h-4 shrink-0" />
@@ -491,9 +501,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('purchase-orders')}
+                onClick={() => selectScreen('purchase-orders')}
                 className={navItemClass('purchase-orders')}
-                title="Purchase Orders"
+                {...searchFilter("Purchase Orders")}
               >
                 <div className="flex items-center space-x-2.5">
                   <ShoppingBag className="w-4 h-4 shrink-0" />
@@ -502,9 +512,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('goods-receipts')}
+                onClick={() => selectScreen('goods-receipts')}
                 className={navItemClass('goods-receipts')}
-                title="Goods Receipts"
+                {...searchFilter("Goods Receipts")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Truck className="w-4 h-4 shrink-0" />
@@ -513,9 +523,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('supplier-bills')}
+                onClick={() => selectScreen('supplier-bills')}
                 className={navItemClass('supplier-bills')}
-                title="Supplier Bills"
+                {...searchFilter("Supplier Bills")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Receipt className="w-4 h-4 shrink-0" />
@@ -524,9 +534,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('supplier-payments')}
+                onClick={() => selectScreen('supplier-payments')}
                 className={navItemClass('supplier-payments')}
-                title="Supplier Payments"
+                {...searchFilter("Supplier Payments")}
               >
                 <div className="flex items-center space-x-2.5">
                   <CreditCard className="w-4 h-4 shrink-0" />
@@ -535,9 +545,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('purchase-reports')}
+                onClick={() => selectScreen('purchase-reports')}
                 className={navItemClass('purchase-reports')}
-                title="Purchase Reports"
+                {...searchFilter("Purchase Reports")}
               >
                 <div className="flex items-center space-x-2.5">
                   <FileSpreadsheet className="w-4 h-4 shrink-0" />
@@ -565,12 +575,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="h-2" />
           )}
 
-          {(openSections.REPORTS || collapsed) && (
+          {(openSections.REPORTS || collapsed || query) && (
             <div className="space-y-0.5 mt-0.5">
               <button
-                onClick={() => onNavigate('sales-reports')}
+                onClick={() => selectScreen('sales-reports')}
                 className={navItemClass('sales-reports')}
-                title="Sales Reports"
+                {...searchFilter("Sales Reports")}
               >
                 <div className="flex items-center space-x-2.5">
                   <BarChart3 className="w-4 h-4 shrink-0" />
@@ -579,9 +589,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('gst-reports')}
+                onClick={() => selectScreen('gst-reports')}
                 className={navItemClass('gst-reports')}
-                title="GST Reports"
+                {...searchFilter("GST Reports")}
               >
                 <div className="flex items-center space-x-2.5">
                   <FileSpreadsheet className="w-4 h-4 shrink-0" />
@@ -590,9 +600,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('reports-classic')}
+                onClick={() => selectScreen('reports-classic')}
                 className={navItemClass('reports-classic')}
-                title="Reports (classic)"
+                {...searchFilter("Reports (classic)")}
               >
                 <div className="flex items-center space-x-2.5">
                   <History className="w-4 h-4 shrink-0" />
@@ -601,9 +611,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('backup-settings')}
+                onClick={() => selectScreen('backup-settings')}
                 className={navItemClass('backup-settings')}
-                title="Export / Backup"
+                {...searchFilter("Export / Backup")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Database className="w-4 h-4 shrink-0" />
@@ -612,9 +622,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('import')}
+                onClick={() => selectScreen('import')}
                 className={navItemClass('import')}
-                title="Data Import"
+                {...searchFilter("Data Import")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Upload className="w-4 h-4 shrink-0" />
@@ -642,12 +652,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="h-2" />
           )}
 
-          {(openSections.ADMIN || collapsed) && (
+          {(openSections.ADMIN || collapsed || query) && (
             <div className="space-y-0.5 mt-0.5">
               <button
-                onClick={() => onNavigate('settings')}
+                onClick={() => selectScreen('settings')}
                 className={navItemClass('shop-settings')}
-                title="Shop Settings"
+                {...searchFilter("Shop Settings")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Settings className="w-4 h-4 shrink-0" />
@@ -656,9 +666,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('business-settings')}
+                onClick={() => selectScreen('business-settings')}
                 className={navItemClass('business-settings')}
-                title="Business Settings"
+                {...searchFilter("Business Settings")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Building2 className="w-4 h-4 shrink-0" />
@@ -667,9 +677,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('integrations')}
+                onClick={() => selectScreen('integrations')}
                 className={navItemClass('integrations')}
-                title="Integrations"
+                {...searchFilter("Integrations")}
               >
                 <div className="flex items-center space-x-2.5">
                   <TrendingUp className="w-4 h-4 shrink-0" />
@@ -678,9 +688,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('users')}
+                onClick={() => selectScreen('users')}
                 className={navItemClass('users')}
-                title="Users"
+                {...searchFilter("Users")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Users className="w-4 h-4 shrink-0" />
@@ -689,9 +699,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('roles-permissions')}
+                onClick={() => selectScreen('roles-permissions')}
                 className={navItemClass('roles-permissions')}
-                title="Roles & Permissions"
+                {...searchFilter("Roles & Permissions")}
               >
                 <div className="flex items-center space-x-2.5">
                   <KeyRound className="w-4 h-4 shrink-0" />
@@ -700,9 +710,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('theme-layout')}
+                onClick={() => selectScreen('theme-layout')}
                 className={navItemClass('theme-layout')}
-                title="Theme & Layout"
+                {...searchFilter("Theme & Layout")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Palette className="w-4 h-4 shrink-0" />
@@ -711,9 +721,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('login-page')}
+                onClick={() => selectScreen('login-page')}
                 className={navItemClass('login-page')}
-                title="Login Page"
+                {...searchFilter("Login Page")}
               >
                 <div className="flex items-center space-x-2.5">
                   <LogIn className="w-4 h-4 shrink-0" />
@@ -722,9 +732,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('security')}
+                onClick={() => selectScreen('security')}
                 className={navItemClass('security')}
-                title="Security"
+                {...searchFilter("Security")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Lock className="w-4 h-4 shrink-0" />
@@ -733,9 +743,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('licence')}
+                onClick={() => selectScreen('licence')}
                 className={navItemClass('licence')}
-                title="Licence"
+                {...searchFilter("Licence")}
               >
                 <div className="flex items-center space-x-2.5">
                   <Award className="w-4 h-4 shrink-0" />
@@ -744,9 +754,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('audit-logs')}
+                onClick={() => selectScreen('audit-logs')}
                 className={navItemClass('audit-log')}
-                title="Audit Log"
+                {...searchFilter("Audit Log")}
               >
                 <div className="flex items-center space-x-2.5">
                   <History className="w-4 h-4 shrink-0" />
@@ -755,9 +765,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigate('error-log')}
+                onClick={() => selectScreen('error-log')}
                 className={navItemClass('error-log')}
-                title="Error Log"
+                {...searchFilter("Error Log")}
               >
                 <div className="flex items-center space-x-2.5">
                   <AlertCircle className="w-4 h-4 shrink-0" />
