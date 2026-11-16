@@ -299,6 +299,7 @@ export const SupplierBillsView: React.FC<SupplierBillsViewProps> = ({
     return d.toISOString().slice(0, 10);
   });
   const [formTaxMode, setFormTaxMode] = useState<'intra' | 'inter'>('intra');
+  const [formEwayBillNo, setFormEwayBillNo] = useState('');
   const [formItcEligible, setFormItcEligible] = useState<string>('yes');
   const [formPrintedTotal, setFormPrintedTotal] = useState<number>(0);
   const [formIsCustomPrintedTotal, setFormIsCustomPrintedTotal] = useState(false);
@@ -421,6 +422,7 @@ export const SupplierBillsView: React.FC<SupplierBillsViewProps> = ({
     d.setDate(d.getDate() + 15);
     setFormDueDate(d.toISOString().slice(0, 10));
     setFormTaxMode('intra');
+    setFormEwayBillNo('');
     setFormItcEligible('yes');
     setFormOtherCharges(0);
     setFormTdsApplicable(true);
@@ -448,6 +450,7 @@ export const SupplierBillsView: React.FC<SupplierBillsViewProps> = ({
     setFormInvoiceDate(bill.supplierInvoiceDate || bill.billDate);
     setFormDueDate(bill.dueDate);
     setFormTaxMode(bill.taxMode || 'intra');
+    setFormEwayBillNo(bill.ewayBillNo || '');
     setFormItcEligible(bill.itcEligible ? 'yes' : 'no');
     setFormOtherCharges(bill.otherCharges || 0);
     setFormTdsApplicable(bill.tdsApplicable || false);
@@ -467,8 +470,13 @@ export const SupplierBillsView: React.FC<SupplierBillsViewProps> = ({
     setShowEditorModal(true);
   };
 
-  // Save Bill (Draft)
+  // Save Bill (Draft / Posted)
   const handleSaveBill = (statusToSave: 'DRAFT' | 'POSTED' = 'DRAFT') => {
+    if (statusToSave === 'POSTED' && !formInvoiceNo.trim()) {
+      alert("Supplier Tax Invoice Number is required to post this bill under GST Section 16.");
+      return;
+    }
+
     const selectedSupplier = suppliers.find(s => s.id === formSupplierId) || suppliers[0];
     const billNumber = editingBill ? editingBill.billNumber : `BILL-SUP-${String(billsList.length + 894).padStart(3, '0')}`;
 
@@ -481,8 +489,9 @@ export const SupplierBillsView: React.FC<SupplierBillsViewProps> = ({
     const newBill: SupplierBill = {
       id: editingBill ? editingBill.id : `sb-${Date.now()}`,
       billNumber,
-      supplierInvoiceNo: formInvoiceNo,
+      supplierInvoiceNo: formInvoiceNo.trim(),
       supplierInvoiceDate: formInvoiceDate,
+      ewayBillNo: formEwayBillNo.trim() || undefined,
       billDate: formInvoiceDate,
       dueDate: formDueDate,
       supplier: selectedSupplier,
@@ -551,43 +560,25 @@ export const SupplierBillsView: React.FC<SupplierBillsViewProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="page">
       {/* 1. Header */}
       <div className="page-hdr">
         <div className="page-hdr-left">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 10,
-              background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff'
-            }}>
-              <Receipt size={22} />
-            </div>
-            <div>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Supplier Bills</h1>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
-                Bills received from suppliers. Capture invoice numbers, match against goods receipts, check against PO rates, then post for payment.
-              </p>
-            </div>
-          </div>
+          <h1>Supplier Bills</h1>
+          <p>
+            Purchase invoices checked against the PO rate on the actual weight received. Open a bill for its GRNs, POs and payments.
+          </p>
         </div>
 
         <div className="btn-group">
           <button 
             type="button" 
-            className="btn btn-primary"
-            onClick={handleOpenNewBill}
-          >
-            <Plus size={16} /> New bill
-          </button>
-          <button 
-            type="button" 
-            className="btn btn-outline"
+            className="btn btn-outline btn-sm"
             onClick={() => {
               const csv = [
-                ['Bill #', 'Invoice #', 'Date', 'Supplier', 'Taxable', 'GST 3%', 'Total', 'Balance Due', 'Due Date', 'Status', 'Payment'],
+                ['Bill #', 'Invoice #', 'E-Way Bill', 'Date', 'Supplier', 'Taxable', 'GST 3%', 'Total', 'Balance Due', 'Due Date', 'Status', 'Payment'],
                 ...billsList.map(b => [
-                  b.billNumber, b.supplierInvoiceNo || '', b.billDate, b.supplierName || '',
+                  b.billNumber, b.supplierInvoiceNo || '', b.ewayBillNo || '', b.billDate, b.supplierName || '',
                   b.taxableAmount, b.gstAmount || 0, b.totalAmount, b.balanceDue, b.dueDate, b.status, b.payStatus
                 ])
               ].map(r => r.join(',')).join('\n');
@@ -599,12 +590,11 @@ export const SupplierBillsView: React.FC<SupplierBillsViewProps> = ({
               a.click();
             }}
           >
-            <Download size={15} /> Export CSV
+            <Download size={14} /> Export CSV
           </button>
-
           <button 
             type="button" 
-            className="btn btn-outline"
+            className="btn btn-outline btn-sm"
             onClick={() => {
               if (billsList.length > 0) {
                 const unpaid = billsList.find(b => b.balanceDue > 0) || billsList[0];
@@ -617,86 +607,85 @@ export const SupplierBillsView: React.FC<SupplierBillsViewProps> = ({
               }
             }}
           >
-            <CreditCard size={15} /> Record Payment
+            <CreditCard size={14} /> Record Payment
           </button>
-
+          <button 
+            type="button" 
+            className="btn btn-primary btn-sm"
+            onClick={handleOpenNewBill}
+          >
+            <Plus size={14} /> New bill
+          </button>
         </div>
       </div>
 
       {/* 2. KPI Cards */}
-      <div className="s360-grid">
-        <div className="card s360-card">
-          <div className="s360-label">Total Inward Invoices</div>
-          <div className="s360-val">{kpis.totalCount}</div>
-          <div className="helper">Billed supplier consignments</div>
+      <div className="sum-grid">
+        <div className="sum-box">
+          <div className="sum-val">{kpis.totalCount}</div>
+          <div className="sum-lbl">Total Inward Invoices</div>
         </div>
 
-        <div className="card s360-card">
-          <div className="s360-label">Invoiced Value</div>
-          <div className="s360-val" style={{ color: 'var(--gold)' }}>
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: 'var(--gold)' }}>
             ₹{(kpis.totalInvoiced / 100000).toFixed(2)} L
           </div>
-          <div className="helper">₹{kpis.totalInvoiced.toLocaleString('en-IN')} gross billings</div>
+          <div className="sum-lbl">Invoiced Value</div>
         </div>
 
-        <div className="card s360-card">
-          <div className="s360-label">GST Input Tax Credit (ITC)</div>
-          <div className="s360-val" style={{ color: 'var(--success)' }}>
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: 'var(--success)' }}>
             ₹{kpis.totalItc.toLocaleString('en-IN')}
           </div>
-          <div className="helper">3% GST claimable on GSTR-2B</div>
+          <div className="sum-lbl">GST Input Tax Credit (ITC)</div>
         </div>
 
-        <div className="card s360-card">
-          <div className="s360-label">Balance Payable</div>
-          <div className="s360-val" style={{ color: kpis.totalDue > 0 ? 'var(--danger)' : 'var(--success)' }}>
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: kpis.totalDue > 0 ? 'var(--danger)' : 'var(--success)' }}>
             ₹{(kpis.totalDue / 100000).toFixed(2)} L
           </div>
-          <div className="helper">
-            {kpis.totalOverdue > 0 ? `₹${kpis.totalOverdue.toLocaleString('en-IN')} overdue` : 'All bills within credit cycle'}
+          <div className="sum-lbl">
+            {kpis.totalOverdue > 0 ? `₹${kpis.totalOverdue.toLocaleString('en-IN')} overdue` : 'Payable Balance'}
           </div>
         </div>
       </div>
 
       {/* 3. Filter Toolbar */}
-      <div className="card" style={{ padding: 14 }}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: 10, flex: '1 1 320px', alignItems: 'center' }}>
-            <div style={{ position: 'relative', width: '100%', maxWidth: 360 }}>
-              <Search size={16} style={{ position: 'absolute', left: 12, top: 10, color: 'var(--muted)' }} />
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div className="card-body" style={{ padding: "12px 16px", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", gap: 10, flex: "1 1 320px", alignItems: "center", flexWrap: "wrap" }}>
+            <div className="search-box" style={{ flex: 1, minWidth: 260 }}>
+              <Search size={14} />
               <input 
                 type="text" 
-                className="input input-sm" 
-                style={{ paddingLeft: 34, width: '100%' }}
-                placeholder="Search Bill #, Invoice #, Supplier..."
+                placeholder="Search Bill #, Invoice #, E-way bill, Supplier..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
 
-            <select 
-              className="input input-sm" 
-              style={{ width: 'auto' }}
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-            >
-              <option value="ALL">All Bill Statuses</option>
-              <option value="DRAFT">Draft</option>
-              <option value="POSTED">Posted</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
-
-            <select 
-              className="input input-sm" 
-              style={{ width: 'auto' }}
-              value={payStatusFilter}
-              onChange={e => setPayStatusFilter(e.target.value)}
-            >
-              <option value="ALL">All Pay Statuses</option>
-              <option value="UNPAID">Unpaid</option>
-              <option value="PARTIALLY_PAID">Partially Paid</option>
-              <option value="PAID">Paid</option>
-            </select>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              {(['ALL', 'DRAFT', 'POSTED', 'CANCELLED'] as const).map(st => (
+                <button
+                  key={st}
+                  type="button"
+                  className={`filter-pill ${statusFilter === st ? 'active' : ''}`}
+                  onClick={() => setStatusFilter(st)}
+                >
+                  {st === 'ALL' ? 'All Status' : st}
+                </button>
+              ))}
+              {(['ALL', 'UNPAID', 'PARTIALLY_PAID', 'PAID'] as const).map(pt => (
+                <button
+                  key={pt}
+                  type="button"
+                  className={`filter-pill ${payStatusFilter === pt ? 'active' : ''}`}
+                  onClick={() => setPayStatusFilter(pt)}
+                >
+                  {pt === 'ALL' ? 'All Payment' : pt.replace('_', ' ')}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="helper">
@@ -963,17 +952,33 @@ export const SupplierBillsView: React.FC<SupplierBillsViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="label">ITC Eligibility</label>
+                  <label className="label">E-Way Bill No. (12 Digits)</label>
+                  <input 
+                    type="text" 
+                    maxLength={12}
+                    className="input mono"
+                    placeholder="e.g. 241029384756"
+                    value={formEwayBillNo}
+                    onChange={e => setFormEwayBillNo(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="label">ITC Eligibility (GST Sec 16)</label>
                   <select 
                     className="input"
                     value={formItcEligible}
                     onChange={e => setFormItcEligible(e.target.value)}
                   >
-                    <option value="yes">Yes — Eligible for Full Input Tax Credit</option>
-                    <option value="no">No — Ineligible / Blocked Credit</option>
+                    <option value="yes">Eligible — Inward Supply u/s 16 (GSTR-2B)</option>
+                    <option value="no">Ineligible — Blocked Credit u/s 17(5)</option>
                     <option value="partial">Partial ITC</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="alert alert-info" style={{ marginTop: 10, fontSize: 11.5, padding: '8px 12px' }}>
+                <b>GST Section 16 Compliance:</b> Inward supply must be backed by original tax invoice and GSTR-2B matching. Under the 2nd proviso to Sec 16(2), supplier dues must be discharged within 180 days to avoid ITC reversal with interest.
               </div>
 
               {/* Unbilled Consignments Helper Box */}

@@ -29,6 +29,19 @@ interface SuppliersPurchasingViewProps {
   onRecordSupplierPayment?: (spay: SupplierPayment) => void;
 }
 
+const GST_STATE_MAP: Record<string, string> = {
+  "01": "Jammu & Kashmir", "02": "Himachal Pradesh", "03": "Punjab", "04": "Chandigarh",
+  "05": "Uttarakhand", "06": "Haryana", "07": "Delhi", "08": "Rajasthan",
+  "09": "Uttar Pradesh", "10": "Bihar", "11": "Sikkim", "12": "Arunachal Pradesh",
+  "13": "Nagaland", "14": "Manipur", "15": "Mizoram", "16": "Tripura",
+  "17": "Meghalaya", "18": "Assam", "19": "West Bengal", "20": "Jharkhand",
+  "21": "Odisha", "22": "Chhattisgarh", "23": "Madhya Pradesh", "24": "Gujarat",
+  "25": "Daman & Diu", "26": "Dadra & Nagar Haveli", "27": "Maharashtra", "29": "Karnataka",
+  "30": "Goa", "31": "Lakshadweep", "32": "Kerala", "33": "Tamil Nadu",
+  "34": "Puducherry", "35": "Andaman & Nicobar", "36": "Telangana", "37": "Andhra Pradesh",
+  "38": "Ladakh"
+};
+
 export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = ({
   initialTab = "suppliers",
   suppliers: initialSuppliers = mockSuppliers,
@@ -82,8 +95,16 @@ export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = (
   const [newSupPerson, setNewSupPerson] = useState("");
   const [newSupMobile, setNewSupMobile] = useState("");
   const [newSupCity, setNewSupCity] = useState("Mumbai");
+  const [newSupState, setNewSupState] = useState("Maharashtra");
   const [newSupGSTIN, setNewSupGSTIN] = useState("27AAACK1234F1Z1");
+  const [newSupPAN, setNewSupPAN] = useState("AAACK1234F");
   const [newSupCategory, setNewSupCategory] = useState<string>("Bullion Dealer");
+  const [newSupTdsApplicable, setNewSupTdsApplicable] = useState(true);
+  const [newSupTdsSection, setNewSupTdsSection] = useState<'194Q' | '194C' | 'NONE'>('194Q');
+  const [newSupCreditDays, setNewSupCreditDays] = useState(30);
+  const [newSupOpeningBalance, setNewSupOpeningBalance] = useState(0);
+  const [newSupOpeningType, setNewSupOpeningType] = useState<'CR' | 'DR'>('CR');
+  const [gstinError, setGstinError] = useState("");
 
   // PO Form
   const [poSupplierId, setPoSupplierId] = useState(suppliersList[0]?.id || "");
@@ -159,9 +180,83 @@ export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = (
     }, 120);
   };
 
+  const handleGstinChange = (val: string) => {
+    const clean = val.toUpperCase().trim();
+    setNewSupGSTIN(clean);
+    if (!clean) {
+      setGstinError("");
+      return;
+    }
+    if (clean.length < 2) {
+      setGstinError("State code must be 2 digits (01-37)");
+      return;
+    }
+    const stateCode = clean.slice(0, 2);
+    const stateNum = parseInt(stateCode, 10);
+    if (isNaN(stateNum) || stateNum < 1 || stateNum > 37) {
+      setGstinError(`Invalid state code '${stateCode}'. Must be 01 to 37.`);
+      return;
+    }
+    if (GST_STATE_MAP[stateCode]) {
+      setNewSupState(GST_STATE_MAP[stateCode]);
+    }
+    if (clean.length >= 12) {
+      const panPart = clean.slice(2, 12);
+      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+      if (panRegex.test(panPart)) {
+        setNewSupPAN(panPart);
+      }
+    }
+    if (clean.length === 15) {
+      const gstinRegex = /^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+      if (!gstinRegex.test(clean)) {
+        setGstinError("Invalid GSTIN structure. Must follow 2 digits + 10 char PAN + 1 entity + Z + checksum.");
+      } else {
+        setGstinError("");
+      }
+    } else if (clean.length > 15) {
+      setGstinError("GSTIN cannot exceed 15 alphanumeric characters.");
+    } else {
+      setGstinError("");
+    }
+  };
+
+  const handleToggleSupplierStatus = (supId: string) => {
+    setSuppliersList(prev => prev.map(s => {
+      if (s.id === supId) {
+        const nextStatus = s.status === 'INACTIVE' ? 'ACTIVE' : 'INACTIVE';
+        return { ...s, status: nextStatus };
+      }
+      return s;
+    }));
+  };
+
   const handleCreateSupplier = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSupName.trim() || !newSupMobile.trim()) return;
+    
+    // Strict GSTIN verification if provided
+    if (newSupGSTIN.trim()) {
+      const gstinClean = newSupGSTIN.trim().toUpperCase();
+      const stateNum = parseInt(gstinClean.slice(0, 2), 10);
+      if (isNaN(stateNum) || stateNum < 1 || stateNum > 37) {
+        alert(`Invalid GSTIN: State code '${gstinClean.slice(0, 2)}' is invalid. Must be between 01 and 37.`);
+        return;
+      }
+      const gstinRegex = /^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+      if (!gstinRegex.test(gstinClean)) {
+        alert("Invalid GSTIN format: Must be standard 15-character GSTIN (State code + 10-char PAN + Entity + Z + checksum).");
+        return;
+      }
+      const extractedPan = gstinClean.slice(2, 12);
+      if (newSupPAN && newSupPAN.trim().toUpperCase() !== extractedPan) {
+        alert(`PAN Mismatch: Entered PAN (${newSupPAN}) does not match GSTIN PAN characters (${extractedPan}).`);
+        return;
+      }
+    }
+
+    const openingNet = newSupOpeningType === 'CR' ? Number(newSupOpeningBalance || 0) : -Number(newSupOpeningBalance || 0);
+
     const newSup: Supplier = {
       id: `sup-${Date.now()}`,
       supplierCode: `SUP-${String(suppliersList.length + 1).padStart(4, "0")}`,
@@ -170,11 +265,13 @@ export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = (
       tradeName: newSupName.trim(),
       contactPerson: newSupPerson.trim() || newSupName.trim(),
       mobile: newSupMobile.trim(),
+      phone: newSupMobile.trim(),
       city: newSupCity.trim(),
-      state: "Maharashtra",
-      gstin: newSupGSTIN.trim(),
+      state: newSupState.trim(),
+      gstin: newSupGSTIN.trim().toUpperCase(),
       category: newSupCategory,
-      currentBalanceDue: 0
+      status: "ACTIVE",
+      currentBalanceDue: openingNet
     };
     setSuppliersList(prev => [...prev, newSup]);
     if (onAddSupplier) onAddSupplier(newSup);
@@ -182,6 +279,7 @@ export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = (
     setNewSupName("");
     setNewSupPerson("");
     setNewSupMobile("");
+    setGstinError("");
   };
 
   const handleCreatePO = (e: React.FormEvent) => {
@@ -558,25 +656,25 @@ export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = (
 
           {activeTab === "suppliers" && (
             <>
-              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                 <span className="helper" style={{ fontSize: 12, fontWeight: 600 }}>Status:</span>
                 <button
                   type="button"
-                  className={`btn btn-xs ${supplierStatusFilter === "ALL" ? "btn-primary" : "btn-outline"}`}
+                  className={`filter-pill ${supplierStatusFilter === "ALL" ? "active" : ""}`}
                   onClick={() => setSupplierStatusFilter("ALL")}
                 >
                   All
                 </button>
                 <button
                   type="button"
-                  className={`btn btn-xs ${supplierStatusFilter === "ACTIVE" ? "btn-primary" : "btn-outline"}`}
+                  className={`filter-pill ${supplierStatusFilter === "ACTIVE" ? "active" : ""}`}
                   onClick={() => setSupplierStatusFilter("ACTIVE")}
                 >
                   Active
                 </button>
                 <button
                   type="button"
-                  className={`btn btn-xs ${supplierStatusFilter === "INACTIVE" ? "btn-primary" : "btn-outline"}`}
+                  className={`filter-pill ${supplierStatusFilter === "INACTIVE" ? "active" : ""}`}
                   onClick={() => setSupplierStatusFilter("INACTIVE")}
                 >
                   Inactive
@@ -654,19 +752,32 @@ export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = (
                     (bill.supplierId === sup.id || bill.supplier?.id === sup.id) && bill.status !== 'CANCELLED' && bill.status !== 'DRAFT'
                   );
                   const billsDue = linkedBills.length ? linkedBills.reduce((sum, bill) => sum + (bill.balanceAmount ?? bill.balanceDue), 0) : null;
+                  const supAdvance = paymentsList
+                    .filter(p => (p.supplierId === sup.id || p.supplierName === sup.tradeName || p.supplierName === sup.name) && p.status !== 'VOIDED')
+                    .reduce((sum, p) => sum + (p.unallocated || 0), 0);
+                  const netBalance = billsDue !== null ? (billsDue - supAdvance) : sup.currentBalanceDue;
+                  const isInactive = sup.status === 'INACTIVE';
+                  
                   return (
-                    <tr key={sup.id}>
+                    <tr key={sup.id} style={isInactive ? { opacity: 0.6 } : undefined}>
                       <td className="mono">{sup.code || sup.supplierCode || '—'}</td>
-                      <td><strong>{sup.tradeName || sup.name || '—'}</strong></td>
+                      <td>
+                        <strong>{sup.tradeName || sup.name || '—'}</strong>
+                        {isInactive && <span className="badge badge-gray" style={{ marginLeft: 6, fontSize: 10 }}>Inactive</span>}
+                      </td>
                       <td className="mono">{sup.gstin || '—'}</td>
                       <td className="mono">{sup.phone || sup.mobile || '—'}</td>
                       <td>{sup.city || '—'}</td>
-                      <td className="num">—</td>
+                      <td className="num">{(sup as any).creditDays || 30} d</td>
                       <td className="num">{billsDue === null ? '—' : `₹${billsDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}</td>
-                      <td className="num">—</td>
-                      <td className="num">₹{sup.currentBalanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td className="num">{supAdvance > 0 ? `₹${supAdvance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}</td>
+                      <td className="num">
+                        <b style={{ color: Number(netBalance) > 0 ? "var(--danger)" : Number(netBalance) < 0 ? "var(--success)" : undefined }}>
+                          ₹{netBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </b>
+                      </td>
                       <td style={{ textAlign: "right" }}>
-                        <div style={{ display: "inline-flex", gap: 6 }}>
+                        <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
                           <button
                             type="button"
                             onClick={() => setSelectedSupplier(sup)}
@@ -685,6 +796,14 @@ export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = (
                           >
                             <ShoppingBag size={12} />
                             <span>Order</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSupplierStatus(sup.id)}
+                            className={`btn btn-xs ${isInactive ? 'btn-primary' : 'btn-ghost'}`}
+                            title={isInactive ? 'Activate supplier' : 'Deactivate supplier'}
+                          >
+                            {isInactive ? 'Activate' : 'Deactivate'}
                           </button>
                         </div>
                       </td>
@@ -771,10 +890,10 @@ export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = (
         />
       )}
 
-      {/* MODAL 1: Add Supplier Modal (.overlay > .modal) */}
+      {/* MODAL 1: Add Supplier Modal (.overlay > .modal.modal-lg) */}
       {showAddSupplierModal && (
         <div className="overlay" onClick={() => setShowAddSupplierModal(false)}>
-          <div className="modal modal-md" onClick={(e) => e.stopPropagation()}>
+          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h3>
                 <Building2 size={18} style={{ color: "var(--primary)" }} />
@@ -789,7 +908,7 @@ export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = (
               </button>
             </div>
             <form onSubmit={handleCreateSupplier}>
-              <div className="modal-body">
+              <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 <div className="g2">
                   <div>
                     <label className="label">Trade Name / Company *</label>
@@ -827,26 +946,6 @@ export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = (
                     />
                   </div>
                   <div>
-                    <label className="label">City</label>
-                    <input
-                      type="text"
-                      className="input input-sm"
-                      style={{ width: "100%" }}
-                      value={newSupCity}
-                      onChange={(e) => setNewSupCity(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="label">GSTIN (15 Digits)</label>
-                    <input
-                      type="text"
-                      className="input input-sm"
-                      style={{ width: "100%" }}
-                      value={newSupGSTIN}
-                      onChange={(e) => setNewSupGSTIN(e.target.value)}
-                    />
-                  </div>
-                  <div>
                     <label className="label">Category</label>
                     <select
                       className="input input-sm"
@@ -859,7 +958,135 @@ export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = (
                       <option value="Jewellery Manufacturer">Jewellery Manufacturer</option>
                       <option value="Diamond Wholesale">Diamond Wholesale</option>
                       <option value="Findings / Stones">Findings / Stones</option>
+                      <option value="Karigar Workshop">Karigar Workshop</option>
                     </select>
+                  </div>
+                </div>
+
+                {/* GSTIN & Tax Compliance (Section 16 / TDS) */}
+                <div style={{ background: "var(--surface2, #fbfbf9)", padding: 12, borderRadius: "var(--r, 10px)", border: "1px solid var(--border)" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: "var(--primary-d)" }}>
+                    GSTIN & Statutory Tax Configuration
+                  </div>
+                  <div className="g3">
+                    <div>
+                      <label className="label">GSTIN (15 Digits)</label>
+                      <input
+                        type="text"
+                        maxLength={15}
+                        className="input input-sm mono"
+                        style={{ width: "100%" }}
+                        placeholder="27AAACK1234F1Z1"
+                        value={newSupGSTIN}
+                        onChange={(e) => handleGstinChange(e.target.value)}
+                      />
+                      {gstinError ? (
+                        <div style={{ color: "var(--danger)", fontSize: 11, marginTop: 3 }}>{gstinError}</div>
+                      ) : newSupGSTIN.length === 15 ? (
+                        <div style={{ color: "var(--success)", fontSize: 11, marginTop: 3 }}>✓ Valid GSTIN Structure ({newSupState})</div>
+                      ) : null}
+                    </div>
+                    <div>
+                      <label className="label">PAN (Permanent Account No)</label>
+                      <input
+                        type="text"
+                        maxLength={10}
+                        className="input input-sm mono"
+                        style={{ width: "100%" }}
+                        placeholder="AAACK1234F"
+                        value={newSupPAN}
+                        onChange={(e) => setNewSupPAN(e.target.value.toUpperCase())}
+                      />
+                    </div>
+                    <div>
+                      <label className="label">State / Region</label>
+                      <input
+                        type="text"
+                        className="input input-sm"
+                        style={{ width: "100%" }}
+                        value={newSupState}
+                        onChange={(e) => setNewSupState(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="g3" style={{ marginTop: 10 }}>
+                    <div>
+                      <label className="label">City</label>
+                      <input
+                        type="text"
+                        className="input input-sm"
+                        style={{ width: "100%" }}
+                        value={newSupCity}
+                        onChange={(e) => setNewSupCity(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="label">TDS Applicability</label>
+                      <select
+                        className="input input-sm"
+                        style={{ width: "100%" }}
+                        value={newSupTdsSection}
+                        onChange={(e) => {
+                          const val = e.target.value as any;
+                          setNewSupTdsSection(val);
+                          setNewSupTdsApplicable(val !== 'NONE');
+                        }}
+                      >
+                        <option value="194Q">Sec 194Q: Purchase of Goods (0.1% &gt; ₹50L)</option>
+                        <option value="194C">Sec 194C: Job Work / Karigar (1% Indiv / 2% Co)</option>
+                        <option value="NONE">Exempt / Not Applicable</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">Credit Period</label>
+                      <select
+                        className="input input-sm"
+                        style={{ width: "100%" }}
+                        value={newSupCreditDays}
+                        onChange={(e) => setNewSupCreditDays(Number(e.target.value))}
+                      >
+                        <option value={0}>Immediate / Advance</option>
+                        <option value={7}>7 Days</option>
+                        <option value={15}>15 Days</option>
+                        <option value={30}>30 Days (Standard)</option>
+                        <option value={45}>45 Days</option>
+                        <option value={60}>60 Days</option>
+                        <option value={90}>90 Days</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Opening Balance / Ledger */}
+                <div style={{ background: "#fff", padding: 12, borderRadius: "var(--r, 10px)", border: "1px solid var(--border)" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Opening Ledger Balance</div>
+                  <div className="g2">
+                    <div>
+                      <label className="label">Opening Amount (₹)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="input input-sm"
+                        style={{ width: "100%" }}
+                        placeholder="0.00"
+                        value={newSupOpeningBalance}
+                        onChange={(e) => setNewSupOpeningBalance(Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Balance Type</label>
+                      <select
+                        className="input input-sm"
+                        style={{ width: "100%" }}
+                        value={newSupOpeningType}
+                        onChange={(e) => setNewSupOpeningType(e.target.value as 'CR' | 'DR')}
+                      >
+                        <option value="CR">Credit (We owe supplier / Payable)</option>
+                        <option value="DR">Debit (Supplier owes us / Advance)</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>

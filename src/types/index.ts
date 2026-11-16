@@ -689,6 +689,9 @@ export interface PurchaseOrderLine {
   grossWeight: number;
   netWeight: number;
   stoneWeight?: number;
+  makingCharge?: number;
+  makingChargeType?: 'per_gram' | 'fixed';
+  jobWorkSac?: string;
   rateBasis: 'per_gram' | 'per_ct' | 'fixed' | string;
   rate: number;
   discount?: number;
@@ -840,6 +843,7 @@ export interface SupplierBill {
   supplierName?: string;
   supplierInvoiceNo?: string;
   supplierInvoiceDate?: string;
+  ewayBillNo?: string;
   billDate: string;
   dueDate: string;
   taxMode?: 'intra' | 'inter';
@@ -892,6 +896,9 @@ export interface SupplierPayment {
   mode: PaymentMode | string;
   referenceNo: string; // UTR or Cheque no
   utr?: string;
+  tdsDeducted?: number;
+  tdsSection?: string;
+  netPaid?: number;
   operator: string;
   status?: 'ACTIVE' | 'VOIDED' | string;
   voidReason?: string;

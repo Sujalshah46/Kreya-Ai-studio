@@ -810,7 +810,7 @@ export const DataImportView: React.FC<DataImportViewProps> = ({
   };
 
   return (
-    <div className="page" style={{ padding: '16px 20px', maxWidth: 1240, margin: '0 auto' }}>
+    <div className="page">
       {/* 1. Licence Warning Banner */}
       <div 
         className="license-banner rounded-lg mb-3 flex items-center justify-between p-3" 

@@ -425,8 +425,12 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
     const stoneWeight = Number(line.stoneWeight || 0);
     const rate = Number(line.rate || 0);
     const discount = Number(line.discount || 0);
-    const gstPct = Number(line.gstPct || 3);
     const basis = line.rateBasis || 'per_gram';
+    const isJobWork = line.category === 'Job Work' || line.metalType === 'jobwork' || line.hsn === '9988' || line.jobWorkSac === '998892';
+    const gstPct = line.gstPct !== undefined ? Number(line.gstPct) : (isJobWork ? 18 : 3);
+    const makingCharge = Number(line.makingCharge || 0);
+    const makingType = line.makingChargeType || 'per_gram';
+    const makingAmount = makingType === 'fixed' ? makingCharge : (makingCharge * netWeight);
 
     let base = 0;
     if (basis === 'per_gram') {
@@ -437,7 +441,7 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
       base = qty * rate;
     }
 
-    const taxable = Math.max(0, base - discount);
+    const taxable = Math.max(0, base + makingAmount - discount);
     const gstAmount = Math.round(taxable * (gstPct / 100) * 100) / 100;
     const lineTotal = taxable + gstAmount;
 
@@ -445,12 +449,15 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
       description: line.description || '',
       metalType: line.metalType || 'gold',
       purity: line.purity || '22K (916)',
-      category: line.category || 'Jewellery',
-      hsn: line.hsn || '7113',
+      category: isJobWork ? 'Job Work' : (line.category || 'Jewellery'),
+      hsn: isJobWork ? '9988' : (line.hsn || (line.metalType === 'silver' ? '7106' : '7113')),
+      jobWorkSac: isJobWork ? '998892' : undefined,
       qty,
       grossWeight: Number(line.grossWeight || netWeight),
       netWeight,
       stoneWeight,
+      makingCharge,
+      makingChargeType: makingType,
       rateBasis: basis,
       rate,
       discount,
@@ -626,118 +633,96 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="page">
       {/* 1. Page Header */}
       <div className="page-hdr">
         <div className="page-hdr-left">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 10,
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff'
-            }}>
-              <ShoppingBag size={22} />
-            </div>
-            <div>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Purchase Orders</h1>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
-                Draft → Submitted → Approved → Received / Closed. Open a PO for its goods receipts, supplier bills and payments.
-              </p>
-            </div>
-          </div>
+          <h1>Purchase Orders</h1>
+          <p>
+            Track purchase orders, goods receipts, supplier bills and payments.
+          </p>
         </div>
 
         <div className="btn-group">
           <button 
             type="button" 
-            className="btn btn-primary"
-            onClick={handleOpenNewPO}
-          >
-            <Plus size={16} /> New PO
-          </button>
-          <button 
-            type="button" 
-            className="btn btn-outline" 
+            className="btn btn-outline btn-sm" 
             onClick={() => exportPurchaseOrders('csv')}
           >
-            <Download size={15} /> CSV
+            <Download size={14} /> CSV
           </button>
-
           <button 
             type="button" 
-            className="btn btn-outline" 
+            className="btn btn-outline btn-sm" 
             onClick={() => exportPurchaseOrders('xlsx')}
           >
-            <FileSpreadsheet size={15} /> Excel
+            <FileSpreadsheet size={14} /> Excel
           </button>
-
+          <button 
+            type="button" 
+            className="btn btn-primary btn-sm"
+            onClick={handleOpenNewPO}
+          >
+            <Plus size={14} /> New PO
+          </button>
         </div>
       </div>
 
       {/* 2. KPI Summary Cards */}
-      <div className="s360-grid">
-        <div className="card s360-card">
-          <div className="s360-label">Total Purchase Orders</div>
-          <div className="s360-val">{kpiStats.total}</div>
-          <div className="helper">{kpiStats.approvedCount} in active workflow</div>
+      <div className="sum-grid">
+        <div className="sum-box">
+          <div className="sum-val">{kpiStats.total}</div>
+          <div className="sum-lbl">Total Purchase Orders</div>
         </div>
 
-        <div className="card s360-card">
-          <div className="s360-label">Total Ordered Value</div>
-          <div className="s360-val" style={{ color: 'var(--gold)' }}>
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: 'var(--gold)' }}>
             ₹{(kpiStats.totalValue / 100000).toFixed(2)} L
           </div>
-          <div className="helper">₹{kpiStats.totalValue.toLocaleString('en-IN')} gross estimate</div>
+          <div className="sum-lbl">Total Ordered Value</div>
         </div>
 
-        <div className="card s360-card">
-          <div className="s360-label">Fulfillment Status</div>
-          <div className="s360-val" style={{ color: kpiStats.fulfilledPct >= 80 ? 'var(--success)' : 'var(--warning, #f59e0b)' }}>
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: kpiStats.fulfilledPct >= 80 ? 'var(--success)' : 'var(--warning, #f59e0b)' }}>
             {kpiStats.fulfilledPct}%
           </div>
-          <div className="helper">{kpiStats.totalReceivedQty} of {kpiStats.totalOrderedQty} pieces received</div>
+          <div className="sum-lbl">Fulfillment Rate ({kpiStats.totalReceivedQty}/{kpiStats.totalOrderedQty} pc)</div>
         </div>
 
-        <div className="card s360-card">
-          <div className="s360-label">Closed / Completed</div>
-          <div className="s360-val" style={{ color: 'var(--success)' }}>
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: 'var(--success)' }}>
             {kpiStats.fulfilledCount}
           </div>
-          <div className="helper">Fully received & stock verified</div>
+          <div className="sum-lbl">Closed / Fulfilled</div>
         </div>
       </div>
 
       {/* 3. Filter & Search Toolbar */}
-      <div className="card" style={{ padding: 14 }}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: 10, flex: '1 1 320px', alignItems: 'center' }}>
-            <div style={{ position: 'relative', width: '100%', maxWidth: 360 }}>
-              <Search size={16} style={{ position: 'absolute', left: 12, top: 10, color: 'var(--muted)' }} />
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div className="card-body" style={{ padding: "12px 16px", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", gap: 10, flex: "1 1 320px", alignItems: "center", flexWrap: "wrap" }}>
+            <div className="search-box" style={{ flex: 1, minWidth: 260 }}>
+              <Search size={14} />
               <input 
                 type="text" 
-                className="input input-sm" 
-                style={{ paddingLeft: 34, width: '100%' }}
                 placeholder="Search PO #, supplier name, notes..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
 
-            <select 
-              className="input input-sm" 
-              style={{ width: 'auto' }}
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="DRAFT">Draft</option>
-              <option value="SUBMITTED">Submitted</option>
-              <option value="APPROVED">Approved</option>
-              <option value="PARTIALLY_RECEIVED">Partially Received</option>
-              <option value="FULFILLED">Received / Fulfilled</option>
-              <option value="CLOSED">Closed</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              {(['ALL', 'DRAFT', 'SUBMITTED', 'APPROVED', 'PARTIALLY_RECEIVED', 'FULFILLED'] as const).map(st => (
+                <button
+                  key={st}
+                  type="button"
+                  className={`filter-pill ${statusFilter === st ? 'active' : ''}`}
+                  onClick={() => setStatusFilter(st)}
+                >
+                  {st === 'ALL' ? 'All' : st === 'FULFILLED' ? 'Received' : st.replace('_', ' ')}
+                </button>
+              ))}
+            </div>
 
             <select 
               className="input input-sm" 
@@ -1597,21 +1582,47 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                       </div>
 
                       <div>
-                        <label className="label">GST %</label>
+                        <label className="label">Making Charge (₹/g)</label>
                         <input 
                           type="number" 
+                          step="0.01"
+                          placeholder="0.00"
                           className="input"
-                          value={line.gstPct}
+                          value={line.makingCharge || ''}
                           onChange={e => {
                             const val = Number(e.target.value);
-                            setFormLines(formLines.map((l, i) => i === idx ? calculateLine({ ...l, gstPct: val }) : l));
+                            setFormLines(formLines.map((l, i) => i === idx ? calculateLine({ ...l, makingCharge: val }) : l));
                           }}
                         />
                       </div>
 
+                      <div>
+                        <label className="label">GST / SAC</label>
+                        <select 
+                          className="input"
+                          value={line.gstPct}
+                          onChange={e => {
+                            const val = Number(e.target.value);
+                            const isJob = val === 18;
+                            setFormLines(formLines.map((l, i) => i === idx ? calculateLine({ 
+                              ...l, 
+                              gstPct: val,
+                              category: isJob ? 'Job Work' : l.category,
+                              hsn: isJob ? '9988' : l.hsn,
+                              jobWorkSac: isJob ? '998892' : undefined
+                            }) : l));
+                          }}
+                        >
+                          <option value={3}>3% (Gold/Silver)</option>
+                          <option value={18}>18% (SAC 9988 Job Work)</option>
+                          <option value={5}>5% (Specified Karigar)</option>
+                          <option value={0}>0% (Exempt)</option>
+                        </select>
+                      </div>
+
                       <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 14 }}>
                         <div className="helper">
-                          Taxable: <b>₹{line.taxable?.toLocaleString('en-IN')}</b> · GST 3%: <b>₹{line.gstAmount?.toLocaleString('en-IN')}</b>
+                          Taxable: <b>₹{line.taxable?.toLocaleString('en-IN')}</b> · GST {line.gstPct}%: <b>₹{line.gstAmount?.toLocaleString('en-IN')}</b>
                         </div>
                         <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gold, #b45309)' }} className="mono">
                           ₹{line.lineTotal?.toLocaleString('en-IN')}

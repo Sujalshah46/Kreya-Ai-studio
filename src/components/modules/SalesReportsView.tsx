@@ -52,6 +52,7 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
   onNavigate
 }) => {
   const [activeReportTab, setActiveReportTab] = useState<number>(1);
+  const [dayBookMode, setDayBookMode] = useState<'daily' | 'monthly'>('daily');
   const [dateRange, setDateRange] = useState<DateRangePreset>('MONTH');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -152,6 +153,30 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
     getDay(date).refunds += memo.refundAmount;
   }
   const dayBookRows = [...dailyTotals.entries()].sort(([a], [b]) => b.localeCompare(a));
+  const monthlyTotals = useMemo(() => {
+    const months = new Map<string, ReturnType<typeof blankDay>>();
+    for (const [date, day] of dailyTotals.entries()) {
+      const monthKey = date.slice(0, 7);
+      const current = months.get(monthKey) ?? blankDay();
+      current.invoices += day.invoices;
+      current.sales += day.sales;
+      current.gst += day.gst;
+      current.due += day.due;
+      current.same += day.same;
+      current.earlier += day.earlier;
+      current.advances += day.advances;
+      current.repairs += day.repairs;
+      current.loans += day.loans;
+      current.cash += day.cash;
+      current.nonCash += day.nonCash;
+      current.refunds += day.refunds;
+      months.set(monthKey, current);
+    }
+    return [...months.entries()].sort(([a], [b]) => b.localeCompare(a));
+  }, [dailyTotals]);
+
+  const activeDayBookRows = dayBookMode === 'daily' ? dayBookRows : monthlyTotals;
+
   const dayBookValues = (day: ReturnType<typeof blankDay>) => [
     day.invoices, day.sales, day.gst, day.due, day.same, day.earlier,
     day.advances, day.repairs, day.loans, day.cash + day.nonCash, day.cash, day.nonCash,
@@ -176,12 +201,15 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
   const marginPct = soldExclGst > 0 ? ((estimatedProfit / soldExclGst) * 100).toFixed(1) : '0.0';
   const markupPct = estimatedCost > 0 ? ((estimatedProfit / estimatedCost) * 100).toFixed(1) : '0.0';
 
-  // Category stats
+  // Category stats & breakdowns (Gold, Silver, Diamond, Platinum, Making charges, Waste)
   const categoryStats: Record<string, { count: number; weight: number; value: number }> = useMemo(() => {
     const stats: Record<string, { count: number; weight: number; value: number }> = {
       'Gold Jewellery': { count: 0, weight: 0, value: 0 },
       'Silver Articles': { count: 0, weight: 0, value: 0 },
       'Diamond Jewellery': { count: 0, weight: 0, value: 0 },
+      'Platinum Jewellery': { count: 0, weight: 0, value: 0 },
+      'Making Charges': { count: 0, weight: 0, value: 0 },
+      'Wastage / Value Addition': { count: 0, weight: 0, value: 0 },
       'Bullion Coins & Bars': { count: 0, weight: 0, value: 0 }
     };
     filteredInvoices.forEach(inv => {
@@ -191,6 +219,8 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
         const metal = (itm.metalType || '').toLowerCase();
         if (rawCat.includes('diamond') || (itm.stoneValue && itm.stoneValue > 10000)) {
           cat = 'Diamond Jewellery';
+        } else if (rawCat.includes('platinum') || metal.includes('platinum')) {
+          cat = 'Platinum Jewellery';
         } else if (rawCat.includes('silver') || metal.includes('silver')) {
           cat = 'Silver Articles';
         } else if (rawCat.includes('coin') || rawCat.includes('bar') || rawCat.includes('bullion')) {
@@ -202,6 +232,22 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
         stats[cat].count += 1;
         stats[cat].weight += itm.grossWeight || 0;
         stats[cat].value += itm.lineTotal || 0;
+
+        // Making charges breakdown
+        const making = itm.makingAmount || itm.makingCharges || 0;
+        if (making > 0) {
+          stats['Making Charges'].count += 1;
+          stats['Making Charges'].weight += itm.netWeight || 0;
+          stats['Making Charges'].value += making;
+        }
+
+        // Wastage / Value Addition breakdown
+        const waste = itm.wastageAmount || ((itm.metalValue || 0) * (itm.wastagePct || 0) / 100) || 0;
+        if (waste > 0) {
+          stats['Wastage / Value Addition'].count += 1;
+          stats['Wastage / Value Addition'].weight += ((itm.netWeight || 0) * (itm.wastagePct || 0) / 100);
+          stats['Wastage / Value Addition'].value += waste;
+        }
       });
     });
     return stats;
@@ -306,7 +352,7 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
   };
 
   return (
-    <div className="page" style={{ padding: '16px 20px', maxWidth: '100%' }}>
+    <div className="page">
       {/* Licence Banner Parity */}
       <div 
         className="license-banner rounded-lg mb-3 flex items-center justify-between p-3" 
@@ -543,6 +589,29 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
               </div>
             </div>
 
+            {/* Daily / Monthly toggle for Day-Book */}
+            {activeReportTab === 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="helper" style={{ fontSize: 11 }}>Grouping:</span>
+                <div className="inline-flex rounded-md border border-[#e5e8e4] p-0.5 bg-[#f7f6f1]">
+                  <button
+                    type="button"
+                    onClick={() => setDayBookMode('daily')}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded ${dayBookMode === 'daily' ? 'bg-white shadow-xs text-[#202522]' : 'text-[#626b65] hover:text-[#202522]'}`}
+                  >
+                    Daily
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDayBookMode('monthly')}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded ${dayBookMode === 'monthly' ? 'bg-white shadow-xs text-[#202522]' : 'text-[#626b65] hover:text-[#202522]'}`}
+                  >
+                    Monthly
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* View Mode Toggle for Invoice Register */}
             {activeReportTab === 2 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -579,16 +648,22 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
                 </caption>
                 <thead>
                   <tr>{dayBookColumns.map((column, index) => (
-                    <th key={column} className={index > 0 ? 'num' : undefined} scope="col">{column}</th>
+                    <th key={column} className={index > 0 ? 'num' : undefined} scope="col">
+                      {index === 0 && dayBookMode === 'monthly' ? 'Month' : column}
+                    </th>
                   ))}</tr>
                 </thead>
                 <tbody>
-                  {dayBookRows.length === 0 && (
+                  {activeDayBookRows.length === 0 && (
                     <tr><td colSpan={dayBookColumns.length} className="empty">No data for this period.</td></tr>
                   )}
-                  {dayBookRows.map(([date, day]) => (
+                  {activeDayBookRows.map(([date, day]) => (
                     <tr key={date}>
-                      <td>{displayDate.format(new Date(date + 'T00:00:00Z')).replace(/ /g, '-')}</td>
+                      <td className="font-semibold">
+                        {dayBookMode === 'monthly'
+                          ? new Date(date + '-01T00:00:00Z').toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+                          : displayDate.format(new Date(date + 'T00:00:00Z')).replace(/ /g, '-')}
+                      </td>
                       {dayBookValues(day).map((value, index) => (
                         <td className="num" key={dayBookColumns[index + 1]}>
                           {value === null ? '—' : index === 0 ? value : displayMoney.format(value)}
@@ -740,32 +815,47 @@ export const SalesReportsView: React.FC<SalesReportsViewProps> = ({
 
             {/* REGISTER 4: Category & volume breakdown */}
             {activeReportTab === 4 && (
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>CATEGORY</th>
-                    <th className="num">ITEMS SOLD</th>
-                    <th className="num">TOTAL GROSS WT (G)</th>
-                    <th className="num">TOTAL VALUE (₹)</th>
-                    <th className="num">SHARE %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(categoryStats).map(([cat, stat]) => {
-                    const totalVal = Object.values(categoryStats).reduce((a, b) => a + b.value, 0);
-                    const pct = totalVal > 0 ? ((stat.value / totalVal) * 100).toFixed(1) : '0.0';
-                    return (
-                      <tr key={cat}>
-                        <td style={{ fontWeight: 600 }}>{cat}</td>
-                        <td className="num font-bold">{stat.count}</td>
-                        <td className="num font-mono">{stat.weight.toFixed(3)} g</td>
-                        <td className="num font-bold" style={{ color: 'var(--primary)' }}>₹{stat.value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                        <td className="num">{pct}%</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 p-3 bg-[#f7f6f1] border-b border-[#e5e8e4]">
+                  {['Gold Jewellery', 'Silver Articles', 'Diamond Jewellery', 'Platinum Jewellery', 'Making Charges', 'Wastage / Value Addition'].map(key => (
+                    <div key={key} className="bg-white p-2.5 rounded-md border border-[#e5e8e4]">
+                      <div className="text-[10.5px] font-semibold text-[#626b65] truncate">{key}</div>
+                      <div className="text-[13px] font-bold text-[#202522] mt-0.5">
+                        ₹{(categoryStats[key]?.value || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                      </div>
+                      <div className="text-[10px] text-[#8e9890] mt-0.5">
+                        {categoryStats[key]?.count || 0} entries · {(categoryStats[key]?.weight || 0).toFixed(2)}g
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th>CATEGORY / REVENUE STREAM</th>
+                      <th className="num">ITEMS / BILLS</th>
+                      <th className="num">TOTAL GROSS WT (G)</th>
+                      <th className="num">TOTAL VALUE (₹)</th>
+                      <th className="num">SHARE %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(categoryStats).map(([cat, stat]) => {
+                      const totalVal = Object.values(categoryStats).reduce((a, b) => a + b.value, 0);
+                      const pct = totalVal > 0 ? ((stat.value / totalVal) * 100).toFixed(1) : '0.0';
+                      return (
+                        <tr key={cat}>
+                          <td style={{ fontWeight: 600 }}>{cat}</td>
+                          <td className="num font-bold">{stat.count}</td>
+                          <td className="num font-mono">{stat.weight > 0 ? `${stat.weight.toFixed(3)} g` : '—'}</td>
+                          <td className="num font-bold" style={{ color: 'var(--primary)' }}>₹{stat.value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                          <td className="num">{pct}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
 
             {/* REGISTER 5: Metal & purity-wise sales */}

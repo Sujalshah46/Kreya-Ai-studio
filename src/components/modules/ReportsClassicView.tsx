@@ -4,7 +4,7 @@ import {
   BarChart3, Calendar, FileText, Download, Printer, Filter, 
   TrendingUp, Award, DollarSign, PieChart, ShoppingBag, ArrowUpRight,
   ChevronRight, Users, CreditCard, RotateCcw, ArrowDownRight, Layers,
-  AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, Coins, Clock, Lock
+  AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, Coins, Clock, Lock, X
 } from 'lucide-react';
 import { SalesInvoice, Customer, StoreProfile, InventoryItem, GirviLoan } from '../../types';
 import { invoiceReceipts } from '../../data/invoicePayments';
@@ -32,6 +32,7 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
   onNavigate
 }) => {
   const [activeTab, setActiveTab] = useState<ReportTab>('sales');
+  const [selectedLedgerCustomer, setSelectedLedgerCustomer] = useState<Customer | null>(null);
   
   const today = calendarDate.format(new Date());
   const monthStart = today.slice(0, 7) + '-01';
@@ -39,15 +40,46 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
   // Date filter inputs
   const [fromDate, setFromDate] = useState(monthStart);
   const [toDate, setToDate] = useState(today);
+  const [datePreset, setDatePreset] = useState<'TODAY' | 'WEEK' | 'MONTH' | 'CUSTOM' | 'ALL'>('MONTH');
   
   // Applied filters (updated on clicking "Apply")
   const [appliedFrom, setAppliedFrom] = useState(monthStart);
   const [appliedTo, setAppliedTo] = useState(today);
   const [isAppliedNotice, setIsAppliedNotice] = useState(false);
 
+  const applyPreset = (preset: 'TODAY' | 'WEEK' | 'MONTH' | 'CUSTOM' | 'ALL') => {
+    setDatePreset(preset);
+    let f = '';
+    let t = today;
+    if (preset === 'TODAY') {
+      f = today;
+      t = today;
+    } else if (preset === 'WEEK') {
+      const d = new Date(today + 'T00:00:00Z');
+      d.setUTCDate(d.getUTCDate() - 7);
+      f = d.toISOString().slice(0, 10);
+      t = today;
+    } else if (preset === 'MONTH') {
+      f = monthStart;
+      t = today;
+    } else if (preset === 'ALL') {
+      f = '';
+      t = '';
+    }
+    if (preset !== 'CUSTOM') {
+      setFromDate(f);
+      setToDate(t);
+      setAppliedFrom(f);
+      setAppliedTo(t);
+      setIsAppliedNotice(true);
+      setTimeout(() => setIsAppliedNotice(false), 2000);
+    }
+  };
+
   const handleApply = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (fromDate && toDate && fromDate > toDate) return;
+    setDatePreset('CUSTOM');
     setAppliedFrom(fromDate);
     setAppliedTo(toDate);
     setIsAppliedNotice(true);
@@ -204,7 +236,7 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
   };
 
   return (
-    <div className="page" style={{ padding: '16px 20px', maxWidth: '100%' }}>
+    <div className="page">
       {/* Licence Banner Parity */}
       <div 
         className="license-banner rounded-lg mb-3 flex items-center justify-between p-3" 
@@ -281,6 +313,24 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
               <Calendar size={14} style={{ color: 'var(--primary)' }} />
               Date Filter:
             </span>
+            {/* Quick Presets */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              {(['TODAY', 'WEEK', 'MONTH', 'CUSTOM', 'ALL'] as const).map(p => (
+                <button
+                  type="button"
+                  key={p}
+                  onClick={() => applyPreset(p)}
+                  className={`btn btn-xs ${datePreset === p ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ fontSize: 11, padding: '3px 8px' }}
+                >
+                  {p === 'TODAY' && 'Today'}
+                  {p === 'WEEK' && 'Week'}
+                  {p === 'MONTH' && 'Month'}
+                  {p === 'CUSTOM' && 'Custom'}
+                  {p === 'ALL' && 'All'}
+                </button>
+              ))}
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface2)', padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)' }}>
               <span className="helper" style={{ fontSize: 11, margin: 0 }}>From</span>
               <input
@@ -657,13 +707,24 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
                         ₹{(cust.balanceDue || cust.closingBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
                       <td>
-                        <button
-                          onClick={() => alert(`Payment reminder generated for ${cust.fullName || cust.name}`)}
-                          className="btn btn-outline btn-xs"
-                          style={{ fontSize: 11 }}
-                        >
-                          Send Reminder
-                        </button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLedgerCustomer(cust)}
+                            className="btn btn-primary btn-xs"
+                            style={{ fontSize: 11 }}
+                          >
+                            View Ledger
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => alert(`Payment reminder generated for ${cust.fullName || cust.name}`)}
+                            className="btn btn-outline btn-xs"
+                            style={{ fontSize: 11 }}
+                          >
+                            Send Reminder
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -680,6 +741,234 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Customer Ledger Statement Modal */}
+      {selectedLedgerCustomer && (() => {
+        const custInvoices = invoices.filter(inv => 
+          inv.customer?.id === selectedLedgerCustomer.id ||
+          (selectedLedgerCustomer.mobile && (inv.customer?.mobile === selectedLedgerCustomer.mobile || inv.customer?.phone === selectedLedgerCustomer.mobile)) ||
+          (inv.customer?.name && inv.customer.name.toLowerCase() === (selectedLedgerCustomer.name || selectedLedgerCustomer.fullName || '').toLowerCase())
+        );
+
+        type LedgerLine = {
+          date: string;
+          voucherNo: string;
+          type: string;
+          particulars: string;
+          debit: number;
+          credit: number;
+        };
+
+        const lines: LedgerLine[] = [];
+        const opBal = selectedLedgerCustomer.openingBalance || 0;
+        if (opBal !== 0) {
+          lines.push({
+            date: '2026-04-01',
+            voucherNo: 'OP-BAL',
+            type: 'Opening Balance',
+            particulars: 'Brought forward from previous financial year',
+            debit: opBal > 0 ? opBal : 0,
+            credit: opBal < 0 ? Math.abs(opBal) : 0
+          });
+        }
+
+        custInvoices.forEach(inv => {
+          const invDate = (inv.invoiceDate || inv.date || '2026-11-15').slice(0, 10);
+          const invTotal = inv.grandTotal ?? inv.totalAmount ?? inv.productTotalValue ?? 0;
+          lines.push({
+            date: invDate,
+            voucherNo: inv.invoiceNo || inv.invoiceNumber || 'INV',
+            type: 'Sales Invoice',
+            particulars: `Jewellery sales (${inv.items.length} items)`,
+            debit: invTotal,
+            credit: 0
+          });
+
+          if ((inv.oldMetalExchangeCredit || 0) > 0) {
+            lines.push({
+              date: invDate,
+              voucherNo: `EXCH-${inv.invoiceNo || 'INV'}`,
+              type: 'Old Metal Exchange',
+              particulars: 'Customer scrap gold / silver return credit',
+              debit: 0,
+              credit: inv.oldMetalExchangeCredit || 0
+            });
+          }
+
+          const receipts = invoiceReceipts(inv);
+          receipts.forEach(rcpt => {
+            if (['OLD_GOLD_EXCHANGE', 'CUSTOMER_CREDIT'].includes(rcpt.mode.toUpperCase())) return;
+            lines.push({
+              date: (rcpt.date || rcpt.timestamp || invDate).slice(0, 10),
+              voucherNo: rcpt.receiptNo || rcpt.referenceNo || 'RCPT',
+              type: `Payment (${rcpt.mode})`,
+              particulars: `Payment receipt towards invoice ${inv.invoiceNo || 'INV'}`,
+              debit: 0,
+              credit: rcpt.amount
+            });
+          });
+        });
+
+        lines.sort((a, b) => a.date.localeCompare(b.date));
+
+        let running = 0;
+        const ledgerWithBalance = lines.map(line => {
+          running += (line.debit - line.credit);
+          return { ...line, balance: running };
+        });
+
+        const totalDebit = lines.reduce((s, l) => s + l.debit, 0);
+        const totalCredit = lines.reduce((s, l) => s + l.credit, 0);
+        const finalBalance = totalDebit - totalCredit;
+
+        const handleDownloadLedgerCSV = () => {
+          const headers = ['Date', 'Voucher No', 'Type', 'Particulars', 'Debit (Dr)', 'Credit (Cr)', 'Running Balance'];
+          const rows = ledgerWithBalance.map(l => [
+            l.date,
+            l.voucherNo,
+            l.type,
+            `"${l.particulars}"`,
+            l.debit.toFixed(2),
+            l.credit.toFixed(2),
+            l.balance.toFixed(2)
+          ]);
+          const csv = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+          const a = document.createElement('a');
+          a.href = encodeURI(csv);
+          a.download = `Ledger_${(selectedLedgerCustomer.fullName || selectedLedgerCustomer.name).replace(/\s+/g, '_')}_${today}.csv`;
+          a.click();
+        };
+
+        return (
+          <div className="modal-backdrop" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+            <div className="modal-card card" style={{ maxWidth: 960, width: '100%', maxHeight: '90vh', overflowY: 'auto', background: 'var(--surface, #ffffff)', padding: 0 }}>
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
+                      Customer Account Statement &amp; Ledger
+                    </h2>
+                    <span className="badge badge-gold font-mono">{selectedLedgerCustomer.code || 'CUST'}</span>
+                  </div>
+                  <div className="helper" style={{ fontSize: 12, marginTop: 4 }}>
+                    <strong>{selectedLedgerCustomer.fullName || selectedLedgerCustomer.name}</strong> · Mobile: {selectedLedgerCustomer.mobile || '—'} · City: {selectedLedgerCustomer.city || 'Mumbai'} · PAN: {selectedLedgerCustomer.pan || '—'} · Credit Limit: ₹{(selectedLedgerCustomer.creditLimit || 100000).toLocaleString('en-IN')}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLedgerCustomer(null)}
+                  className="btn btn-ghost btn-sm"
+                  style={{ padding: 4 }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Ledger Summary KPIs */}
+              <div style={{ padding: '12px 20px', background: 'var(--surface2, #fbfbf9)', borderBottom: '1px solid var(--border)' }}>
+                <div className="sum-grid" style={{ margin: 0, gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                  <div className="sum-box">
+                    <div className="sum-val">₹{opBal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                    <div className="sum-lbl">Opening Balance</div>
+                  </div>
+                  <div className="sum-box">
+                    <div className="sum-val" style={{ color: 'var(--primary)' }}>₹{totalDebit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                    <div className="sum-lbl">Total Billed / Debits</div>
+                  </div>
+                  <div className="sum-box">
+                    <div className="sum-val" style={{ color: 'var(--success)' }}>₹{totalCredit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                    <div className="sum-lbl">Total Receipts / Credits</div>
+                  </div>
+                  <div className="sum-box">
+                    <div className="sum-val" style={{ color: finalBalance > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                      ₹{finalBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className="sum-lbl">Net Outstanding Due</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ledger Itemized Table */}
+              <div className="tbl-wrap" style={{ maxHeight: 360, overflowY: 'auto' }}>
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th>DATE</th>
+                      <th>VOUCHER / REF</th>
+                      <th>TYPE</th>
+                      <th>PARTICULARS</th>
+                      <th className="num">DEBIT (DR ₹)</th>
+                      <th className="num">CREDIT (CR ₹)</th>
+                      <th className="num">RUNNING BALANCE (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ledgerWithBalance.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="empty">No transactions found for this customer account.</td>
+                      </tr>
+                    ) : (
+                      ledgerWithBalance.map((line, idx) => (
+                        <tr key={idx}>
+                          <td>{line.date}</td>
+                          <td className="font-mono font-bold">{line.voucherNo}</td>
+                          <td>
+                            <span className={`badge ${line.debit > 0 ? 'badge-gold' : 'badge-green'}`}>
+                              {line.type}
+                            </span>
+                          </td>
+                          <td>{line.particulars}</td>
+                          <td className="num font-mono">
+                            {line.debit > 0 ? `₹${line.debit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                          </td>
+                          <td className="num font-mono" style={{ color: 'var(--success)' }}>
+                            {line.credit > 0 ? `₹${line.credit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                          </td>
+                          <td className="num font-mono font-bold" style={{ color: line.balance > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                            ₹{line.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Modal Actions */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid var(--border)', background: 'var(--surface2, #fbfbf9)' }}>
+                <div className="helper" style={{ fontSize: 11.5 }}>
+                  Statement generated for financial audit &amp; balance confirmation.
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={handleDownloadLedgerCSV}
+                    className="btn btn-outline btn-sm"
+                  >
+                    <Download size={14} />
+                    Download CSV
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="btn btn-outline btn-sm"
+                  >
+                    <Printer size={14} />
+                    Print Statement
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedLedgerCustomer(null)}
+                    className="btn btn-primary btn-sm"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

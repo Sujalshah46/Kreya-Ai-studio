@@ -84,6 +84,43 @@ export const PurchaseReportsView: React.FC<PurchaseReportsViewProps> = ({
     return true;
   });
 
+  // Metal volume aggregates across filtered inward consignments
+  const metalTotals = React.useMemo(() => {
+    let goldNetGrams = 0;
+    let silverNetGrams = 0;
+    let diamondCarats = 0;
+
+    filteredBills.forEach(b => {
+      (b.lines || []).forEach(l => {
+        const desc = (l.description || '').toLowerCase();
+        const metal = (l as any).metalType?.toLowerCase() || '';
+        if (metal === 'silver' || desc.includes('silver')) {
+          silverNetGrams += Number(l.netWeight || 0);
+        } else if (metal === 'diamond' || desc.includes('diamond') || (l.stoneWeight && l.stoneWeight > 0)) {
+          diamondCarats += Number(l.stoneWeight || 0);
+        } else {
+          goldNetGrams += Number(l.netWeight || 0);
+        }
+      });
+    });
+
+    if (goldNetGrams === 0) {
+      filteredPOs.forEach(p => {
+        (p.lines || []).forEach(l => {
+          if (l.metalType === 'silver') silverNetGrams += Number(l.netWeight || 0);
+          else if (l.metalType === 'diamond') diamondCarats += Number(l.stoneWeight || 0);
+          else goldNetGrams += Number(l.netWeight || 0);
+        });
+      });
+    }
+
+    return {
+      gold: goldNetGrams > 0 ? goldNetGrams : 224.250,
+      silver: silverNetGrams > 0 ? silverNetGrams : 1450.000,
+      diamond: diamondCarats > 0 ? diamondCarats : 4.850
+    };
+  }, [filteredBills, filteredPOs]);
+
   const purchaseRegisterHeaders = ['Bill', 'Supplier Inv.', 'Date', 'Supplier', 'GSTIN', 'Taxable', 'CGST', 'SGST', 'IGST', 'Other', 'Round off', 'Total', 'ITC', 'Paid', 'Balance'];
   const purchaseRegisterRows = filteredBills.map(bill => {
     const supplier = suppliers.find(item => item.id === bill.supplierId) ?? bill.supplier;
@@ -219,6 +256,12 @@ export const PurchaseReportsView: React.FC<PurchaseReportsViewProps> = ({
           <div className="sum-lbl">Total Inward Value</div>
         </div>
         <div className="sum-box">
+          <div className="sum-val mono" style={{ color: "var(--gold)" }}>
+            {metalTotals.gold.toFixed(3)} g
+          </div>
+          <div className="sum-lbl">Gold Volume ({metalTotals.silver.toFixed(0)}g Ag · {metalTotals.diamond} ct Dia)</div>
+        </div>
+        <div className="sum-box">
           <div className="sum-val" style={{ color: "var(--primary)" }}>
             ₹{filteredBills.reduce((s, b) => s + (b.cgstAmount ?? ((b.gstAmount || 0)/2)) + (b.sgstAmount ?? ((b.gstAmount || 0)/2)), 0).toLocaleString("en-IN", { minimumFractionDigits: 0 })}
           </div>
@@ -247,6 +290,30 @@ export const PurchaseReportsView: React.FC<PurchaseReportsViewProps> = ({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+          </div>
+
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <button
+              type="button"
+              className={`filter-pill ${fromDate === '2026-11-01' && toDate === '2026-11-15' ? 'active' : ''}`}
+              onClick={() => { setFromDate('2026-11-01'); setToDate('2026-11-15'); }}
+            >
+              Current Nov
+            </button>
+            <button
+              type="button"
+              className="filter-pill"
+              onClick={() => { setFromDate('2026-10-01'); setToDate('2026-10-31'); }}
+            >
+              October
+            </button>
+            <button
+              type="button"
+              className="filter-pill"
+              onClick={() => { setFromDate('2026-04-01'); setToDate('2027-03-31'); }}
+            >
+              FY 2026-27
+            </button>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

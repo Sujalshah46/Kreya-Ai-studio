@@ -480,45 +480,20 @@ export const GoodsReceiptsView: React.FC<GoodsReceiptsViewProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="page">
       {/* 1. Header */}
       <div className="page-hdr">
         <div className="page-hdr-left">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 10,
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff'
-            }}>
-              <Truck size={22} />
-            </div>
-            <div>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Goods Receipts</h1>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
-                Goods received from suppliers go into stock here. Open a receipt for its PO, supplier bills and payments.
-              </p>
-            </div>
-          </div>
+          <h1>Goods Receipts</h1>
+          <p>
+            Goods received from suppliers go into stock here. Open a receipt for its PO, supplier bills and payments.
+          </p>
         </div>
 
         <div className="btn-group">
           <button 
             type="button" 
-            className="btn btn-outline"
-            onClick={() => {
-              setIntakeMode('direct');
-              setFormReceiptDate(new Date().toISOString().slice(0, 10));
-              setFormChallanNo(`DC/DIR/${Math.floor(1000 + Math.random() * 9000)}`);
-              setFormNotes('Direct inward receipt without PO');
-              setFormOverrideReason('');
-              setShowInwardModal(true);
-            }}
-          >
-            <Plus size={15} /> Receive without PO
-          </button>
-          <button 
-            type="button" 
-            className="btn btn-outline"
+            className="btn btn-outline btn-sm"
             onClick={() => {
               const csv = [
                 ['GRN Number', 'Date', 'Supplier', 'PO Number', 'Challan', 'Pieces', 'Net Weight g', 'Status'],
@@ -535,13 +510,25 @@ export const GoodsReceiptsView: React.FC<GoodsReceiptsViewProps> = ({
               a.click();
             }}
           >
-            <Download size={15} /> Export CSV
+            <Download size={14} /> Export CSV
           </button>
-
-
           <button 
             type="button" 
-            className="btn btn-primary"
+            className="btn btn-outline btn-sm"
+            onClick={() => {
+              setIntakeMode('direct');
+              setFormReceiptDate(new Date().toISOString().slice(0, 10));
+              setFormChallanNo(`DC/DIR/${Math.floor(1000 + Math.random() * 9000)}`);
+              setFormNotes('Direct inward receipt without PO');
+              setFormOverrideReason('');
+              setShowInwardModal(true);
+            }}
+          >
+            <Plus size={14} /> Receive without PO
+          </button>
+          <button 
+            type="button" 
+            className="btn btn-primary btn-sm"
             onClick={() => {
               setIntakeMode('po');
               setFormReceiptDate(new Date().toISOString().slice(0, 10));
@@ -551,82 +538,76 @@ export const GoodsReceiptsView: React.FC<GoodsReceiptsViewProps> = ({
               setShowInwardModal(true);
             }}
           >
-            <Plus size={16} /> Inward Goods Receipt
+            <Plus size={14} /> Inward Goods Receipt
           </button>
         </div>
       </div>
 
       {/* 2. KPI Cards */}
-      <div className="s360-grid">
-        <div className="card s360-card">
-          <div className="s360-label">Total Goods Receipts</div>
-          <div className="s360-val">{kpis.totalCount}</div>
-          <div className="helper">Inward stock consignments</div>
+      <div className="sum-grid">
+        <div className="sum-box">
+          <div className="sum-val">{kpis.totalCount}</div>
+          <div className="sum-lbl">Total Goods Receipts</div>
         </div>
 
-        <div className="card s360-card">
-          <div className="s360-label">Total Pieces Inward</div>
-          <div className="s360-val" style={{ color: 'var(--success)' }}>
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: 'var(--success)' }}>
             {kpis.totalPieces} pc
           </div>
-          <div className="helper">Jewellery items tagged</div>
+          <div className="sum-lbl">Total Pieces Inward</div>
         </div>
 
-        <div className="card s360-card">
-          <div className="s360-label">Net Metal Inward</div>
-          <div className="s360-val mono" style={{ color: 'var(--gold)' }}>
+        <div className="sum-box">
+          <div className="sum-val mono" style={{ color: 'var(--gold)' }}>
             {kpis.totalWeight.toFixed(3)} g
           </div>
-          <div className="helper">Precision assay verified</div>
+          <div className="sum-lbl">Net Metal Inward</div>
         </div>
 
-        <div className="card s360-card">
-          <div className="s360-label">Stock Value Added</div>
-          <div className="s360-val" style={{ color: 'var(--gold)' }}>
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: 'var(--gold)' }}>
             ₹{(kpis.totalStockValue / 100000).toFixed(2)} L
           </div>
-          <div className="helper">{kpis.unbilledPcs} pieces pending supplier bill</div>
+          <div className="sum-lbl">Stock Value ({kpis.unbilledPcs} pcs unbilled)</div>
         </div>
       </div>
 
       {/* 3. Filter & Search Toolbar */}
-      <div className="card" style={{ padding: 14 }}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: 10, flex: '1 1 320px', alignItems: 'center' }}>
-            <div style={{ position: 'relative', width: '100%', maxWidth: 360 }}>
-              <Search size={16} style={{ position: 'absolute', left: 12, top: 10, color: 'var(--muted)' }} />
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div className="card-body" style={{ padding: "12px 16px", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", gap: 10, flex: "1 1 320px", alignItems: "center", flexWrap: "wrap" }}>
+            <div className="search-box" style={{ flex: 1, minWidth: 260 }}>
+              <Search size={14} />
               <input 
                 type="text" 
-                className="input input-sm" 
-                style={{ paddingLeft: 34, width: '100%' }}
                 placeholder="Search GRN #, supplier, PO #, challan..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
 
-            <select 
-              className="input input-sm" 
-              style={{ width: 'auto' }}
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="POSTED">Posted</option>
-              <option value="REVERSED">Reversed</option>
-            </select>
-
-            <select 
-              className="input input-sm" 
-              style={{ width: 'auto' }}
-              value={billedFilter}
-              onChange={e => setBilledFilter(e.target.value)}
-            >
-              <option value="ALL">All Billing States</option>
-              <option value="BILLED">Fully Billed</option>
-              <option value="PARTIAL">Partially Billed</option>
-              <option value="UNBILLED">Unbilled</option>
-            </select>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              {(['ALL', 'POSTED', 'REVERSED'] as const).map(st => (
+                <button
+                  key={st}
+                  type="button"
+                  className={`filter-pill ${statusFilter === st ? 'active' : ''}`}
+                  onClick={() => setStatusFilter(st)}
+                >
+                  {st === 'ALL' ? 'All Status' : st}
+                </button>
+              ))}
+              {(['ALL', 'BILLED', 'PARTIAL', 'UNBILLED'] as const).map(bt => (
+                <button
+                  key={bt}
+                  type="button"
+                  className={`filter-pill ${billedFilter === bt ? 'active' : ''}`}
+                  onClick={() => setBilledFilter(bt)}
+                >
+                  {bt === 'ALL' ? 'All Billing' : bt}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="helper">
@@ -982,7 +963,19 @@ export const GoodsReceiptsView: React.FC<GoodsReceiptsViewProps> = ({
                         </div>
 
                         <div>
-                          <label className="label">Net Weight (Metal g) *</label>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label className="label">Net Weight (Metal g) *</label>
+                            {line.expectedNetWeight ? (
+                              <span style={{ 
+                                fontSize: 11, 
+                                fontWeight: 600, 
+                                color: Math.abs(line.netWeight - line.expectedNetWeight) > 0.050 ? 'var(--danger)' : 'var(--success)' 
+                              }}>
+                                Var: {line.netWeight - line.expectedNetWeight >= 0 ? '+' : ''}{(line.netWeight - line.expectedNetWeight).toFixed(3)}g
+                                {Math.abs(line.netWeight - line.expectedNetWeight) <= 0.050 ? ' (±0.050g OK)' : ' (Exceeds tol)'}
+                              </span>
+                            ) : null}
+                          </div>
                           <input 
                             type="number" 
                             step="0.001"

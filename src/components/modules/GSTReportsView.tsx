@@ -418,7 +418,7 @@ export const GSTReportsView: React.FC<GSTReportsViewProps> = ({
   };
 
   return (
-    <div className="page" style={{ padding: '16px 20px', maxWidth: '100%' }}>
+    <div className="page">
       {/* Licence Banner Parity */}
       <div 
         className="license-banner rounded-lg mb-3 flex items-center justify-between p-3" 

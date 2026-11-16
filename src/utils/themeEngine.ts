@@ -301,13 +301,13 @@ export function computeThemeVars(theme: Partial<ThemeConfig> = {}) {
     ? `linear-gradient(180deg, ${sbBg} 0%, ${mixHex(sbBg, primary, 0.18)} 100%)`
     : sbBg;
   vars['--sb-solid'] = sbBg;
-  vars['--sb-text'] = darkSidebar ? 'rgba(255,255,255,.70)' : '#3f4742';
+  vars['--sb-text'] = darkSidebar ? 'rgba(255,255,255,.85)' : '#3f4742';
   vars['--sb-text-strong'] = darkSidebar ? '#ffffff' : '#202522';
-  vars['--sb-label'] = darkSidebar ? 'rgba(255,255,255,.38)' : '#89918b';
-  vars['--sb-hover'] = darkSidebar ? 'rgba(255,255,255,.05)' : '#f3f4f1';
-  vars['--sb-active'] = darkSidebar ? 'rgba(255,255,255,.08)' : mixHex(primary, '#ffffff', 0.9);
+  vars['--sb-label'] = darkSidebar ? 'rgba(255,255,255,.65)' : '#89918b';
+  vars['--sb-hover'] = darkSidebar ? 'rgba(255,255,255,.08)' : '#f3f4f1';
+  vars['--sb-active'] = darkSidebar ? 'rgba(255,255,255,.15)' : mixHex(primary, '#ffffff', 0.9);
   vars['--sb-active-text'] = darkSidebar ? '#ffffff' : primary;
-  vars['--sb-border'] = darkSidebar ? 'rgba(255,255,255,.06)' : '#e5e8e4';
+  vars['--sb-border'] = darkSidebar ? 'rgba(255,255,255,.08)' : '#e5e8e4';
   vars['--sb-indicator'] = darkSidebar && isDark(primary) ? mixHex(primary, '#ffffff', 0.22) : primary;
 
   const font = FONTS[merged.fontFamily] || FONTS.inter;
@@ -332,13 +332,13 @@ export function computeThemeVars(theme: Partial<ThemeConfig> = {}) {
   });
   vars['--btn-radius'] = merged.radius === 'pill' ? '999px' : `${radii[1] + 1}px`;
 
-  return { vars, isDarkMode, font, theme: merged };
+  return { vars, isDarkMode, darkSidebar, font, theme: merged };
 }
 
 let loadedGoogleFont: string | null = null;
 
 export function applyTheme(theme: Partial<ThemeConfig>, { persist = true } = {}): ThemeConfig {
-  const { vars, isDarkMode, font, theme: finalTheme } = computeThemeVars(theme);
+  const { vars, isDarkMode, darkSidebar, font, theme: finalTheme } = computeThemeVars(theme);
   
   if (typeof document !== 'undefined') {
     const root = document.documentElement;
@@ -347,7 +347,7 @@ export function applyTheme(theme: Partial<ThemeConfig>, { persist = true } = {})
     root.dataset.density = finalTheme.density;
     root.dataset.nav = finalTheme.navLayout;
     root.dataset.zebra = finalTheme.tableZebra ? 'on' : 'off';
-    root.dataset.sidebar = finalTheme.sidebarStyle;
+    root.dataset.sidebar = darkSidebar ? (finalTheme.sidebarStyle === 'brand' ? 'brand' : 'dark') : 'light';
 
     if (font.google && loadedGoogleFont !== font.google) {
       loadedGoogleFont = font.google;

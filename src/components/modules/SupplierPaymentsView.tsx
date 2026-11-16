@@ -169,6 +169,25 @@ export const SupplierPaymentsView: React.FC<SupplierPaymentsViewProps> = ({
   const [formUtr, setFormUtr] = useState(`NEFT/HDFC${Math.floor(100000 + Math.random() * 900000)}`);
   const [formPaymentDate, setFormPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [formNotes, setFormNotes] = useState('');
+  const [formTdsSection, setFormTdsSection] = useState<'NONE' | '194Q' | '194C_INDIV' | '194C_CORP'>('NONE');
+
+  const tdsPct = useMemo(() => {
+    if (formTdsSection === '194Q') return 0.1;
+    if (formTdsSection === '194C_INDIV') return 1.0;
+    if (formTdsSection === '194C_CORP') return 2.0;
+    return 0;
+  }, [formTdsSection]);
+
+  const computedTdsDeducted = useMemo(() => {
+    if (tdsPct === 0) return 0;
+    return Math.round(Number(formMoneyAmount || 0) * (tdsPct / 100) * 100) / 100;
+  }, [formMoneyAmount, tdsPct]);
+
+  const computedNetBankDisbursed = useMemo(() => {
+    return Math.max(0, Number(formMoneyAmount || 0) - computedTdsDeducted);
+  }, [formMoneyAmount, computedTdsDeducted]);
+
+  const isCashExceeding10k = formMode === 'CASH' && Number(formMoneyAmount || 0) > 10000;
 
   // Metal Adjustment Toggle
   const [payWithMetal, setPayWithMetal] = useState(false);
@@ -286,6 +305,13 @@ export const SupplierPaymentsView: React.FC<SupplierPaymentsViewProps> = ({
 
   // Save Payment
   const handleSavePayment = () => {
+    if (isCashExceeding10k) {
+      const proceed = window.confirm(
+        `Income Tax Section 40A(3) Compliance Notice:\nCash payment of ₹${Number(formMoneyAmount).toLocaleString('en-IN')} exceeds the ₹10,000 threshold. Under IT Act, this expense cannot be claimed as tax-deductible.\n\nDo you wish to proceed anyway?`
+      );
+      if (!proceed) return;
+    }
+
     const paymentNumber = `SPAY-2026-${String(paymentsList.length + 58).padStart(5, '0')}`;
     const allocationsList: SupplierPaymentAllocation[] = [];
 
@@ -325,6 +351,9 @@ export const SupplierPaymentsView: React.FC<SupplierPaymentsViewProps> = ({
       mode: formMode,
       referenceNo: formUtr,
       utr: formUtr,
+      tdsDeducted: computedTdsDeducted,
+      tdsSection: formTdsSection !== 'NONE' ? formTdsSection : undefined,
+      netPaid: computedNetBankDisbursed,
       operator: 'Admin (Shop Owner)',
       status: 'ACTIVE',
       notes: formNotes,
@@ -362,45 +391,20 @@ export const SupplierPaymentsView: React.FC<SupplierPaymentsViewProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="page">
       {/* 1. Header */}
       <div className="page-hdr">
         <div className="page-hdr-left">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 10,
-              background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff'
-            }}>
-              <CreditCard size={22} />
-            </div>
-            <div>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Supplier Payments</h1>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
-                Payments to suppliers, allocated to the oldest bills first; anything left is a supplier advance. Open a payment for the bills, GRNs and POs it settled.
-              </p>
-            </div>
-          </div>
+          <h1>Supplier Payments</h1>
+          <p>
+            Payments to suppliers, allocated to the oldest bills first; anything left is a supplier advance. Open a payment for the bills, GRNs and POs it settled.
+          </p>
         </div>
 
         <div className="btn-group">
           <button 
             type="button" 
-            className="btn btn-primary"
-            onClick={() => {
-              setFormMoneyAmount(100000);
-              setFormPaymentDate(new Date().toISOString().slice(0, 10));
-              setFormUtr(`NEFT/HDFC${Math.floor(100000 + Math.random() * 900000)}`);
-              setFormNotes('');
-              setPayWithMetal(false);
-              setShowPaymentModal(true);
-            }}
-          >
-            <Plus size={16} /> New payment
-          </button>
-          <button 
-            type="button" 
-            className="btn btn-outline"
+            className="btn btn-outline btn-sm"
             onClick={() => {
               const csv = [
                 ['Payment #', 'Date', 'Supplier', 'Mode', 'UTR/Ref', 'Money Amount', 'Metal Amount', 'Total Settled', 'Advance', 'Status'],
@@ -417,88 +421,92 @@ export const SupplierPaymentsView: React.FC<SupplierPaymentsViewProps> = ({
               a.click();
             }}
           >
-            <Download size={15} /> Export CSV
+            <Download size={14} /> Export CSV
           </button>
-
+          <button 
+            type="button" 
+            className="btn btn-primary btn-sm"
+            onClick={() => {
+              setFormMoneyAmount(100000);
+              setFormPaymentDate(new Date().toISOString().slice(0, 10));
+              setFormUtr(`NEFT/HDFC${Math.floor(100000 + Math.random() * 900000)}`);
+              setFormNotes('');
+              setPayWithMetal(false);
+              setShowPaymentModal(true);
+            }}
+          >
+            <Plus size={14} /> New payment
+          </button>
         </div>
       </div>
 
       {/* 2. KPI Cards */}
-      <div className="s360-grid">
-        <div className="card s360-card">
-          <div className="s360-label">Total Settled</div>
-          <div className="s360-val" style={{ color: 'var(--success)' }}>
+      <div className="sum-grid">
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: 'var(--success)' }}>
             ₹{(kpis.totalAmount / 100000).toFixed(2)} L
           </div>
-          <div className="helper">₹{kpis.totalAmount.toLocaleString('en-IN')} all disbursements</div>
+          <div className="sum-lbl">Total Settled</div>
         </div>
 
-        <div className="card s360-card">
-          <div className="s360-label">Bank / Cash Money Paid</div>
-          <div className="s360-val">
+        <div className="sum-box">
+          <div className="sum-val">
             ₹{(kpis.totalMoney / 100000).toFixed(2)} L
           </div>
-          <div className="helper">RTGS, NEFT, IMPS & Cheques</div>
+          <div className="sum-lbl">Bank / Cash Money Paid</div>
         </div>
 
-        <div className="card s360-card">
-          <div className="s360-label">Refined Metal Bar Transferred</div>
-          <div className="s360-val" style={{ color: 'var(--gold)' }}>
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: 'var(--gold)' }}>
             ₹{kpis.totalMetalVal.toLocaleString('en-IN')}
           </div>
-          <div className="helper">24K Bullion / refinery bars</div>
+          <div className="sum-lbl">Refined Metal Transferred</div>
         </div>
 
-        <div className="card s360-card">
-          <div className="s360-label">Unallocated Advance</div>
-          <div className="s360-val" style={{ color: 'var(--indigo, #4f46e5)' }}>
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: 'var(--indigo, #4f46e5)' }}>
             ₹{kpis.totalAdvance.toLocaleString('en-IN')}
           </div>
-          <div className="helper">Held with suppliers for next POs</div>
+          <div className="sum-lbl">Unallocated Advance</div>
         </div>
       </div>
 
       {/* 3. Filter Toolbar */}
-      <div className="card" style={{ padding: 14 }}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: 10, flex: '1 1 320px', alignItems: 'center' }}>
-            <div style={{ position: 'relative', width: '100%', maxWidth: 360 }}>
-              <Search size={16} style={{ position: 'absolute', left: 12, top: 10, color: 'var(--muted)' }} />
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div className="card-body" style={{ padding: "12px 16px", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", gap: 10, flex: "1 1 320px", alignItems: "center", flexWrap: "wrap" }}>
+            <div className="search-box" style={{ flex: 1, minWidth: 260 }}>
+              <Search size={14} />
               <input 
                 type="text" 
-                className="input input-sm" 
-                style={{ paddingLeft: 34, width: '100%' }}
                 placeholder="Search Payment #, Supplier, UTR..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
 
-            <select 
-              className="input input-sm" 
-              style={{ width: 'auto' }}
-              value={modeFilter}
-              onChange={e => setModeFilter(e.target.value)}
-            >
-              <option value="ALL">All Payment Modes</option>
-              <option value="NEFT">NEFT</option>
-              <option value="RTGS">RTGS</option>
-              <option value="IMPS">IMPS</option>
-              <option value="CHEQUE">Cheque</option>
-              <option value="CASH">Cash</option>
-              <option value="BANK_TRANSFER">Bank Transfer</option>
-            </select>
-
-            <select 
-              className="input input-sm" 
-              style={{ width: 'auto' }}
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="ACTIVE">Active</option>
-              <option value="VOIDED">Voided</option>
-            </select>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              {(['ALL', 'NEFT', 'RTGS', 'CHEQUE', 'CASH'] as const).map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  className={`filter-pill ${modeFilter === m ? 'active' : ''}`}
+                  onClick={() => setModeFilter(m)}
+                >
+                  {m === 'ALL' ? 'All Modes' : m}
+                </button>
+              ))}
+              {(['ALL', 'ACTIVE', 'VOIDED'] as const).map(st => (
+                <button
+                  key={st}
+                  type="button"
+                  className={`filter-pill ${statusFilter === st ? 'active' : ''}`}
+                  onClick={() => setStatusFilter(st)}
+                >
+                  {st === 'ALL' ? 'All Status' : st}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="helper">
@@ -745,6 +753,59 @@ export const SupplierPaymentsView: React.FC<SupplierPaymentsViewProps> = ({
                     onChange={e => setFormNotes(e.target.value)}
                   />
                 </div>
+              </div>
+
+              {/* Cash 10k Limit Warning */}
+              {isCashExceeding10k && (
+                <div className="alert alert-danger" style={{ marginBottom: 14, fontSize: 12, padding: '8px 12px' }}>
+                  <b>⚠️ Income Tax Section 40A(3) Violation:</b> Cash payment of ₹{Number(formMoneyAmount).toLocaleString('en-IN')} exceeds the statutory limit of ₹10,000 per person per day. Entire expense will be disallowed under Income Tax Act. Please switch to NEFT / RTGS / Cheque.
+                </div>
+              )}
+
+              {/* Statutory TDS Deduction */}
+              <div style={{ background: 'var(--surface-2, #faf7ef)', padding: '12px 14px', borderRadius: 8, border: '1px solid var(--border)', marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: 'var(--primary-d)' }}>
+                  Statutory TDS Deduction (Sec 194Q / 194C)
+                </div>
+                <div className="g3">
+                  <div>
+                    <label className="label">TDS Section</label>
+                    <select
+                      className="input"
+                      value={formTdsSection}
+                      onChange={e => setFormTdsSection(e.target.value as any)}
+                    >
+                      <option value="NONE">No TDS Deduction (0%)</option>
+                      <option value="194Q">Sec 194Q: Purchase of Goods (0.1% on &gt; ₹50L)</option>
+                      <option value="194C_INDIV">Sec 194C: Karigar / Contractor (1% Individual/HUF)</option>
+                      <option value="194C_CORP">Sec 194C: Karigar / Contractor (2% Company/Firm)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">TDS Deducted (₹)</label>
+                    <input
+                      type="text"
+                      readOnly
+                      className="input mono"
+                      value={`₹${computedTdsDeducted.toLocaleString('en-IN')}`}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Net Bank Payout (₹)</label>
+                    <input
+                      type="text"
+                      readOnly
+                      className="input mono"
+                      style={{ fontWeight: 700, color: 'var(--primary)' }}
+                      value={`₹${computedNetBankDisbursed.toLocaleString('en-IN')}`}
+                    />
+                  </div>
+                </div>
+                {formTdsSection !== 'NONE' && (
+                  <div className="helper" style={{ fontSize: 11, marginTop: 6 }}>
+                    Note: Supplier liability is settled in full with Gross Amount (₹{Number(formMoneyAmount).toLocaleString('en-IN')}). TDS (₹{computedTdsDeducted.toLocaleString('en-IN')}) is withheld for quarterly 26Q return filing on supplier's PAN.
+                  </div>
+                )}
               </div>
 
               {/* 24K Bullion / Refined Bar Adjustment Section */}
