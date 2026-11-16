@@ -321,7 +321,7 @@ export const SavingsSchemesView: React.FC<SavingsSchemesViewProps> = ({
   const overdueSchemes = schemes.filter(s => s.status === 'ACTIVE' && s.nextDueDate && s.nextDueDate <= todayStr);
 
   return (
-    <div className="page" style={{ padding: 0 }}>
+    <div className="page">
       {/* Header */}
       <div className="page-hdr">
         <div className="page-hdr-left">
@@ -553,7 +553,7 @@ export const SavingsSchemesView: React.FC<SavingsSchemesViewProps> = ({
       {/* --- ENROLL NEW SCHEME MODAL --- */}
       {showNewSchemeModal && (
         <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowNewSchemeModal(false); }}>
-          <form onSubmit={handleCreateScheme} className="modal modal-xl">
+          <form onSubmit={handleCreateScheme} className="modal modal-md">
             <div className="modal-head">
               <div>
                 <span className="card-title">Enroll Member into Savings Scheme (Chit Fund)</span>

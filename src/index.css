@@ -586,7 +586,8 @@ tbody td {
 /* Zebra Striping */
 .table-zebra tbody tr:nth-child(even),
 table[data-zebra="on"] tbody tr:nth-child(even),
-.tbl-wrap table tbody tr:nth-child(even) {
+.tbl-wrap table tbody tr:nth-child(even),
+.page table tbody tr:nth-child(even) {
   background: var(--zebra, #fafaf8);
 }
 

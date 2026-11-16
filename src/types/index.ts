@@ -415,14 +415,20 @@ export interface SavingScheme {
 }
 
 export interface DenominationCount {
-  n2000: number;
+  n2000?: number;
   n500: number;
   n200: number;
   n100: number;
   n50: number;
   n20: number;
   n10: number;
-  coins: number;
+  coins?: number;
+  c20?: number;
+  c10?: number;
+  c5?: number;
+  c2?: number;
+  c1?: number;
+  [key: string]: number | undefined;
 }
 
 export interface CashRegisterSession {

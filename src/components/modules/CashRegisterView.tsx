@@ -67,7 +67,7 @@ export const CashRegisterView: React.FC<CashRegisterViewProps> = ({
   const [flowCategory, setFlowCategory] = useState('Petty Expenses (Tea/Snacks)');
   const [flowNotes, setFlowNotes] = useState('');
 
-  // Physical Denomination breakdown: 2000, 500, 200, 100, 50, 20, 10, coins
+  // Physical Denomination breakdown: notes (500, 200, 100, 50, 20, 10) & coins (20, 10, 5, 2, 1) matching Kreya
   const [denoms, setDenoms] = useState<DenominationCount>({
     n2000: 0,
     n500: 100,
@@ -76,10 +76,17 @@ export const CashRegisterView: React.FC<CashRegisterViewProps> = ({
     n50: 0,
     n20: 0,
     n10: 0,
-    coins: 0
+    coins: 0,
+    c20: 0,
+    c10: 0,
+    c5: 0,
+    c2: 0,
+    c1: 0
   });
 
   const [differenceReason, setDifferenceReason] = useState('');
+  const [adminLogin, setAdminLogin] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
 
   // Dynamic ledger entries initialized from live DB snapshot (Opening Float ₹50,000 + Cash Sale ₹94,650)
   const [ledgerEntries, setLedgerEntries] = useState<CashLedgerEntry[]>([
@@ -108,6 +115,8 @@ export const CashRegisterView: React.FC<CashRegisterViewProps> = ({
   ]);
 
   // Calculations
+  const noteList = [500, 200, 100, 50, 20, 10];
+  const coinList = [20, 10, 5, 2, 1];
   const openingFloat = 50000;
   const cashSales = ledgerEntries.filter(e => e.type === 'SALE').reduce((s, e) => s + e.inflow, 0);
   const manualCashIn = ledgerEntries.filter(e => e.type === 'IN').reduce((s, e) => s + e.inflow, 0);
@@ -115,14 +124,9 @@ export const CashRegisterView: React.FC<CashRegisterViewProps> = ({
   const expectedCash = openingFloat + cashSales + manualCashIn - manualCashOut;
 
   const physicalTotal = (
-    (denoms.n2000 || 0) * 2000 +
-    (denoms.n500 || 0) * 500 +
-    (denoms.n200 || 0) * 200 +
-    (denoms.n100 || 0) * 100 +
-    (denoms.n50 || 0) * 50 +
-    (denoms.n20 || 0) * 20 +
-    (denoms.n10 || 0) * 10 +
-    (denoms.coins || 0)
+    noteList.reduce((acc, val) => acc + val * Number((denoms as any)[`n${val}`] || 0), 0) +
+    coinList.reduce((acc, val) => acc + val * Number((denoms as any)[`c${val}`] || 0), 0) +
+    ((denoms.n2000 || 0) * 2000)
   );
 
   const discrepancy = physicalTotal - expectedCash;
@@ -211,14 +215,17 @@ export const CashRegisterView: React.FC<CashRegisterViewProps> = ({
   };
 
   const denominationList = [
-    { label: '₹2000 Note', key: 'n2000' as keyof DenominationCount, mult: 2000 },
     { label: '₹500 Note', key: 'n500' as keyof DenominationCount, mult: 500 },
     { label: '₹200 Note', key: 'n200' as keyof DenominationCount, mult: 200 },
     { label: '₹100 Note', key: 'n100' as keyof DenominationCount, mult: 100 },
     { label: '₹50 Note', key: 'n50' as keyof DenominationCount, mult: 50 },
     { label: '₹20 Note', key: 'n20' as keyof DenominationCount, mult: 20 },
     { label: '₹10 Note', key: 'n10' as keyof DenominationCount, mult: 10 },
-    { label: 'Coins (₹)', key: 'coins' as keyof DenominationCount, mult: 1 }
+    { label: '₹20 Coin', key: 'c20' as keyof DenominationCount, mult: 20 },
+    { label: '₹10 Coin', key: 'c10' as keyof DenominationCount, mult: 10 },
+    { label: '₹5 Coin', key: 'c5' as keyof DenominationCount, mult: 5 },
+    { label: '₹2 Coin', key: 'c2' as keyof DenominationCount, mult: 2 },
+    { label: '₹1 Coin', key: 'c1' as keyof DenominationCount, mult: 1 }
   ];
 
   return (
@@ -717,15 +724,12 @@ export const CashRegisterView: React.FC<CashRegisterViewProps> = ({
           </div>
         </div>
 
-      {/* Denomination Counter Modal (2000, 500, 200, 100, 50, 20, 10, coins) */}
+      {/* Denomination Counter Modal (matching exact Kreya Close modal) */}
       {showDenomModal && (
         <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowDenomModal(false); }}>
           <div className="modal modal-lg">
             <div className="modal-head">
-              <div>
-                <span className="card-title">Physical Cash Denomination Count</span>
-                <div className="helper">Session: REG-2026-00001 · Counter {activeCounter?.name || 'MAIN'} · Expected: ₹{expectedCash.toLocaleString('en-IN')}</div>
-                </div>
+              <h3>Close REG-2026-00001</h3>
               <button 
                 type="button" 
                 className="btn btn-outline btn-xs"
@@ -733,76 +737,105 @@ export const CashRegisterView: React.FC<CashRegisterViewProps> = ({
               >
                 ✕
               </button>
-              </div>
+            </div>
 
             <div className="modal-body">
-              <p className="helper" style={{ marginBottom: 12 }}>
-                Enter exact physical counts of currency notes and coins currently in the counter cash drawer:
-              </p>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
-                {denominationList.map(d => (
-                  <div key={d.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                    <span style={{ width: 120, fontWeight: 500 }}>{d.label}:</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span className="helper">×</span>
-                      <input 
-                        type="number"
-                        min="0"
-                        value={(denoms as any)[d.key] || ''}
-                        onChange={(e) => setDenoms({ ...denoms, [d.key]: parseInt(e.target.value) || 0 })}
-                        className="input input-sm"
-                        style={{ width: 90, textAlign: 'center', fontWeight: 700 }}
-                        placeholder="0"
-                      />
-                      </div>
-                    <span className="font-mono" style={{ width: 120, textAlign: 'right', fontWeight: 700 }}>
-                      = ₹{(((denoms as any)[d.key] || 0) * d.mult).toLocaleString('en-IN')}
-                    </span>
-                    </div>
-                ))}
+              <div className="tiles" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
+                <div className="tile" style={{ padding: 12, borderRadius: 8, background: 'var(--surface2, #f9fafb)', border: '1px solid var(--border, #e5e7eb)' }}>
+                  <div className="t-lbl" style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted, #6b7280)', textTransform: 'uppercase' }}>Expected cash</div>
+                  <div className="t-val font-mono" style={{ fontSize: 18, fontWeight: 700, color: 'var(--text, #111827)', marginTop: 2 }}>
+                    ₹{expectedCash.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
                 </div>
-
-              {/* Reconciliation Totals */}
-              <div style={{ background: 'var(--surface2)', padding: 12, borderRadius: 'var(--r)', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--muted)' }}>Expected Drawer Total:</span>
-                  <span className="font-mono" style={{ fontWeight: 700 }}>₹{expectedCash.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-                  <span style={{ fontWeight: 600 }}>Physical Counted Cash:</span>
-                  <span className="font-mono" style={{ fontWeight: 800, color: 'var(--primary)', fontSize: 16 }}>
+                <div className="tile" style={{ padding: 12, borderRadius: 8, background: 'var(--surface2, #f9fafb)', border: '1px solid var(--border, #e5e7eb)' }}>
+                  <div className="t-lbl" style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted, #6b7280)', textTransform: 'uppercase' }}>Counted</div>
+                  <div className="t-val font-mono" style={{ fontSize: 18, fontWeight: 700, color: 'var(--text, #111827)', marginTop: 2 }}>
                     ₹{physicalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
                   </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, paddingTop: 6, borderTop: '1px solid var(--border)' }}>
-                  <span style={{ fontWeight: 600 }}>Discrepancy:</span>
-                  <span className={`badge ${discrepancy === 0 ? 'badge-green' : discrepancy > 0 ? 'badge-blue' : 'badge-red'}`} style={{ fontWeight: 700 }}>
-                    {discrepancy === 0 
-                      ? '₹0.00 (Balanced)' 
-                      : (discrepancy > 0 
-                          ? `+₹${discrepancy.toLocaleString('en-IN')} (Surplus)` 
-                          : `-₹${Math.abs(discrepancy).toLocaleString('en-IN')} (Shortage)`)}
-                  </span>
+                </div>
+                <div className="tile" style={{ padding: 12, borderRadius: 8, background: Math.abs(discrepancy) < 0.001 ? '#ecfdf5' : '#fef2f2', border: `1px solid ${Math.abs(discrepancy) < 0.001 ? '#a7f3d0' : '#fecaca'}` }}>
+                  <div className="t-lbl" style={{ fontSize: 11, fontWeight: 600, color: Math.abs(discrepancy) < 0.001 ? '#065f46' : '#991b1b', textTransform: 'uppercase' }}>Difference</div>
+                  <div className="t-val font-mono" style={{ fontSize: 18, fontWeight: 700, color: Math.abs(discrepancy) < 0.001 ? '#047857' : '#b91c1c', marginTop: 2 }}>
+                    {discrepancy >= 0 ? `+₹${discrepancy.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : `-₹${Math.abs(discrepancy).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
                   </div>
-
-                {discrepancy !== 0 && (
-                  <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
-                    <label className="label helper" style={{ fontWeight: 700, color: 'var(--warn)' }}>
-                      Difference Reason * (Required for day closing audit):
-                    </label>
-                    <input
-                      type="text"
-                      value={differenceReason}
-                      onChange={(e) => setDifferenceReason(e.target.value)}
-                      placeholder="e.g. Minor cash rounding / verified change float difference"
-                      className="input input-sm"
-                      required
-                    />
-                    </div>
-                )}
+                  <div className="t-sub" style={{ fontSize: 11, fontWeight: 600, color: Math.abs(discrepancy) < 0.001 ? '#065f46' : '#991b1b', marginTop: 2 }}>
+                    {Math.abs(discrepancy) < 0.001 ? 'matches' : discrepancy > 0 ? 'excess' : 'shortage'}
+                  </div>
                 </div>
               </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10, margin: '14px 0' }}>
+                {[500, 200, 100, 50, 20, 10].map(t => (
+                  <label key={`n${t}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, fontWeight: 500, background: 'var(--surface2, #f9fafb)', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border, #e5e7eb)' }}>
+                    <span>₹{t} ×</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={(denoms as any)[`n${t}`] || ''}
+                      onChange={e => setDenoms({ ...denoms, [`n${t}`]: parseInt(e.target.value) || 0 })}
+                      className="input input-sm"
+                      style={{ width: 65, textAlign: 'center', fontWeight: 600 }}
+                    />
+                  </label>
+                ))}
+                {[20, 10, 5, 2, 1].map(t => (
+                  <label key={`c${t}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, fontWeight: 500, background: 'var(--surface2, #f9fafb)', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border, #e5e7eb)' }}>
+                    <span>₹{t} coin ×</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={(denoms as any)[`c${t}`] || ''}
+                      onChange={e => setDenoms({ ...denoms, [`c${t}`]: parseInt(e.target.value) || 0 })}
+                      className="input input-sm"
+                      style={{ width: 65, textAlign: 'center', fontWeight: 600 }}
+                    />
+                  </label>
+                ))}
+              </div>
+
+              <p style={{ marginTop: 10, fontWeight: 700, fontSize: 13.5 }}>
+                Counted: ₹{physicalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </p>
+
+              {Math.abs(discrepancy) > 0.001 && (
+                <div style={{ marginTop: 14 }}>
+                  <label className="label" style={{ fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                    Reason for the difference <span style={{ color: 'var(--danger, #ef4444)' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={differenceReason}
+                    onChange={e => setDifferenceReason(e.target.value)}
+                    placeholder="Reason for discrepancy..."
+                    required
+                  />
+                </div>
+              )}
+
+              {Math.abs(discrepancy) > 500 && (
+                <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: '#fffbeb', border: '1px solid #fef3c7', color: '#92400e', fontSize: 13 }}>
+                  <b>Above the approval limit (₹500.00).</b> An admin signs in here to approve:
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+                    <input
+                      className="input input-sm"
+                      placeholder="Admin email / username"
+                      value={adminLogin}
+                      onChange={e => setAdminLogin(e.target.value)}
+                      autoComplete="off"
+                    />
+                    <input
+                      className="input input-sm"
+                      type="password"
+                      placeholder="Admin password"
+                      value={adminPassword}
+                      onChange={e => setAdminPassword(e.target.value)}
+                      autoComplete="new-password"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="modal-foot">
               <button
@@ -810,18 +843,22 @@ export const CashRegisterView: React.FC<CashRegisterViewProps> = ({
                 onClick={() => setShowDenomModal(false)}
                 className="btn btn-outline"
               >
-                Cancel
+                Back
               </button>
               <button
                 type="button"
                 onClick={handleConfirmClose}
+                disabled={
+                  (Math.abs(discrepancy) > 0.001 && !differenceReason.trim()) ||
+                  (Math.abs(discrepancy) > 500 && (!adminLogin.trim() || !adminPassword.trim()))
+                }
                 className="btn btn-primary"
               >
-                Lock & Close Register
+                <Lock size={13} /> Close day
               </button>
-              </div>
             </div>
           </div>
+        </div>
       )}
 
       {/* Manual Cash Flow In/Out Modal */}

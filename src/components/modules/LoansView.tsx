@@ -553,7 +553,7 @@ export const LoansView: React.FC<LoansViewProps> = ({
   };
 
   return (
-    <div className="page" style={{ padding: 0 }}>
+    <div className="page">
       {/* Header */}
       <div className="page-hdr">
         <div className="page-hdr-left">
@@ -835,7 +835,7 @@ export const LoansView: React.FC<LoansViewProps> = ({
       {/* --- NEW GIRVI LOAN SANCTION MODAL --- */}
       {showNewLoanModal && (
         <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowNewLoanModal(false); }}>
-          <form onSubmit={handleCreateLoan} className="modal modal-xl">
+          <form onSubmit={handleCreateLoan} className="modal modal-lg">
             <div className="modal-head">
               <div>
                 <span className="card-title">Sanction New Gold / Silver Loan (Girvi)</span>

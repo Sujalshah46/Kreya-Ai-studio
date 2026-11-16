@@ -413,7 +413,7 @@ export const OldGoldPurchaseView: React.FC<OldGoldPurchaseViewProps> = ({
   const totalPayoutDisbursed = purchases.reduce((s, p) => s + (p.totalCashPayout || p.totalCashPaidOut || p.totalAmount || 0), 0);
 
   return (
-    <div className="page" style={{ padding: 0 }}>
+    <div className="page">
       {/* Toast Notification */}
       {toastMsg && (
         <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 18px', boxShadow: '0 4px 14px rgba(0,0,0,.15)', fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>
@@ -618,7 +618,7 @@ export const OldGoldPurchaseView: React.FC<OldGoldPurchaseViewProps> = ({
       {/* --- NEW SCRAP PURCHASE & TOUCH ASSAY MODAL --- */}
       {showModal && (
         <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}>
-          <form onSubmit={handleCreatePurchase} className="modal modal-xl">
+          <form onSubmit={handleCreatePurchase} className="modal modal-lg">
             <div className="modal-head">
               <div>
                 <span className="card-title">New Scrap Purchase Intake & Melter Assay</span>

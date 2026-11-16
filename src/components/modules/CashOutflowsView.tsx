@@ -268,7 +268,7 @@ export const CashOutflowsView: React.FC<CashOutflowsViewProps> = ({
   };
 
   return (
-    <div className="page" style={{ padding: 0 }}>
+    <div className="page">
       {/* Header */}
       <div className="page-hdr">
         <div className="page-hdr-left">
@@ -528,7 +528,7 @@ export const CashOutflowsView: React.FC<CashOutflowsViewProps> = ({
       {/* --- NEW VOUCHER DISBURSEMENT MODAL --- */}
       {showNewVoucherModal && (
         <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowNewVoucherModal(false); }}>
-          <form onSubmit={handleCreateVoucher} className="modal modal-lg">
+          <form onSubmit={handleCreateVoucher} className="modal modal-md">
             <div className="modal-head">
               <div>
                 <span className="card-title">New Cash Outflow / Petty Voucher</span>
