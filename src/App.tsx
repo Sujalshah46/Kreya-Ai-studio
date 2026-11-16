@@ -611,7 +611,7 @@ export function App() {
           onToggleMobile={() => setMobileOpen(prev => !prev)}
         />
 
-        <div className={`flex-1 ${currentModule === 'dashboard' ? '' : 'p-4 md:py-6 md:px-7'}`}>
+        <div className="flex-1">
           
           {/* 1. MAIN */}
           {currentModule === 'dashboard' && (
