@@ -1,3 +1,4 @@
+import { applyInvoiceReceipt, invoiceReceipts } from './data/invoicePayments';
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
@@ -39,6 +40,7 @@ import { ShopSettingsUsersView } from './components/modules/ShopSettingsUsersVie
 import { StoreProfileCountersView } from './components/modules/StoreProfileCountersView';
 import { UsersSecurityView } from './components/modules/UsersSecurityView';
 import { AuditLogsView } from './components/modules/AuditLogsView';
+import { DataExportBackupView } from './components/modules/DataExportBackupView';
 import { SyncDatabaseView } from './components/modules/SyncDatabaseView';
 import { BusinessSettingsView } from './components/modules/BusinessSettingsView';
 import { IntegrationsView } from './components/modules/IntegrationsView';
@@ -54,7 +56,7 @@ import { DataImportView } from './components/modules/DataImportView';
 import { 
   mockStore, mockDailyRates, mockCounters, mockCustomers, 
   mockInventory, mockInvoices, mockLoans, mockRepairs, mockSchemes, 
-  mockCashRegister, mockMetalBookings, mockCancellations, mockShipments,
+  mockCashRegister, mockMetalBookings, mockCancellations, mockCreditMemos, mockShipments,
   mockOldGoldPurchases, mockCashOutflows, mockOldMetalStock,
   mockSuppliers, mockPurchaseOrders, mockGoodsReceipts, mockSupplierBills,
   mockSupplierPayments, mockUsers
@@ -62,7 +64,7 @@ import {
 import { 
   Counter, DailyRates, InventoryItem, SalesInvoice, GirviLoan, 
   RepairOrder, SavingScheme, PaymentTransaction, PaymentMode, 
-  DenominationCount, RepairStatus, MetalBooking, CancellationRecord,
+  DenominationCount, RepairStatus, MetalBooking, CancellationRecord, CreditMemoRecord,
   ShipmentRecord, OldGoldPurchase, CashOutflowRecord, OldMetalStockItem,
   Supplier, PurchaseOrder, GoodsReceipt, SupplierBill, SupplierPayment,
   UserAccount, StoreProfile
@@ -91,6 +93,7 @@ export function App() {
   // Extended Sidebar Models State
   const [metalBookings, setMetalBookings] = useState<MetalBooking[]>(mockMetalBookings);
   const [cancellations, setCancellations] = useState<CancellationRecord[]>(mockCancellations);
+  const [creditMemos, setCreditMemos] = useState<CreditMemoRecord[]>(mockCreditMemos);
   const [shipments, setShipments] = useState<ShipmentRecord[]>(mockShipments);
   const [oldGoldPurchases, setOldGoldPurchases] = useState<OldGoldPurchase[]>(mockOldGoldPurchases);
   const [cashOutflows, setCashOutflows] = useState<CashOutflowRecord[]>(mockCashOutflows);
@@ -123,7 +126,7 @@ export function App() {
       case '/outflows':
       case '/cash-outflows': return 'cash-outflows';
       case '/inventory': return 'inventory';
-      case '/stock': return 'stock-valuation';
+      case '/stock': return 'valuation';
       case '/tags':
       case '/stock-ledger': return 'stock-ledger';
       case '/stock-verification': return 'inventory-verification';
@@ -169,7 +172,7 @@ export function App() {
   const getPathFromModule = (mod: string): string => {
     switch (mod) {
       case 'daily-rates': return '/daily-rates';
-      case 'customers': return 'customers';
+      case 'customers': return '/customers';
       case 'payments-pending': return '/payments';
       case 'billing': return '/orders';
       case 'metal-booking': return '/bookings';
@@ -183,10 +186,11 @@ export function App() {
       case 'old-gold':
       case 'old-metal': return '/old-gold';
       case 'schemes':
-      case 'savings-schemes': return '/schemes';
+      case 'savings-schemes': return '/deposits';
       case 'outflows':
       case 'cash-outflows': return '/outflows';
       case 'inventory': return '/inventory';
+      case 'valuation':
       case 'stock-valuation': return '/stock';
       case 'tags':
       case 'stock-ledger': return '/stock-ledger';
@@ -270,19 +274,19 @@ export function App() {
       }
       if (e.key === 'F1') {
         e.preventDefault();
-        setCurrentModule('billing');
+        navigateTo('billing');
       }
       if (e.key === 'F2') {
         e.preventDefault();
-        setCurrentModule('inventory');
+        navigateTo('inventory');
       }
       if (e.key === 'F3') {
         e.preventDefault();
-        setCurrentModule('daily-rates');
+        navigateTo('daily-rates');
       }
       if (e.key === 'F4') {
         e.preventDefault();
-        setCurrentModule('cash-register');
+        navigateTo('cash-register');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -291,44 +295,52 @@ export function App() {
 
   // Handlers for state updates
   const handleSaveInvoice = (invoice: SalesInvoice) => {
-    setInvoices([invoice, ...invoices]);
-    // Deduct stock for sold items
-    invoice.items.forEach(it => {
-      setInventory(prev => prev.map(invItem => {
-        if (invItem.itemCode === it.itemCode || invItem.id === it.itemId) {
-          return { ...invItem, stockQty: Math.max(0, invItem.stockQty - 1) };
-        }
-        return invItem;
+    const previous = invoices.find(existing => existing.id === invoice.id);
+    setInvoices(current => previous
+      ? current.map(existing => existing.id === invoice.id ? invoice : existing)
+      : [invoice, ...current]);
+
+    const itemCount = (source: SalesInvoice | undefined, stock: InventoryItem) =>
+      source?.items.filter(item => item.itemId ? item.itemId === stock.id : item.itemCode === stock.itemCode).length ?? 0;
+    setInventory(current => current.map(stock => {
+      const delta = itemCount(previous, stock) - itemCount(invoice, stock);
+      return delta ? { ...stock, stockQty: Math.max(0, stock.stockQty + delta) } : stock;
+    }));
+
+    const cash = (source?: SalesInvoice) => source ? invoiceReceipts(source)
+      .filter(receipt => receipt.mode.toUpperCase() === 'CASH')
+      .reduce((total, receipt) => total + receipt.amount, 0) : 0;
+    const cashDelta = cash(invoice) - cash(previous);
+    if (cashDelta) {
+      setCashRegister(current => ({
+        ...current,
+        cashInflows: current.cashInflows + cashDelta,
+        closingBalanceCalculated: (current.closingBalanceCalculated ?? current.expectedCash) + cashDelta,
+        expectedCash: current.expectedCash + cashDelta
       }));
-    });
-    // Add transaction to active register
-    if (invoice.paidAmount > 0) {
-      setCashRegister(prev => ({
-        ...prev,
-        closingBalanceCalculated: (prev.closingBalanceCalculated || prev.expectedCash) + invoice.paidAmount,
-        expectedCash: prev.expectedCash + invoice.paidAmount
+    }
+  };
+
+  const handleCancelInvoice = (invoice: SalesInvoice, cancellation: CancellationRecord, memo: CreditMemoRecord | undefined, restock: boolean) => {
+    const original = invoices.find(existing => existing.id === invoice.id);
+    if (!original || original.status === 'CANCELLED' || original.status === 'ESTIMATE') return;
+    setInvoices(current => current.map(existing => existing.id === invoice.id ? invoice : existing));
+    setCancellations(current => [cancellation, ...current]);
+    if (memo) setCreditMemos(current => [memo, ...current]);
+    if (restock) {
+      const retained = new Set(invoice.status === 'CANCELLED' ? [] : invoice.items.map(item => item.id));
+      const removed = original.items.filter(item => !retained.has(item.id));
+      setInventory(current => current.map(stock => {
+        const count = removed.filter(item => item.itemId ? item.itemId === stock.id : item.itemCode === stock.itemCode).length;
+        return count ? { ...stock, stockQty: stock.stockQty + count } : stock;
       }));
     }
   };
 
   const handleAddPayment = (invoiceId: string, payment: PaymentTransaction) => {
-    setInvoices(invoices.map(inv => {
-      if (inv.id === invoiceId) {
-        const currentTransactions = inv.paymentTransactions || inv.payments || [];
-        const updatedTransactions = [...currentTransactions, payment];
-        const newPaid = inv.paidAmount + payment.amount;
-        const newBalance = Math.max(0, inv.productTotalValue - newPaid);
-        return {
-          ...inv,
-          paidAmount: newPaid,
-          balanceDue: newBalance,
-          paymentTransactions: updatedTransactions,
-          payments: updatedTransactions,
-          status: newBalance <= 0 ? 'COMPLETED' : 'PENDING'
-        };
-      }
-      return inv;
-    }));
+    setInvoices(current => current.map(invoice =>
+      invoice.id === invoiceId ? applyInvoiceReceipt(invoice, payment) ?? invoice : invoice
+    ));
   };
 
   const handleAddItem = (item: InventoryItem) => {
@@ -356,30 +368,18 @@ export function App() {
     });
   };
 
-  const handleRecordLoanRepayment = (loanId: string, principalPaid: number, interestPaid: number, mode: PaymentMode) => {
-    setLoans(prevLoans => prevLoans.map(loan => {
-      if (loan.id === loanId) {
-        const newPrincipalDue = Math.max(0, loan.principalDue - principalPaid);
-        return {
-          ...loan,
-          principalDue: newPrincipalDue,
-          status: newPrincipalDue <= 0 ? 'REDEEMED' : loan.status
-        };
-      }
-      return loan;
-    }));
-  };
-
   const handleSaveRepair = (repair: RepairOrder) => {
     setRepairs([repair, ...repairs]);
   };
 
-  const handleUpdateRepairStatus = (repairId: string, status: RepairStatus, balancePaid?: number) => {
-    setRepairs(repairs.map(rep => {
+  const handleUpdateRepairStatus = (repairId: string, status: RepairStatus, payment?: PaymentTransaction) => {
+    setRepairs(current => current.map(rep => {
       if (rep.id === repairId) {
-        const newAdvance = rep.advancePaid + (balancePaid || 0);
-        const newBalance = Math.max(0, rep.totalCost - newAdvance);
-        return { ...rep, status, advancePaid: newAdvance, balanceDue: newBalance };
+        if (!payment) return { ...rep, status };
+        if (rep.payments.some(receipt => receipt.id === payment.id) || payment.amount > rep.balanceDue) return rep;
+        const newAdvance = Math.round((rep.advancePaid + payment.amount) * 100) / 100;
+        const newBalance = Math.max(0, Math.round((rep.balanceDue - payment.amount) * 100) / 100);
+        return { ...rep, status, advancePaid: newAdvance, balanceDue: newBalance, payments: [...rep.payments, payment] };
       }
       return rep;
     }));
@@ -449,7 +449,7 @@ export function App() {
   };
 
   const handleCreateBooking = (booking: MetalBooking) => {
-    setMetalBookings([booking, ...metalBookings]);
+    setMetalBookings(current => current.some(existing => existing.id === booking.id) ? current : [booking, ...current]);
   };
 
   const handleRecordOldGoldPurchase = (purchase: OldGoldPurchase) => {
@@ -469,7 +469,8 @@ export function App() {
   };
 
   return (
-    <div className="h-screen w-screen bg-[#f8fafc] flex font-sans text-slate-800 antialiased select-none overflow-hidden">
+    <div className="h-screen w-screen flex antialiased overflow-hidden" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+      <a className="skip-link" href="#main">Skip to content</a>
       {/* Left Application Sidebar */}
       <Sidebar
         currentModule={currentModule}
@@ -493,7 +494,7 @@ export function App() {
           currentModule={currentModule}
         />
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#f8fafc] text-slate-800">
+        <main id="main" tabIndex={-1} className={`flex-1 overflow-y-auto ${currentModule === 'dashboard' ? '' : 'p-4 md:py-6 md:px-7'}`}>
           
           {/* 1. MAIN */}
           {currentModule === 'dashboard' && (
@@ -505,6 +506,7 @@ export function App() {
               repairs={repairs}
               inventory={inventory}
               customers={customers}
+              bookings={metalBookings}
               onNavigate={navigateTo}
             />
           )}
@@ -546,6 +548,8 @@ export function App() {
               inventory={inventory}
               invoices={invoices}
               onSaveInvoice={handleSaveInvoice}
+              cancellations={cancellations}
+              onCancelInvoice={handleCancelInvoice}
               onAddPayment={handleAddPayment}
             />
           )}
@@ -564,6 +568,10 @@ export function App() {
             <CancellationsView
               store={store}
               cancellations={cancellations}
+              creditMemos={creditMemos}
+              onIssueRefund={memo => setCreditMemos(current => current.map(existing =>
+                existing.id === memo.id && existing.refundStatus === 'pending' ? memo : existing
+              ))}
             />
           )}
 
@@ -613,7 +621,6 @@ export function App() {
               loans={loans}
               customers={customers}
               onSaveLoan={handleSaveLoan}
-              onRecordRepayment={handleRecordLoanRepayment}
             />
           )}
 
@@ -761,6 +768,10 @@ export function App() {
             <SalesReportsView
               store={store}
               invoices={invoices}
+              repairs={repairs}
+              loans={loans}
+              bookings={metalBookings}
+              creditMemos={creditMemos}
               onNavigate={navigateTo}
             />
           )}
@@ -783,7 +794,12 @@ export function App() {
             />
           )}
 
-          {(currentModule === 'backup-settings' || currentModule === 'sync') && (
+          {currentModule === 'backup-settings' && (
+            <DataExportBackupView store={store} customers={customers} inventory={inventory} invoices={invoices}
+              loans={loans} repairs={repairs} schemes={schemes} />
+          )}
+
+          {currentModule === 'sync' && (
             <SyncDatabaseView
               store={store}
               customers={customers}
@@ -792,7 +808,7 @@ export function App() {
               loans={loans}
               repairs={repairs}
               schemes={schemes}
-              defaultTab={currentModule === 'backup-settings' ? 'backup' : 'sync'}
+              defaultTab="sync"
               onNavigate={navigateTo}
             />
           )}
@@ -872,7 +888,7 @@ export function App() {
           )}
 
           {(currentModule === 'login-page' || currentModule === 'settings-login') && (
-            <LoginPageView />
+            <LoginPageView store={store} />
           )}
 
           {(currentModule === 'security' || currentModule === 'settings-security') && (
@@ -985,3 +1001,4 @@ export function App() {
 }
 
 export default App;
+

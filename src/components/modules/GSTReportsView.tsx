@@ -337,16 +337,19 @@ export const GSTReportsView: React.FC<GSTReportsViewProps> = ({
     link.click();
   };
 
+  const invoiceValue = (records: SalesInvoice[]) => records.reduce((sum, invoice) =>
+    sum + (invoice.grandTotal ?? invoice.totalAmount ?? invoice.productTotalValue), 0);
+
   const handleDownloadExcel = () => {
     const wb = XLSX.utils.book_new();
 
     // 1. GSTR-1 Summary Sheet
     const summaryRows = [
-      { 'Table': '4A', 'Description': 'B2B Invoices', 'Count': b2bInvoices.length, 'Taxable Value (₹)': b2bTaxable, 'IGST (₹)': 0, 'CGST (₹)': b2bCgst, 'SGST (₹)': b2bSgst, 'Total Tax (₹)': b2bTax },
+      { 'Table': '4A', 'Description': 'B2B Invoices', 'Count': b2bInvoices.length, 'Invoice Value (₹)': invoiceValue(b2bInvoices), 'Taxable Value (₹)': b2bTaxable, 'IGST (₹)': 0, 'CGST (₹)': b2bCgst, 'SGST (₹)': b2bSgst, 'Total Tax (₹)': b2bTax },
       { 'Table': '5', 'Description': 'B2C Large Invoices', 'Count': 0, 'Taxable Value (₹)': 0, 'IGST (₹)': 0, 'CGST (₹)': 0, 'SGST (₹)': 0, 'Total Tax (₹)': 0 },
-      { 'Table': '7', 'Description': 'B2C Small Supplies', 'Count': b2cInvoices.length, 'Taxable Value (₹)': b2cTaxable, 'IGST (₹)': 0, 'CGST (₹)': b2cCgst, 'SGST (₹)': b2cSgst, 'Total Tax (₹)': b2cTax },
+      { 'Table': '7', 'Description': 'B2C Small Supplies', 'Count': b2cInvoices.length, 'Invoice Value (₹)': invoiceValue(b2cInvoices), 'Taxable Value (₹)': b2cTaxable, 'IGST (₹)': 0, 'CGST (₹)': b2cCgst, 'SGST (₹)': b2cSgst, 'Total Tax (₹)': b2cTax },
       { 'Table': '9B', 'Description': 'Credit/Debit Notes', 'Count': 0, 'Taxable Value (₹)': 0, 'IGST (₹)': 0, 'CGST (₹)': 0, 'SGST (₹)': 0, 'Total Tax (₹)': 0 },
-      { 'Table': '12', 'Description': 'HSN Summary (7113 / 7108)', 'Count': b2bInvoices.length + b2cInvoices.length, 'Taxable Value (₹)': b2bTaxable + b2cTaxable, 'IGST (₹)': 0, 'CGST (₹)': b2bCgst + b2cCgst, 'SGST (₹)': b2bSgst + b2cSgst, 'Total Tax (₹)': b2bTax + b2cTax }
+      { 'Table': '12', 'Description': 'HSN Summary (7113 / 7108)', 'Count': b2bInvoices.length + b2cInvoices.length, 'Invoice Value (₹)': invoiceValue(filteredInvoices), 'Taxable Value (₹)': b2bTaxable + b2cTaxable, 'IGST (₹)': 0, 'CGST (₹)': b2bCgst + b2cCgst, 'SGST (₹)': b2bSgst + b2cSgst, 'Total Tax (₹)': b2bTax + b2cTax }
     ];
     const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
     XLSX.utils.book_append_sheet(wb, wsSummary, 'GSTR-1 Summary');
@@ -424,7 +427,7 @@ export const GSTReportsView: React.FC<GSTReportsViewProps> = ({
         <div className="flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
           <span className="text-xs font-medium text-amber-950">
-            ⚠️ Licence expires in 30 days (15-Dec-2026). Contact Kreya IT Consulting to renew.
+            ⚠️ Licence status is unavailable. Open Licence for verification details.
           </span>
         </div>
         <button 
@@ -684,13 +687,13 @@ export const GSTReportsView: React.FC<GSTReportsViewProps> = ({
                   <thead>
                     <tr>
                       <th>TABLE</th>
-                      <th>SECTION DESCRIPTION</th>
-                      <th className="num">DOCS</th>
-                      <th className="num">TAXABLE VALUE (₹)</th>
-                      <th className="num">CGST (₹)</th>
-                      <th className="num">SGST (₹)</th>
-                      <th className="num">IGST (₹)</th>
-                      <th className="num">TOTAL TAX (₹)</th>
+                      <th>SECTION</th>
+                      <th className="num">DOCS / ROWS</th>
+                      <th className="num">INVOICE VALUE</th>
+                      <th className="num">TAXABLE</th>
+                      <th className="num">IGST</th>
+                      <th className="num">CGST</th>
+                      <th className="num">SGST</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -698,17 +701,17 @@ export const GSTReportsView: React.FC<GSTReportsViewProps> = ({
                       <td className="font-bold" style={{ color: 'var(--primary)' }}>4A</td>
                       <td style={{ fontWeight: 600 }}>B2B Invoices (buyer has GSTIN)</td>
                       <td className="num">{b2bInvoices.length}</td>
+                      <td className="num">₹{invoiceValue(b2bInvoices).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="num">₹{b2bTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td className="num">₹0.00</td>
                       <td className="num">₹{b2bCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="num">₹{b2bSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td className="num">₹0.00</td>
-                      <td className="num font-bold">₹{(b2bCgst + b2bSgst).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     </tr>
                     <tr>
                       <td className="font-bold" style={{ color: 'var(--primary)' }}>5</td>
                       <td style={{ fontWeight: 600 }}>B2C Large (Inter-state invoice &gt; ₹1 Lakh)</td>
                       <td className="num">{b2clInvoices.length}</td>
-                      <td className="num">₹0.00</td>
+                      <td className="num">₹{invoiceValue(b2clInvoices).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="num">₹0.00</td>
                       <td className="num">₹0.00</td>
                       <td className="num">₹0.00</td>
@@ -718,11 +721,11 @@ export const GSTReportsView: React.FC<GSTReportsViewProps> = ({
                       <td className="font-bold" style={{ color: 'var(--success)' }}>7</td>
                       <td style={{ fontWeight: 700 }}>B2C Small (Intra-state retail counter sales)</td>
                       <td className="num font-bold">{b2cInvoices.length}</td>
+                      <td className="num">₹{invoiceValue(b2cInvoices).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="num font-bold">₹{b2cTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td className="num">₹0.00</td>
                       <td className="num font-bold" style={{ color: 'var(--primary)' }}>₹{b2cCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="num font-bold" style={{ color: 'var(--primary)' }}>₹{b2cSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td className="num">₹0.00</td>
-                      <td className="num font-bold" style={{ color: 'var(--success)' }}>₹{b2cTotalTax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     </tr>
                     <tr>
                       <td className="font-bold">8</td>
@@ -758,11 +761,11 @@ export const GSTReportsView: React.FC<GSTReportsViewProps> = ({
                       <td className="font-bold" style={{ color: 'var(--info)' }}>12</td>
                       <td style={{ fontWeight: 600 }}>HSN Summary (HSN 7113 - Articles of Jewellery)</td>
                       <td className="num">{filteredInvoices.length}</td>
+                      <td className="num">₹{invoiceValue(filteredInvoices).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="num">₹{b2cTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td className="num">₹0.00</td>
                       <td className="num">₹{b2cCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="num">₹{b2cSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td className="num">₹0.00</td>
-                      <td className="num font-bold">₹{b2cTotalTax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     </tr>
                     <tr>
                       <td className="font-bold">13</td>
@@ -775,11 +778,11 @@ export const GSTReportsView: React.FC<GSTReportsViewProps> = ({
                     <tr>
                       <td colSpan={2} style={{ fontWeight: 700 }}>GSTR-1 Outward Supplies Total</td>
                       <td className="num" style={{ fontWeight: 700 }}>{filteredInvoices.length}</td>
+                      <td className="num">₹{invoiceValue(filteredInvoices).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="num" style={{ fontWeight: 700 }}>₹{totalTaxableOutward.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td className="num" style={{ fontWeight: 700 }}>₹0.00</td>
                       <td className="num" style={{ fontWeight: 700, color: 'var(--primary)' }}>₹{totalCgstOutward.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="num" style={{ fontWeight: 700, color: 'var(--primary)' }}>₹{totalSgstOutward.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td className="num" style={{ fontWeight: 700 }}>₹0.00</td>
-                      <td className="num" style={{ fontWeight: 700, color: 'var(--success)' }}>₹{totalTaxOutward.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -1500,3 +1503,4 @@ export const GSTReportsView: React.FC<GSTReportsViewProps> = ({
 };
 
 export const GstReportsView = GSTReportsView;
+

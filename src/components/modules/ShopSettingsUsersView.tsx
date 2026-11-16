@@ -47,6 +47,7 @@ export const ShopSettingsUsersView: React.FC<ShopSettingsUsersViewProps> = ({
   const [email, setEmail] = useState(initialStore?.email || 'admin@jewellery.com');
   const [mobile, setMobile] = useState(initialStore?.mobile || '9324773823');
   const [gstin, setGstin] = useState(initialStore?.gstin || '27ACZPJ7126B1ZA');
+  const [upiId, setUpiId] = useState(initialStore?.upiId ?? '');
   const [panNumber, setPanNumber] = useState('ACZPJ7126B');
 
   // Doc Prefixes matching standard jewellery software & live DB
@@ -136,6 +137,11 @@ export const ShopSettingsUsersView: React.FC<ShopSettingsUsersViewProps> = ({
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
+    const paymentAddress = upiId.trim();
+    if (paymentAddress && !/^[a-z0-9_.-]+@[a-z0-9.-]+$/i.test(paymentAddress)) {
+      alert('Enter a valid showroom UPI ID.');
+      return;
+    }
     if (onUpdateStore) {
       onUpdateStore({
         ...initialStore,
@@ -147,6 +153,7 @@ export const ShopSettingsUsersView: React.FC<ShopSettingsUsersViewProps> = ({
         state: 'Maharashtra',
         stateCode: '27',
         gstin,
+        upiId: paymentAddress || undefined,
         phone,
         email,
         mobile,
@@ -424,6 +431,11 @@ export const ShopSettingsUsersView: React.FC<ShopSettingsUsersViewProps> = ({
               <p className="text-[10px] text-slate-500 mt-0.5">2.50% CGST + 2.50% SGST</p>
             </div>
           </div>
+
+          <label className="block mt-3">
+            <span className="font-semibold">Showroom UPI ID</span>
+            <input className="input mt-1" value={upiId} onChange={event => setUpiId(event.target.value)} />
+          </label>
 
           <div className="p-3 bg-slate-50 rounded border border-slate-200 mt-2">
             <span className="font-semibold text-slate-700 block mb-1">Labour & Repair Services (SAC 998722)</span>
@@ -727,3 +739,4 @@ export const ShopSettingsUsersView: React.FC<ShopSettingsUsersViewProps> = ({
     </div>
   );
 };
+

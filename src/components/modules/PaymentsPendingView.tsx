@@ -1,3 +1,4 @@
+import { applyInvoiceReceipt, invoiceReceipts } from '../../data/invoicePayments';
 import React, { useState, useEffect } from 'react';
 import { Customer, SalesInvoice, PaymentMode, PaymentTransaction } from '../../types';
 
@@ -88,7 +89,7 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
   const [collectRef, setCollectRef] = useState<string>('');
   const [collectorName, setCollectorName] = useState<string>('Cashier');
 
-  // Build receipts from invoices and sample payments
+  // Build the receipt list from recorded invoice transactions
   const [payments, setPayments] = useState<PaymentRecord[]>(() => {
     const list: PaymentRecord[] = [];
     invoices.forEach((inv, invIdx) => {
@@ -96,8 +97,9 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
       const custPhone = inv.customer?.mobile || inv.customer?.phone || '';
       const invNo = inv.invoiceNumber || inv.invoiceNo || `INV-2026-${String(invIdx + 1).padStart(4, '0')}`;
 
-      if (inv.payments && inv.payments.length > 0) {
-        inv.payments.forEach((p, pIdx) => {
+      const receipts = invoiceReceipts(inv);
+      if (receipts.length) {
+        receipts.forEach((p, pIdx) => {
           list.push({
             id: p.id || `pay-${inv.id}-${pIdx}`,
             payment_no: p.receiptNo || `REC-2026-${String(list.length + 101).padStart(4, '0')}`,
@@ -116,93 +118,9 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
             voided: false
           });
         });
-      } else if (inv.paidAmount && inv.paidAmount > 0) {
-        list.push({
-          id: `pay-${inv.id}-init`,
-          payment_no: `REC-2026-${String(list.length + 101).padStart(4, '0')}`,
-          created_at: inv.date || '2026-11-15',
-          customer_id: inv.customer?.id,
-          customer_name: custName,
-          customer_phone: custPhone,
-          payment_for: 'order',
-          order_id: inv.id,
-          order_no: invNo,
-          payment_mode: inv.paymentMode || 'CASH',
-          counter_code: 'C1',
-          register_no: 'REG-001',
-          amount: inv.paidAmount,
-          reference_no: 'INITIAL-PAY',
-          voided: false
-        });
       }
     });
 
-    // Sample default receipts if empty
-    if (list.length === 0) {
-      list.push(
-        {
-          id: 'rec-1',
-          payment_no: 'REC-2026-0101',
-          created_at: '2026-11-15',
-          customer_name: 'Sujal Singh',
-          customer_phone: '8977897896',
-          payment_for: 'order',
-          order_id: 'ord-1',
-          order_no: 'INV-2026-00276',
-          payment_mode: 'UPI',
-          counter_code: 'C1',
-          register_no: 'REG-001',
-          amount: 85000,
-          reference_no: 'UPI/981729381',
-          voided: false
-        },
-        {
-          id: 'rec-2',
-          payment_no: 'REC-2026-0102',
-          created_at: '2026-11-15',
-          customer_name: 'Priya Sharma',
-          customer_phone: '9811234567',
-          payment_for: 'order',
-          order_id: 'ord-2',
-          order_no: 'INV-2026-00271',
-          payment_mode: 'CASH',
-          counter_code: 'C1',
-          register_no: 'REG-001',
-          amount: 50000,
-          reference_no: 'COUNTER-CASH',
-          voided: false
-        },
-        {
-          id: 'rec-3',
-          payment_no: 'REC-2026-0103',
-          created_at: '2026-11-14',
-          customer_name: 'Rahul Verma',
-          customer_phone: '9876543210',
-          payment_for: 'deposit',
-          payment_mode: 'CARD',
-          counter_code: 'C2',
-          register_no: 'REG-002',
-          amount: 25000,
-          reference_no: 'HDFC-POS-8419',
-          voided: false
-        },
-        {
-          id: 'rec-4',
-          payment_no: 'REC-2026-0100',
-          created_at: '2026-11-14',
-          customer_name: 'Anil Mehta',
-          customer_phone: '9922334455',
-          payment_for: 'order',
-          order_no: 'INV-2026-00262',
-          payment_mode: 'CASH',
-          counter_code: 'C1',
-          amount: 15000,
-          reference_no: 'CASH',
-          voided: true,
-          void_reason: 'Entered wrong invoice number by cashier'
-        }
-      );
-    }
     return list;
   });
 
@@ -356,7 +274,7 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
   };
 
   const handleConfirmCollect = () => {
-    if (!collectInvoice || collectAmount <= 0) return;
+    if (!collectInvoice) return;
     const newReceiptNo = `REC-2026-${String(payments.length + 101).padStart(4, '0')}`;
     const paymentTxn: PaymentTransaction = {
       id: `pay-${Date.now()}`,
@@ -367,6 +285,11 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
       referenceNo: collectRef || 'COUNTER-CASH',
       collectorName: collectorName
     };
+
+    if (!applyInvoiceReceipt(collectInvoice, paymentTxn)) {
+      alert('Enter a valid payment amount that does not exceed the amount due.');
+      return;
+    }
 
     if (onRecordPayment) {
       onRecordPayment(collectInvoice.id, paymentTxn);
@@ -1393,3 +1316,4 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
     </div>
   );
 };
+

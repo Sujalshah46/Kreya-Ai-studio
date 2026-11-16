@@ -271,7 +271,7 @@ export const SupplierPaymentsView: React.FC<SupplierPaymentsViewProps> = ({
   const kpis = useMemo(() => {
     const totalCount = paymentsList.length;
     const totalAmount = paymentsList.filter(p => p.status !== 'VOIDED').reduce((acc, p) => acc + p.amount, 0);
-    const totalMoney = paymentsList.filter(p => p.status !== 'VOIDED').reduce((acc, p) => acc + (p.moneyAmount || p.amount), 0);
+    const totalMoney = paymentsList.filter(p => p.status !== 'VOIDED').reduce((acc, p) => acc + (p.moneyAmount ?? p.amount), 0);
     const totalMetalVal = paymentsList.filter(p => p.status !== 'VOIDED' && p.metalAdjustment).reduce((acc, p) => acc + (p.metalAdjustment?.metalAmount || 0), 0);
     const totalAdvance = paymentsList.filter(p => p.status !== 'VOIDED').reduce((acc, p) => acc + (p.unallocated || 0), 0);
 
@@ -386,13 +386,27 @@ export const SupplierPaymentsView: React.FC<SupplierPaymentsViewProps> = ({
         <div className="btn-group">
           <button 
             type="button" 
+            className="btn btn-primary"
+            onClick={() => {
+              setFormMoneyAmount(100000);
+              setFormPaymentDate(new Date().toISOString().slice(0, 10));
+              setFormUtr(`NEFT/HDFC${Math.floor(100000 + Math.random() * 900000)}`);
+              setFormNotes('');
+              setPayWithMetal(false);
+              setShowPaymentModal(true);
+            }}
+          >
+            <Plus size={16} /> New payment
+          </button>
+          <button 
+            type="button" 
             className="btn btn-outline"
             onClick={() => {
               const csv = [
                 ['Payment #', 'Date', 'Supplier', 'Mode', 'UTR/Ref', 'Money Amount', 'Metal Amount', 'Total Settled', 'Advance', 'Status'],
                 ...paymentsList.map(p => [
                   p.paymentNumber, p.date, p.supplierName, p.mode, p.referenceNo,
-                  p.moneyAmount || p.amount, p.metalAdjustment?.metalAmount || 0, p.amount, p.unallocated || 0, p.status
+                  p.moneyAmount ?? p.amount, p.metalAdjustment?.metalAmount || 0, p.amount, p.unallocated || 0, p.status
                 ])
               ].map(r => r.join(',')).join('\n');
               const blob = new Blob([csv], { type: 'text/csv' });
@@ -406,20 +420,6 @@ export const SupplierPaymentsView: React.FC<SupplierPaymentsViewProps> = ({
             <Download size={15} /> Export CSV
           </button>
 
-          <button 
-            type="button" 
-            className="btn btn-primary"
-            onClick={() => {
-              setFormMoneyAmount(100000);
-              setFormPaymentDate(new Date().toISOString().slice(0, 10));
-              setFormUtr(`NEFT/HDFC${Math.floor(100000 + Math.random() * 900000)}`);
-              setFormNotes('');
-              setPayWithMetal(false);
-              setShowPaymentModal(true);
-            }}
-          >
-            <Plus size={16} /> New payment
-          </button>
         </div>
       </div>
 
@@ -513,15 +513,15 @@ export const SupplierPaymentsView: React.FC<SupplierPaymentsViewProps> = ({
           <table className="table">
             <thead>
               <tr>
-                <th style={{ width: 140 }}>Payment #</th>
+                <th style={{ width: 140 }}>Payment</th>
                 <th>Date</th>
                 <th>Supplier</th>
                 <th>Mode</th>
-                <th>UTR / Ref #</th>
-                <th className="num">Money Amount</th>
-                <th className="num">Metal (g)</th>
-                <th className="num">Total Settled</th>
-                <th>Bills Settled</th>
+                <th>UTR</th>
+                <th className="num">Money</th>
+                <th className="num">Metal g</th>
+                <th className="num">Total</th>
+                <th>Bills</th>
                 <th className="num">Advance</th>
                 <th style={{ textAlign: 'center' }}>Status</th>
                 <th style={{ textAlign: 'right', width: 110 }}>Actions</th>
@@ -549,7 +549,7 @@ export const SupplierPaymentsView: React.FC<SupplierPaymentsViewProps> = ({
                     </span>
                   </td>
                   <td><span className="mono">{pay.referenceNo || pay.utr || '—'}</span></td>
-                  <td className="num mono">₹{(pay.moneyAmount || pay.amount).toLocaleString('en-IN')}</td>
+                  <td className="num mono">₹{(pay.moneyAmount ?? pay.amount).toLocaleString('en-IN')}</td>
                   <td className="num mono">
                     {pay.metalAdjustment ? `${pay.metalAdjustment.fineQty.toFixed(3)} g` : '—'}
                   </td>
@@ -1274,3 +1274,4 @@ export const SupplierPaymentsView: React.FC<SupplierPaymentsViewProps> = ({
     </div>
   );
 };
+

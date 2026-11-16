@@ -1,3 +1,4 @@
+import * as XLSX from 'xlsx';
 import React, { useState } from 'react';
 import { 
   FileSpreadsheet, Printer, Download, Filter, Calendar, 
@@ -41,6 +42,8 @@ export const PurchaseReportsView: React.FC<PurchaseReportsViewProps> = ({
 
   // Filtering logic
   const filteredBills = bills.filter(b => {
+    if ((fromDate && b.billDate < fromDate) || (toDate && b.billDate > toDate)) return false;
+
     if (selectedSupplier !== 'ALL' && b.supplierId !== selectedSupplier && b.supplier?.id !== selectedSupplier) {
       return false;
     }
@@ -81,7 +84,33 @@ export const PurchaseReportsView: React.FC<PurchaseReportsViewProps> = ({
     return true;
   });
 
+  const purchaseRegisterHeaders = ['Bill', 'Supplier Inv.', 'Date', 'Supplier', 'GSTIN', 'Taxable', 'CGST', 'SGST', 'IGST', 'Other', 'Round off', 'Total', 'ITC', 'Paid', 'Balance'];
+  const purchaseRegisterRows = filteredBills.map(bill => {
+    const supplier = suppliers.find(item => item.id === bill.supplierId) ?? bill.supplier;
+    const fallbackHalfTax = bill.taxMode === 'inter' ? 0 : (bill.gstAmount ?? 0) / 2;
+    const eligible = typeof bill.itcEligible === 'string'
+      ? ['true', 'yes', 'eligible'].includes(bill.itcEligible.toLowerCase())
+      : bill.itcEligible;
+    return [
+      bill.billNumber, bill.supplierInvoiceNo ?? '', bill.billDate, supplier?.tradeName ?? bill.supplierName ?? '',
+      supplier?.gstin ?? '', bill.taxableAmount, bill.cgstAmount ?? fallbackHalfTax, bill.sgstAmount ?? fallbackHalfTax,
+      bill.igstAmount ?? (bill.taxMode === 'inter' ? bill.gstAmount ?? 0 : 0), bill.otherCharges ?? 0,
+      bill.roundOff ?? 0, bill.totalAmount, eligible ? 'Eligible' : 'Ineligible', bill.paidAmount,
+      bill.balanceAmount ?? bill.balanceDue
+    ] as const;
+  });
+  const exportRegister = (format: 'csv' | 'xlsx') => {
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.aoa_to_sheet([purchaseRegisterHeaders, ...purchaseRegisterRows.map(row => [...row])]);
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Purchase register');
+    XLSX.writeFile(workbook, `purchase_register.${format}`, { bookType: format });
+  };
+
   const handleExportCsv = () => {
+    if (activeReportTab === 1) {
+      exportRegister('csv');
+      return;
+    }
     const activeReport = reportList.find(r => r.id === activeReportTab)?.name || 'Purchase_Report';
     const lines: string[] = [];
     lines.push(`"KreyaJewel360 - ${activeReport}"`);
@@ -119,6 +148,10 @@ export const PurchaseReportsView: React.FC<PurchaseReportsViewProps> = ({
   };
 
   const handleExportExcel = () => {
+    if (activeReportTab === 1) {
+      exportRegister('xlsx');
+      return;
+    }
     handleExportCsv();
   };
 
@@ -308,92 +341,21 @@ export const PurchaseReportsView: React.FC<PurchaseReportsViewProps> = ({
             {activeReportTab === 1 && (
               <table className="tbl">
                 <thead>
-                  <tr>
-                    <th>BILL NO</th>
-                    <th>DATE</th>
-                    <th>SUPPLIER</th>
-                    <th style={{ textAlign: "right" }}>TAXABLE</th>
-                    <th style={{ textAlign: "right" }}>CGST (1.5%)</th>
-                    <th style={{ textAlign: "right" }}>SGST (1.5%)</th>
-                    <th style={{ textAlign: "right" }}>OTHER</th>
-                    <th style={{ textAlign: "right" }}>ROUNDOFF</th>
-                    <th style={{ textAlign: "right" }}>TOTAL</th>
-                    <th style={{ textAlign: "right" }}>BALANCE</th>
-                  </tr>
+                  <tr>{purchaseRegisterHeaders.map((label, index) => (
+                    <th key={label} className={index >= 5 && index !== 12 ? 'num' : undefined}>{label}</th>
+                  ))}</tr>
                 </thead>
                 <tbody>
-                  {filteredBills.length === 0 ? (
-                    <tr>
-                      <td colSpan={10}>
-                        <div className="empty">
-                          <p style={{ fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>No inward bills found</p>
-                          <p className="helper">No purchase records match the selected date or supplier filter.</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredBills.map((bill, idx) => {
-                      const supplier = suppliers.find(s => s.id === bill.supplierId) || bill.supplier;
-                      const cgst = bill.cgstAmount ?? ((bill.gstAmount || 0) / 2);
-                      const sgst = bill.sgstAmount ?? ((bill.gstAmount || 0) / 2);
-                      const bal = bill.balanceAmount ?? bill.balanceDue ?? 0;
-
-                      return (
-                        <tr key={idx}>
-                          <td style={{ fontFamily: "monospace", fontWeight: 600 }}>{bill.billNumber}</td>
-                          <td>{bill.billDate}</td>
-                          <td><strong>{supplier?.tradeName || supplier?.name || 'Bullion Supplier'}</strong></td>
-                          <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                            ₹{bill.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </td>
-                          <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                            ₹{cgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </td>
-                          <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                            ₹{sgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </td>
-                          <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>₹0.00</td>
-                          <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>-₹0.05</td>
-                          <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                            <strong>₹{bill.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
-                          </td>
-                          <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                            {bal > 0 ? (
-                              <strong style={{ color: "var(--danger)" }}>
-                                ₹{bal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                              </strong>
-                            ) : (
-                              <span className="badge badge-green">Paid</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
+                  {purchaseRegisterRows.length === 0 && (
+                    <tr><td colSpan={purchaseRegisterHeaders.length} className="empty">No inward bills match the selected filters.</td></tr>
                   )}
-                  {filteredBills.length > 0 && (
-                    <tr style={{ fontWeight: 700, background: "var(--surface2)", borderTop: "2px solid var(--border)" }}>
-                      <td colSpan={3} style={{ textAlign: "right", textTransform: "uppercase", fontSize: 11, color: "var(--muted)" }}>
-                        Total Inward:
+                  {purchaseRegisterRows.map(row => (
+                    <tr key={row[0]}>{row.map((value, column) => (
+                      <td key={purchaseRegisterHeaders[column]} className={typeof value === 'number' ? 'num mono' : undefined}>
+                        {typeof value === 'number' ? `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : value || '—'}
                       </td>
-                      <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                        ₹{filteredBills.reduce((s, b) => s + b.taxableAmount, 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                        ₹{filteredBills.reduce((s, b) => s + (b.cgstAmount ?? ((b.gstAmount || 0) / 2)), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                        ₹{filteredBills.reduce((s, b) => s + (b.sgstAmount ?? ((b.gstAmount || 0) / 2)), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>₹0.00</td>
-                      <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>-₹0.10</td>
-                      <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: "var(--primary)" }}>
-                        ₹{filteredBills.reduce((s, b) => s + b.totalAmount, 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: "var(--danger)" }}>
-                        ₹{filteredBills.reduce((s, b) => s + (b.balanceAmount ?? b.balanceDue ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  )}
+                    ))}</tr>
+                  ))}
                 </tbody>
               </table>
             )}
@@ -982,3 +944,4 @@ export const PurchaseReportsView: React.FC<PurchaseReportsViewProps> = ({
     </div>
   );
 };
+

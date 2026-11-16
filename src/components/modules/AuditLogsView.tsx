@@ -299,7 +299,7 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({
         <div className="flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
           <span className="text-xs font-medium text-amber-950">
-            ⚠️ Licence expires in 30 days (15-Dec-2026). Contact Kreya IT Consulting to renew.
+            ⚠️ Licence status is unavailable. Open Licence for verification details.
           </span>
         </div>
         <button 
@@ -315,7 +315,7 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({
       <div className="page-hdr flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="page-hdr-left">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold tracking-tight">Audit Logs & Governance Stream</h1>
+            <h1 className="text-xl font-bold tracking-tight">Audit Log</h1>
             {/* Header banner Counter badge */}
             <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#fef8ee] text-[#92400e] rounded-full border border-[#efdcb6] text-xs font-semibold shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse" />
@@ -448,14 +448,12 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({
           <table className="tbl w-full text-xs">
             <thead>
               <tr className="border-b border-slate-200 text-slate-500">
-                <th className="py-2.5 px-3 text-left">TIMESTAMP</th>
-                <th className="py-2.5 px-3 text-left">OPERATOR</th>
-                <th className="py-2.5 px-3 text-left">COUNTER / STATION</th>
-                <th className="py-2.5 px-3 text-left">ACTION TYPE</th>
-                <th className="py-2.5 px-3 text-left">TARGET / RECORD</th>
-                <th className="py-2.5 px-3 text-left">SUMMARY OF CHANGE</th>
-                <th className="py-2.5 px-3 text-left">IP / TERMINAL METADATA</th>
-                <th className="py-2.5 px-3 text-center">VALUE DIFF</th>
+                <th className="py-2.5 px-3 text-left">WHEN</th>
+                <th className="py-2.5 px-3 text-left">WHO</th>
+                <th className="py-2.5 px-3 text-left">ACTION</th>
+                <th className="py-2.5 px-3 text-left">RECORD</th>
+                <th className="py-2.5 px-3 text-left">DETAILS</th>
+                <th className="py-2.5 px-3 text-left">IP</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -470,10 +468,6 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({
                   </td>
 
                   <td className="py-3 px-3">
-                    <span className="text-slate-600 font-medium">{log.counter}</span>
-                  </td>
-
-                  <td className="py-3 px-3">
                     <span className={`badge ${getActionBadgeColor(log.actionType, log.severity)}`}>
                       {log.actionType}
                     </span>
@@ -485,14 +479,7 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({
 
                   <td className="py-3 px-3 text-slate-700 max-w-sm leading-relaxed">
                     {log.summary}
-                  </td>
-
-                  <td className="py-3 px-3">
-                    <div className="font-mono text-[11px] text-slate-600">{log.ipAddress}</div>
-                    <div className="text-[10px] text-slate-400 truncate max-w-[150px]">{log.deviceMetadata}</div>
-                  </td>
-
-                  <td className="py-3 px-3 text-center">
+                  <div className="mt-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -505,7 +492,15 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({
                       <Eye size={12} />
                       <span>View Diff</span>
                     </button>
+                  </div>
                   </td>
+
+                  <td className="py-3 px-3">
+                    <div className="font-mono text-[11px] text-slate-600">{log.ipAddress}</div>
+                    <div className="text-[10px] text-slate-400 truncate max-w-[150px]">{log.deviceMetadata}</div>
+                  </td>
+
+
                 </tr>
               ))}
             </tbody>
@@ -514,7 +509,7 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({
 
         <div className="dt-pager p-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 bg-slate-50">
           <span>Showing 1 to {filteredLogs.length} of {logsList.length} events logged</span>
-          <span className="font-mono text-[11px]">Storage: PostgreSQL public.audit_log partition</span>
+          <span className="font-mono text-[11px]">Preview data</span>
         </div>
       </div>
 
@@ -707,3 +702,4 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({
     </div>
   );
 };
+

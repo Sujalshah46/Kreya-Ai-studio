@@ -48,6 +48,9 @@ export const MetalAdvanceBookingView: React.FC<MetalAdvanceBookingViewProps> = (
   const [showSlipModal, setShowSlipModal] = useState(false);
   const [activeBookingForSlip, setActiveBookingForSlip] = useState<MetalBooking | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [bookingFilter, setBookingFilter] = useState({ query: '', from: '', to: '' });
 
   // Form states matching Kreya QS + XS
   const [selectedCustomer, setSelectedCustomer] = useState<Customer>(customers[0] || {
@@ -150,13 +153,19 @@ export const MetalAdvanceBookingView: React.FC<MetalAdvanceBookingViewProps> = (
   const handleCreateBooking = (e: React.FormEvent) => {
     e.preventDefault();
     const bookingNo = `BKG-2026-${String(bookingsList.length + 45).padStart(5, '0')}`;
+    if (!Number.isFinite(effectiveAdvancePaid) || effectiveAdvancePaid < 0 ||
+        Math.abs(Math.round(effectiveAdvancePaid * 100) / 100 - effectiveAdvancePaid) > 1e-9) {
+      alert('Enter a valid booking advance amount.');
+      return;
+    }
     const newBkg: MetalBooking = {
       id: `bkg-${Date.now()}`,
       bookingNo,
       customer: selectedCustomer,
       customerName: selectedCustomer.name,
       customerPhone: selectedCustomer.mobile || selectedCustomer.phone,
-      bookingDate: bookingDate,
+      bookingDate,
+      occasion: occasion.trim() || undefined,
       deliveryDueDate: deliveryDate,
       deliveryDate: deliveryDate,
       promisedDeliveryDate: deliveryDate,
@@ -167,9 +176,18 @@ export const MetalAdvanceBookingView: React.FC<MetalAdvanceBookingViewProps> = (
       advanceCashPaid: paymentMode === 'CASH' ? effectiveAdvancePaid : 0,
       advancePaid: effectiveAdvancePaid,
       advanceAmountPaid: effectiveAdvancePaid,
+      advanceReceipts: effectiveAdvancePaid > 0 ? [{
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        amount: effectiveAdvancePaid,
+        mode: paymentMode,
+        referenceNo: paymentRefNo.trim() || undefined
+      }] : [],
       balanceAmountDue: balanceDue,
       balanceDue: balanceDue,
       lockedGrams: totalGoldGramsLocked || totalSilverGramsLocked,
+      lockedGoldGrams: totalGoldGramsLocked,
+      lockedSilverGrams: totalSilverGramsLocked,
       bookedWeightGrams: totalGoldGramsLocked || totalSilverGramsLocked,
       notes: notes ? `${notes} · Locked: ${totalGoldGramsLocked.toFixed(3)}g Gold, ${totalSilverGramsLocked.toFixed(3)}g Silver` : `Locked: ${totalGoldGramsLocked.toFixed(3)}g Gold, ${totalSilverGramsLocked.toFixed(3)}g Silver`,
       paymentMode,
@@ -198,13 +216,17 @@ export const MetalAdvanceBookingView: React.FC<MetalAdvanceBookingViewProps> = (
     }
   };
 
-  const filteredBookings = bookingsList.filter(b =>
-    !searchQuery ||
-    b.bookingNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (b.customerName && b.customerName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (b.customer?.name && b.customer.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (b.customerPhone && b.customerPhone.includes(searchQuery))
-  );
+  const filteredBookings = bookingsList.filter(booking => {
+    const { query, from, to } = bookingFilter;
+    const bookingDay = booking.bookingDate?.slice(0, 10);
+    const matchesQuery = !query || [
+      booking.bookingNo, booking.customerName, booking.customer?.name,
+      booking.customerPhone, booking.customer?.mobile, booking.customer?.phone
+    ].some(value => value?.toLowerCase().includes(query));
+    if (!matchesQuery) return false;
+    if (!from && !to) return true;
+    return Boolean(bookingDay && (!from || bookingDay >= from) && (!to || bookingDay <= to));
+  });
 
   const openBookingsCount = bookingsList.filter(b => b.status === 'OPEN').length;
   const totalLockedGoldMetric = bookingsList
@@ -219,7 +241,7 @@ export const MetalAdvanceBookingView: React.FC<MetalAdvanceBookingViewProps> = (
       {/* Header */}
       <div className="page-hdr">
         <div className="page-hdr-left">
-          <h1>Metal Advance Booking</h1>
+          <h1>Advance Bookings</h1>
           <p>{bookingsList.length} advance rate-fixed bookings · Forward Rate-Lock & Metal Deposits</p>
         </div>
 
@@ -260,34 +282,47 @@ export const MetalAdvanceBookingView: React.FC<MetalAdvanceBookingViewProps> = (
 
       {/* Filter Card */}
       <div className="card" style={{ marginBottom: 14 }}>
-        <div className="card-body" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <form className="card-body" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}
+          onSubmit={event => {
+            event.preventDefault();
+            const fields = new FormData(event.currentTarget);
+            const query = String(fields.get('query') ?? '');
+            const from = String(fields.get('from') ?? '');
+            const to = String(fields.get('to') ?? '');
+            setSearchQuery(query);
+            setFromDate(from);
+            setToDate(to);
+            setBookingFilter({ query: query.trim().toLowerCase(), from, to });
+          }}
+        >
           <div className="search-box" style={{ flex: 1, minWidth: 240 }}>
             <Search size={13} style={{ color: 'var(--muted)' }} />
-            <input 
+            <input
+              name="query"
+              aria-label="Search bookings"
               placeholder="Search by Booking No, Customer Name, Mobile..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={event => setSearchQuery(event.target.value)}
             />
           </div>
-          <button 
-            type="button" 
-            className="btn btn-sm btn-primary"
-            onClick={() => {
-              // Trigger search filter
-            }}
-          >
+          <input type="date" name="from" aria-label="From date" className="input input-sm"
+            style={{ width: 'auto' }} value={fromDate} max={toDate || undefined}
+            onChange={event => setFromDate(event.target.value)} />
+          <input type="date" name="to" aria-label="To date" className="input input-sm"
+            style={{ width: 'auto' }} value={toDate} min={fromDate || undefined}
+            onChange={event => setToDate(event.target.value)} />
+          <button type="submit" className="btn btn-sm btn-primary">
             <Search size={13} /> Search
           </button>
-          {searchQuery && (
-            <button 
-              type="button" 
-              className="btn btn-sm btn-outline"
-              onClick={() => setSearchQuery('')}
-            >
-              <X size={13} /> Clear
-            </button>
-          )}
-        </div>
+          <button type="button" className="btn btn-sm btn-outline" onClick={() => {
+            setSearchQuery('');
+            setFromDate('');
+            setToDate('');
+            setBookingFilter({ query: '', from: '', to: '' });
+          }}>
+            <X size={13} /> Clear
+          </button>
+        </form>
       </div>
 
       {/* Bookings Table */}
@@ -297,84 +332,88 @@ export const MetalAdvanceBookingView: React.FC<MetalAdvanceBookingViewProps> = (
             <thead>
               <tr>
                 <th>Booking No</th>
-                <th>Booking Date</th>
-                <th>Delivery Date</th>
                 <th>Customer</th>
-                <th>Metal</th>
-                <th className="num">Locked Rate</th>
-                <th className="num">Locked Wt</th>
-                <th className="num">Contract Val</th>
-                <th className="num">Advance Paid</th>
-                <th className="num">Balance Due</th>
+                <th>Occasion</th>
+                <th className="num">Estimate</th>
+                <th className="num">Paid</th>
+                <th className="num">Balance</th>
+                <th className="num">Gold(g)</th>
+                <th className="num">Silver(g)</th>
+                <th>Delivery</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
-              {filteredBookings.map((b) => (
-                <tr key={b.id}>
-                  <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{b.bookingNo}</td>
-                  <td style={{ fontSize: 11 }}>{b.bookingDate}</td>
-                  <td style={{ fontSize: 11 }}>{b.deliveryDueDate || b.deliveryDate}</td>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>{b.customer?.name || b.customerName}</div>
-                    <div style={{ fontSize: 10, color: 'var(--muted)' }}>{b.customer?.mobile || b.customerPhone}</div>
-                  </td>
-                  <td>{b.metalType}</td>
-                  <td className="num">₹{(b.lockedRatePerGram ? b.lockedRatePerGram * 10 : (rates.gold22kPerGram * 10)).toLocaleString('en-IN')}</td>
-                  <td className="num" style={{ fontWeight: 700, color: 'var(--gold)' }}>
-                    {(b.lockedGrams || b.bookedWeightGrams || 0).toFixed(3)} g
-                  </td>
-                  <td className="num">₹{(b.totalContractValue || 0).toLocaleString('en-IN')}</td>
-                  <td className="num amt-green">₹{(b.advanceAmountPaid || b.advancePaid || 0).toLocaleString('en-IN')}</td>
-                  <td className="num" style={{ fontWeight: 700, color: (b.balanceDue || 0) > 0 ? 'var(--danger)' : 'var(--success)' }}>
-                    ₹{(b.balanceDue || 0).toLocaleString('en-IN')}
-                  </td>
-                  <td>
-                    <span className={`badge ${
-                      b.status === 'DELIVERED' ? 'badge-blue' : (b.status === 'CANCELLED' ? 'badge-red' : 'badge-green')
-                    }`}>
-                      {b.status}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button 
-                        type="button" 
-                        className="btn btn-xs btn-outline"
-                        title="View Certificate"
-                        onClick={() => {
-                          setActiveBookingForSlip(b);
-                          setShowSlipModal(true);
-                        }}
-                      >
-                        <Eye size={11} /> View
-                      </button>
-                      {b.status === 'OPEN' && (
-                        <>
-                          <button 
-                            type="button" 
-                            className="btn btn-xs btn-primary"
-                            onClick={() => handleDeliverBooking(b.id)}
-                          >
-                            Deliver
-                          </button>
-                          <button 
-                            type="button" 
-                            className="btn btn-xs btn-danger"
-                            onClick={() => handleCancelBooking(b.id)}
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {filteredBookings.map((b) => {
+                const legacyWeight = b.lockedGrams ?? b.bookedWeightGrams ?? 0;
+                const metal = b.metalType.toUpperCase();
+                const gold = b.lockedGoldGrams ?? (metal.startsWith('GOLD') ? legacyWeight : 0);
+                const silver = b.lockedSilverGrams ?? (metal.startsWith('SILVER') ? legacyWeight : 0);
+                const paid = b.advanceAmountPaid ?? b.advancePaid ?? b.advanceCashPaid ?? 0;
+                const balance = b.balanceDue ?? b.balanceAmountDue ?? 0;
+                return (
+                  <tr key={b.id}>
+                    <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{b.bookingNo}</td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{b.customer?.name || b.customerName}</div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)' }}>{b.customer?.mobile || b.customerPhone}</div>
+                    </td>
+                    <td>{b.occasion || '—'}</td>
+                    <td className="num">₹{(b.totalContractValue ?? 0).toLocaleString('en-IN')}</td>
+                    <td className="num amt-green">₹{paid.toLocaleString('en-IN')}</td>
+                    <td className="num" style={{ fontWeight: 700, color: balance > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                      ₹{balance.toLocaleString('en-IN')}
+                    </td>
+                    <td className="num">{gold.toFixed(3)}</td>
+                    <td className="num">{silver.toFixed(3)}</td>
+                    <td style={{ fontSize: 11 }}>{b.deliveryDueDate || b.deliveryDate || b.promisedDeliveryDate || '—'}</td>
+                    <td>
+                      <span className={`badge ${
+                        b.status === 'DELIVERED' ? 'badge-blue' : (b.status === 'CANCELLED' ? 'badge-red' : 'badge-green')
+                      }`}>
+                        {b.status}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button 
+                          type="button" 
+                          className="btn btn-xs btn-outline"
+                          title="View Certificate"
+                          onClick={() => {
+                            setActiveBookingForSlip(b);
+                            setShowSlipModal(true);
+                          }}
+                        >
+                          <Eye size={11} /> View
+                        </button>
+                        {b.status === 'OPEN' && (
+                          <>
+                            <button 
+                              type="button" 
+                              className="btn btn-xs btn-primary"
+                              onClick={() => handleDeliverBooking(b.id)}
+                            >
+                              Deliver
+                            </button>
+                            <button 
+                              type="button" 
+                              className="btn btn-xs btn-danger"
+                              onClick={() => handleCancelBooking(b.id)}
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {!filteredBookings.length && (
                 <tr>
-                  <td colSpan={12} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  <td colSpan={11} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
                     No bookings found.
                   </td>
                 </tr>
@@ -976,3 +1015,4 @@ export const MetalAdvanceBookingView: React.FC<MetalAdvanceBookingViewProps> = (
     </div>
   );
 };
+

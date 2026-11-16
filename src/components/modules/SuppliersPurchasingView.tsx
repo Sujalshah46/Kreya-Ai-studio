@@ -376,7 +376,7 @@ export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = (
       {/* Top Header & Actions (.page-hdr) */}
       <div className="page-hdr">
         <div className="page-hdr-left">
-          <h1>Suppliers &amp; Purchasing Suite</h1>
+          <h1>Suppliers</h1>
           <p>
             Vendor master, bullion dealer orders, GRN inspection, 3% GST bills, and RTGS payouts · S.B Borana Jewellers
           </p>
@@ -614,18 +614,22 @@ export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = (
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Supplier Code &amp; Trade Name</th>
-                  <th>Contact Person &amp; Mobile</th>
-                  <th>Location &amp; GSTIN</th>
-                  <th>Category</th>
-                  <th style={{ textAlign: "right" }}>Current Balance Due (₹)</th>
-                  <th style={{ textAlign: "right" }}>Action</th>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>GSTIN</th>
+                  <th>Phone</th>
+                  <th>City</th>
+                  <th className="num">Credit days</th>
+                  <th className="num">Bills due</th>
+                  <th className="num">Advance</th>
+                  <th className="num">Net balance</th>
+                  <th aria-label="Actions"></th>
                 </tr>
               </thead>
               <tbody>
                 {filteredSuppliers.length === 0 ? (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={10}>
                       <div className="empty">
                         <p style={{ fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>No suppliers found</p>
                         <p className="helper">No supplier records match your criteria.</p>
@@ -641,28 +645,22 @@ export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = (
                     </td>
                   </tr>
                 ) : (
-                  filteredSuppliers.map((sup) => (
+                  filteredSuppliers.map((sup) => {
+                  const linkedBills = billsList.filter(bill =>
+                    (bill.supplierId === sup.id || bill.supplier?.id === sup.id) && bill.status !== 'CANCELLED' && bill.status !== 'DRAFT'
+                  );
+                  const billsDue = linkedBills.length ? linkedBills.reduce((sum, bill) => sum + (bill.balanceAmount ?? bill.balanceDue), 0) : null;
+                  return (
                     <tr key={sup.id}>
-                      <td>
-                        <strong>{sup.tradeName || sup.name}</strong>
-                        <div className="helper">{sup.code || sup.supplierCode || "SUP"}</div>
-                      </td>
-                      <td>
-                        <div>{sup.contactPerson || "Primary Contact"}</div>
-                        <div className="helper" style={{ fontFamily: "monospace" }}>{sup.mobile}</div>
-                      </td>
-                      <td>
-                        <div>{sup.city}, {sup.state || "Maharashtra"}</div>
-                        <div className="helper" style={{ fontFamily: "monospace" }}>{sup.gstin}</div>
-                      </td>
-                      <td>
-                        <span className="badge badge-gold">{sup.category || "Bullion"}</span>
-                      </td>
-                      <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                        <strong style={{ color: (sup.currentBalanceDue || 0) > 0 ? "var(--danger)" : "var(--primary)" }}>
-                          ₹{(sup.currentBalanceDue || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </strong>
-                      </td>
+                      <td className="mono">{sup.code || sup.supplierCode || '—'}</td>
+                      <td><strong>{sup.tradeName || sup.name || '—'}</strong></td>
+                      <td className="mono">{sup.gstin || '—'}</td>
+                      <td className="mono">{sup.phone || sup.mobile || '—'}</td>
+                      <td>{sup.city || '—'}</td>
+                      <td className="num">—</td>
+                      <td className="num">{billsDue === null ? '—' : `₹${billsDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}</td>
+                      <td className="num">—</td>
+                      <td className="num">₹{sup.currentBalanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td style={{ textAlign: "right" }}>
                         <div style={{ display: "inline-flex", gap: 6 }}>
                           <button
@@ -687,7 +685,8 @@ export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = (
                         </div>
                       </td>
                     </tr>
-                  ))
+                  );
+                })
                 )}
               </tbody>
             </table>
@@ -1711,3 +1710,4 @@ export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = (
     </div>
   );
 };
+

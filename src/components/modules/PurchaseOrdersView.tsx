@@ -1,3 +1,4 @@
+import * as XLSX from 'xlsx';
 import React, { useState, useMemo } from 'react';
 import { 
   ShoppingBag, Plus, Search, Filter, Calendar, Eye, Edit3, 
@@ -611,6 +612,19 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
     }
   };
 
+  const exportPurchaseOrders = (format: 'csv' | 'xlsx') => {
+    const rows = [
+      ['PO', 'Date', 'Supplier', 'Expected', 'Total', 'Received', 'GRNs', 'Billed', 'Status'],
+      ...filteredPOs.map(po => [
+        po.poNumber, po.orderDate, po.supplier.tradeName, po.expectedDeliveryDate,
+        po.estimatedTotal, po.receivedQty ?? 0, po.grnCount ?? 0, po.billedAmount ?? 0, po.status
+      ])
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), 'Purchase Orders');
+    XLSX.writeFile(workbook, `purchase_orders.${format}`, { bookType: format });
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* 1. Page Header */}
@@ -625,7 +639,7 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
               <ShoppingBag size={22} />
             </div>
             <div>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Purchase Orders (PO)</h1>
+              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Purchase Orders</h1>
               <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
                 Draft → Submitted → Approved → Received / Closed. Open a PO for its goods receipts, supplier bills and payments.
               </p>
@@ -636,22 +650,15 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
         <div className="btn-group">
           <button 
             type="button" 
+            className="btn btn-primary"
+            onClick={handleOpenNewPO}
+          >
+            <Plus size={16} /> New PO
+          </button>
+          <button 
+            type="button" 
             className="btn btn-outline" 
-            onClick={() => {
-              const csv = [
-                ['PO Number', 'Date', 'Supplier', 'Expected', 'Total', 'Received Pcs', 'Ordered Pcs', 'Status'],
-                ...poList.map(p => [
-                  p.poNumber, p.orderDate, p.supplier.tradeName, p.expectedDeliveryDate,
-                  p.estimatedTotal, p.receivedQty || 0, p.orderedQty || 0, p.status
-                ])
-              ].map(r => r.join(',')).join('\n');
-              const blob = new Blob([csv], { type: 'text/csv' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `purchase_orders_${new Date().toISOString().slice(0,10)}.csv`;
-              a.click();
-            }}
+            onClick={() => exportPurchaseOrders('csv')}
           >
             <Download size={15} /> CSV
           </button>
@@ -659,32 +666,11 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
           <button 
             type="button" 
             className="btn btn-outline" 
-            onClick={() => {
-              const csv = [
-                ['PO Number', 'Date', 'Supplier', 'Expected', 'Total', 'Received Pcs', 'Ordered Pcs', 'Status'],
-                ...poList.map(p => [
-                  p.poNumber, p.orderDate, p.supplier.tradeName, p.expectedDeliveryDate,
-                  p.estimatedTotal, p.receivedQty || 0, p.orderedQty || 0, p.status
-                ])
-              ].map(r => r.join(',')).join('\n');
-              const blob = new Blob([csv], { type: 'text/csv' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `purchase_orders_${new Date().toISOString().slice(0,10)}.xlsx`;
-              a.click();
-            }}
+            onClick={() => exportPurchaseOrders('xlsx')}
           >
             <FileSpreadsheet size={15} /> Excel
           </button>
 
-          <button 
-            type="button" 
-            className="btn btn-primary"
-            onClick={handleOpenNewPO}
-          >
-            <Plus size={16} /> New PO
-          </button>
         </div>
       </div>
 
@@ -778,11 +764,11 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
           <table className="table">
             <thead>
               <tr>
-                <th style={{ width: 130 }}>PO Number</th>
-                <th>Order Date</th>
+                <th style={{ width: 130 }}>PO</th>
+                <th>Date</th>
                 <th>Supplier</th>
-                <th>Expected Date</th>
-                <th className="num">Estimated Total</th>
+                <th>Expected</th>
+                <th className="num">Total</th>
                 <th style={{ textAlign: 'center' }}>Received</th>
                 <th style={{ textAlign: 'center' }}>GRNs</th>
                 <th className="num">Billed</th>
@@ -1975,3 +1961,4 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
     </div>
   );
 };
+

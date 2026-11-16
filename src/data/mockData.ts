@@ -1,7 +1,7 @@
 import { 
   StoreProfile, Counter, DailyRates, InventoryItem, Customer, 
   SalesInvoice, GirviLoan, RepairOrder, SavingScheme, CashRegisterSession,
-  MetalBooking, CancellationRecord, ShipmentRecord, OldGoldPurchase,
+  MetalBooking, CancellationRecord, CreditMemoRecord, ShipmentRecord, OldGoldPurchase,
   CashOutflowRecord, OldMetalStockItem, Supplier, PurchaseOrder,
   GoodsReceipt, SupplierBill, SupplierPayment, UserAccount
 } from '../types';
@@ -1067,6 +1067,52 @@ export const mockCancellations: CancellationRecord[] = [
     approvedBy: 'Admin'
   }
 ];
+
+export const mockCreditMemos: CreditMemoRecord[] = [
+    {
+      id: 'cm-001',
+      creditMemoNo: 'CM-2026-00004',
+      cancellationId: 'can-001',
+      orderNo: 'INV-2026-00270',
+      customerName: 'Priya Sharma',
+      customerPhone: '9811234567',
+      originalAmount: 198450,
+      deductionAmount: 2500,
+      refundAmount: 47500,
+      refundMode: 'UPI',
+      refundStatus: 'issued',
+      refundDate: '2026-11-10',
+      notes: 'UPI refund processed via HDFC merchant portal'
+    },
+    {
+      id: 'cm-002',
+      creditMemoNo: 'CM-2026-00005',
+      cancellationId: 'can-002',
+      orderNo: 'INV-2026-00272',
+      customerName: 'Rahul Verma',
+      customerPhone: '9876543210',
+      originalAmount: 85000,
+      deductionAmount: 1500,
+      refundAmount: 83500,
+      refundMode: 'CASH',
+      refundStatus: 'issued',
+      refundDate: '2026-11-12',
+      notes: 'Cash refund issued from Counter MAIN'
+    },
+    {
+      id: 'cm-003',
+      creditMemoNo: 'CM-2026-00006',
+      orderNo: 'INV-2026-00275',
+      customerName: 'Amit Saxena',
+      customerPhone: '9922334455',
+      originalAmount: 120000,
+      deductionAmount: 2000,
+      refundAmount: 118000,
+      refundMode: 'customer_credit',
+      refundStatus: 'pending',
+      notes: 'Awaiting customer account confirmation for store credit / RTGS'
+    }
+  ];
 
 export const mockShipments: ShipmentRecord[] = [
   {
@@ -2336,3 +2382,4 @@ export const mockUsers: UserAccount[] = [
     lastLogin: "Today, 11:37 AM"
   }
 ];
+

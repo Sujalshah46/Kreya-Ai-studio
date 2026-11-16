@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { readPreviewPreferences, savePreviewPreferences } from './previewPreferences';
 import { Palette, Check, Save, RotateCcw, CheckCircle2, Sparkles, Layout, Sliders, Eye } from 'lucide-react';
 
 interface ThemePreset {
@@ -22,23 +23,32 @@ export const ThemeLayoutView: React.FC = () => {
     { id: 'kreya-violet', name: 'Kreya Violet', primary: '#6d28d9', accent: '#8b5cf6', bgDark: '#180f28', description: 'Modern imperial amethyst & vibrant violet' }
   ];
 
-  const [selectedTheme, setSelectedTheme] = useState<string>('graphite-emerald');
-  const [stylePreset, setStylePreset] = useState<'Gradient' | 'Solid'>('Gradient');
-  const [density, setDensity] = useState<'compact' | 'standard' | 'touch'>('compact');
-  const [saved, setSaved] = useState(false);
+  const storageKey = 'kreya:theme-preview';
+  const [baseline, setBaseline] = useState(() => readPreviewPreferences(storageKey, {
+    theme: 'graphite-emerald', style: 'Gradient' as 'Gradient' | 'Solid',
+    layout: 'Side menu' as 'Side menu' | 'Top menu'
+  }));
+  const [selectedTheme, setSelectedTheme] = useState(baseline.theme);
+  const [stylePreset, setStylePreset] = useState(baseline.style);
+  const [layout, setLayout] = useState(baseline.layout);
+  const [saveMessage, setSaveMessage] = useState('');
   const [discardNotice, setDiscardNotice] = useState(false);
 
   const activeThemeObj = themes.find(t => t.id === selectedTheme) || themes[0];
 
   const handleSaveTheme = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    const preferences = { theme: selectedTheme, style: stylePreset, layout };
+    const saved = savePreviewPreferences(storageKey, preferences);
+    if (saved) setBaseline(preferences);
+    setSaveMessage(saved ? 'Theme preview saved in this browser.' : 'The browser could not save the theme preview.');
+    setDiscardNotice(false);
   };
 
   const handleDiscard = () => {
-    setSelectedTheme('graphite-emerald');
-    setStylePreset('Gradient');
-    setDensity('compact');
+    setSelectedTheme(baseline.theme);
+    setStylePreset(baseline.style);
+    setLayout(baseline.layout);
+    setSaveMessage('');
     setDiscardNotice(true);
     setTimeout(() => setDiscardNotice(false), 2500);
   };
@@ -69,7 +79,7 @@ export const ThemeLayoutView: React.FC = () => {
           <button
             onClick={handleDiscard}
             className="btn btn-outline btn-sm flex items-center gap-1.5"
-            title="Reset theme changes to default"
+            title="Restore saved theme preview"
           >
             <RotateCcw size={14} />
             <span>Discard</span>
@@ -78,7 +88,7 @@ export const ThemeLayoutView: React.FC = () => {
             onClick={handleSaveTheme}
             className="btn btn-primary btn-sm flex items-center gap-1.5"
             style={{ fontWeight: 700, background: activeThemeObj.primary, borderColor: activeThemeObj.primary }}
-            title="Apply and save theme preferences"
+            title="Save theme preview preferences"
           >
             <Save size={14} />
             <span>Save theme</span>
@@ -86,16 +96,16 @@ export const ThemeLayoutView: React.FC = () => {
         </div>
       </div>
 
-      {saved && (
+      {saveMessage && (
         <div style={{ padding: 12, background: 'var(--primary-xl)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--primary-d)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
           <CheckCircle2 size={16} />
-          <span style={{ fontWeight: 600 }}>Theme "{activeThemeObj.name}" ({stylePreset}) successfully saved and activated!</span>
+          <span role="status" style={{ fontWeight: 600 }}>{saveMessage}</span>
         </div>
       )}
 
       {discardNotice && (
         <div style={{ padding: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <span>Theme changes discarded. Reset to Graphite Emerald default.</span>
+          <span>Unsaved theme changes discarded.</span>
         </div>
       )}
 
@@ -187,6 +197,17 @@ export const ThemeLayoutView: React.FC = () => {
         </div>
       </div>
 
+      <div className="card" style={{ padding: 18, marginBottom: 16 }}>
+        <div className="card-header"><span className="card-title">Menu layout</span></div>
+        <div className="seg" style={{ marginTop: 12 }}>
+          {(['Side menu', 'Top menu'] as const).map(option => (
+            <button key={option} type="button" aria-pressed={layout === option} onClick={() => setLayout(option)}>
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Live Interactive Preview Box */}
       <div className="card" style={{ padding: 20 }}>
         <div className="card-header" style={{ marginBottom: 14 }}>
@@ -205,6 +226,15 @@ export const ThemeLayoutView: React.FC = () => {
             gap: 14
           }}
         >
+          <div style={{ display: 'flex', flexDirection: layout === 'Side menu' ? 'row' : 'column', gap: 10 }}>
+            <div aria-label={layout} style={{
+              display: 'flex', flexDirection: layout === 'Side menu' ? 'column' : 'row',
+              gap: 8, background: activeThemeObj.primary, borderRadius: 8, padding: 10
+            }}>
+              <span>Dashboard</span><span>Customers</span><span>Sales</span>
+            </div>
+            <div style={{ minWidth: 0, fontWeight: 700 }}>Dashboard preview</div>
+          </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: 11, textTransform: 'uppercase', color: activeThemeObj.accent, fontWeight: 700, letterSpacing: '0.05em' }}>
@@ -250,3 +280,4 @@ export const ThemeLayoutView: React.FC = () => {
 };
 
 export default ThemeLayoutView;
+

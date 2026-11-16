@@ -1,3 +1,5 @@
+import { planPartialCancellation } from '../../data/partialCancellation';
+import { applyInvoiceReceipt, invoiceReceipts } from '../../data/invoicePayments';
 import React, { useState, useRef } from 'react';
 import { 
   Plus, Search, Printer, FileText, CheckCircle2, AlertCircle, 
@@ -6,7 +8,7 @@ import {
 } from 'lucide-react';
 import { 
   SalesInvoice, Customer, InventoryItem, DailyRates, StoreProfile, 
-  PaymentTransaction, PaymentMode, BillingLineItem, OldMetalExchange 
+  PaymentTransaction, PaymentMode, BillingLineItem, OldMetalExchange, CancellationRecord, CreditMemoRecord 
 } from '../../types';
 
 interface OrdersBillingViewProps {
@@ -15,7 +17,9 @@ interface OrdersBillingViewProps {
   customers: Customer[];
   inventory: InventoryItem[];
   invoices: SalesInvoice[];
+  cancellations?: CancellationRecord[];
   onSaveInvoice: (invoice: SalesInvoice) => void;
+  onCancelInvoice: (invoice: SalesInvoice, cancellation: CancellationRecord, memo: CreditMemoRecord | undefined, restock: boolean) => void;
   onAddPayment: (invoiceId: string, payment: PaymentTransaction) => void;
 }
 
@@ -69,7 +73,9 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
   customers: initialCustomers,
   inventory,
   invoices: initialInvoices,
+  cancellations = [],
   onSaveInvoice,
+  onCancelInvoice,
   onAddPayment
 }) => {
   const [invoicesList, setInvoicesList] = useState<SalesInvoice[]>(initialInvoices);
@@ -92,6 +98,17 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
   // Additional action modals for full button parity
   const [showItemCardsModal, setShowItemCardsModal] = useState<SalesInvoice | null>(null);
   const [showPayLinkModal, setShowPayLinkModal] = useState<SalesInvoice | null>(null);
+  const showroomUpi = store.upiId?.trim() ?? '';
+  const linkAmount = showPayLinkModal?.balanceDue ?? 0;
+  const linkInvoiceNo = showPayLinkModal?.invoiceNo || showPayLinkModal?.invoiceNumber || '';
+  const linkMobile = (showPayLinkModal?.customer.mobile || showPayLinkModal?.customer.phone || '').replace(/\D/g, '');
+  const messagingNumber = /^\d{10}$/.test(linkMobile) ? '91' + linkMobile :
+    /^91\d{10}$/.test(linkMobile) ? linkMobile : '';
+  const paymentLink = /^[a-z0-9_.-]+@[a-z0-9.-]+$/i.test(showroomUpi) && Number.isFinite(linkAmount) && linkAmount > 0 && linkInvoiceNo
+    ? 'upi://pay?' + new URLSearchParams({ pa: showroomUpi, pn: store.tradeName, am: linkAmount.toFixed(2), cu: 'INR', tn: 'Invoice ' + linkInvoiceNo })
+    : '';
+  const paymentMessage = 'Please pay ₹' + linkAmount.toFixed(2) + ' for invoice ' + linkInvoiceNo +
+    ' from ' + store.tradeName + ': ' + paymentLink;
   const [showShipModal, setShowShipModal] = useState<SalesInvoice | null>(null);
   const [showPaymentSummaryModal, setShowPaymentSummaryModal] = useState<SalesInvoice | null>(null);
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
@@ -136,8 +153,9 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
 
   // Filters
   const [searchOrder, setSearchOrder] = useState('');
-  const [fromDate, setFromDate] = useState('2026-11-01');
-  const [toDate, setToDate] = useState('2026-11-15');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [dateFilter, setDateFilter] = useState({ from: '', to: '' });
 
   // New Customer Quick Add states
   const [newCustName, setNewCustName] = useState('');
@@ -660,27 +678,91 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
     setShowNewSaleModal(true);
   };
 
-  // Handle Cancellation submission
+  const getCancellationAmounts = (invoice: SalesInvoice) => {
+    const invoiceNo = invoice.invoiceNo || invoice.invoiceNumber || invoice.id;
+    const priorRefund = cancellations.filter(record => record.referenceType === 'partial_order' &&
+      (record.originalReferenceNo || record.originalInvoiceNo) === invoiceNo)
+      .reduce((total, record) => total + Math.round((record.refundAmount ?? 0) * 100), 0);
+    const deduction = Number(cancelDeduction);
+    if (cancelType === 'partial') {
+      const result = planPartialCancellation(invoice, Object.keys(cancelItemSelection).filter(id => cancelItemSelection[id]),
+        priorRefund / 100, deduction);
+      if (!result.ok) return { error: result.reason } as const;
+      const { plan } = result;
+      return {
+        invoice: plan.invoice, items: plan.removedItems, originalAmount: plan.cancelledAmount,
+        paidAmount: plan.collected, refundAmount: plan.refund, deduction
+      } as const;
+    }
+
+    const collected = invoiceReceipts(invoice)
+      .filter(receipt => !['OLD_GOLD_EXCHANGE', 'CUSTOMER_CREDIT'].includes(receipt.mode.toUpperCase()))
+      .reduce((total, receipt) => total + Math.round(receipt.amount * 100), 0);
+    const paid = collected - priorRefund;
+    const fee = Math.round(deduction * 100);
+    if (!Number.isSafeInteger(fee) || !Number.isSafeInteger(paid) ||
+        Math.abs(fee / 100 - deduction) > 1e-9 || fee < 0 || fee > paid) {
+      return { error: 'Enter a deduction between zero and the remaining recorded payments.' } as const;
+    }
+    return {
+      invoice: { ...invoice, status: 'CANCELLED', balanceDue: 0 } satisfies SalesInvoice,
+      items: invoice.items, originalAmount: invoice.grandTotal ?? invoice.totalAmount ?? invoice.productTotalValue,
+      paidAmount: paid / 100, refundAmount: (paid - fee) / 100, deduction
+    } as const;
+  };
+
+  const cancellationPreview = selectedInvoiceForCancel ? getCancellationAmounts(selectedInvoiceForCancel) : undefined;
   const handleProcessCancellation = () => {
-    if (!selectedInvoiceForCancel) return;
+    if (!selectedInvoiceForCancel || !cancellationPreview) return;
     const inv = selectedInvoiceForCancel;
-    const deduction = parseFloat(cancelDeduction) || 0;
-    const totalPaid = inv.paidAmount || inv.totalAmount || 0;
-    const refundDue = Math.max(0, totalPaid - deduction);
-
-    const updated = invoicesList.map(item => {
-      if (item.id === inv.id) {
-        return {
-          ...item,
-          status: 'CANCELLED' as const,
-          notes: `${item.notes ? item.notes + ' | ' : ''}Cancelled (${cancelType}): ${cancelReason}. Refund: ₹${refundDue} via ${cancelRefundMode}`
-        };
-      }
-      return item;
-    });
-
-    setInvoicesList(updated);
-    alert(`Order ${inv.invoiceNo} cancelled. Credit Memo created for ₹${refundDue.toLocaleString('en-IN')}.${cancelRestock ? ' Items restocked to inventory.' : ''}`);
+    if (inv.status === 'CANCELLED' || inv.status === 'ESTIMATE' || !cancelReason.trim()) return;
+    if ('error' in cancellationPreview) {
+      alert(cancellationPreview.error);
+      return;
+    }
+    const { originalAmount, paidAmount, refundAmount, deduction, items, invoice: postedInvoice } = cancellationPreview;
+    const id = crypto.randomUUID();
+    const suffix = id.slice(0, 8).toUpperCase();
+    const year = new Date().getFullYear();
+    const invoiceNo = inv.invoiceNo || inv.invoiceNumber || inv.id;
+    const creditMemoNo = refundAmount > 0 ? 'CM-' + year + '-' + suffix : undefined;
+    const cancellation: CancellationRecord = {
+      id,
+      cancellationNo: 'CAN-' + year + '-' + suffix,
+      referenceType: cancelType === 'partial' ? 'partial_order' : 'order',
+      originalInvoiceNo: invoiceNo,
+      originalReferenceNo: invoiceNo,
+      customerName: inv.customer.name,
+      customerPhone: inv.customer.mobile || inv.customer.phone,
+      originalAmount,
+      paidAmount,
+      deductionAmount: deduction,
+      refundAmount,
+      refundMode: cancelRefundMode,
+      creditMemoNo,
+      itemsSummary: items.map(item => item.itemName).join(', '),
+      reason: cancelReason.trim(),
+      status: 'approved',
+      cancelledAt: new Date().toISOString()
+    };
+    const memo: CreditMemoRecord | undefined = creditMemoNo ? {
+      id: crypto.randomUUID(),
+      creditMemoNo,
+      cancellationId: id,
+      orderNo: invoiceNo,
+      customerName: cancellation.customerName,
+      customerPhone: cancellation.customerPhone,
+      originalAmount: cancellation.originalAmount ?? 0,
+      deductionAmount: deduction,
+      refundAmount,
+      refundMode: cancelRefundMode,
+      refundStatus: 'pending',
+      notes: cancellation.reason
+    } : undefined;
+    onCancelInvoice(postedInvoice, cancellation, memo, cancelRestock);
+    setInvoicesList(current => current.map(item => item.id === inv.id ? postedInvoice : item));
+    const result = cancelType === 'partial' ? 'Selected items cancelled.' : 'Order cancelled.';
+    alert(memo ? result + ' Credit memo is pending refund disbursement.' : result);
     setSelectedInvoiceForCancel(null);
     setCancelReason('');
     setCancelDeduction('0');
@@ -832,7 +914,10 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
       (inv.invoiceNo && inv.invoiceNo.toLowerCase().includes(q)) ||
       inv.customer.name.toLowerCase().includes(q) ||
       (inv.customer.mobile && inv.customer.mobile.includes(q));
-    return matchQ;
+    const date = (inv.invoiceDate || inv.date || '').slice(0, 10);
+    const hasDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
+    return matchQ && (!dateFilter.from || (hasDate && date >= dateFilter.from)) &&
+      (!dateFilter.to || (hasDate && date <= dateFilter.to));
   });
 
   // Filtered customer search for modal
@@ -879,40 +964,54 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
 
       {/* Filter Card */}
       <div className="card" style={{ marginBottom: 14 }}>
-        <div className="card-body" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <form className="card-body" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}
+          onSubmit={event => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            const from = String(form.get('fromDate') ?? '');
+            const to = String(form.get('toDate') ?? '');
+            setFromDate(from);
+            setToDate(to);
+            setDateFilter({ from, to });
+          }}
+        >
           <div className="search-box" style={{ flex: 1, minWidth: 200 }}>
             <Search size={13} style={{ color: 'var(--muted)' }} />
             <input 
-              placeholder="Order no, customer, mobile..." 
+              aria-label="Search orders"
+              placeholder="Order no, customer..." 
               value={searchOrder}
               onChange={(e) => setSearchOrder(e.target.value)}
             />
           </div>
           <input 
             className="input input-sm" 
-            type="date" 
+            type="date"
+            name="fromDate"
+            aria-label="From date"
+            max={toDate || undefined}
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
             style={{ width: 'auto' }}
           />
           <input 
             className="input input-sm" 
-            type="date" 
+            type="date"
+            name="toDate"
+            aria-label="To date"
+            min={fromDate || undefined}
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
             style={{ width: 'auto' }}
           />
           <button 
-            type="button" 
+            type="submit"
             className="btn btn-sm btn-outline"
             title="Filter orders list"
-            onClick={() => {
-              // Trigger filter refresh
-            }}
           >
             <Filter size={13} /> Filter
           </button>
-          {(searchOrder || fromDate || toDate) && (
+          {(searchOrder || fromDate || toDate || dateFilter.from || dateFilter.to) && (
             <button 
               type="button" 
               className="btn btn-sm btn-outline"
@@ -921,12 +1020,13 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                 setSearchOrder('');
                 setFromDate('');
                 setToDate('');
+                setDateFilter({ from: '', to: '' });
               }}
             >
               <X size={13} /> Clear
             </button>
           )}
-        </div>
+        </form>
       </div>
 
       {/* Orders Table */}
@@ -939,11 +1039,12 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                 <th>Date</th>
                 <th>Customer</th>
                 <th>Items</th>
-                <th className="num">Taxable</th>
-                <th className="num">GST 3%</th>
-                <th className="num">Total</th>
+                <th className="num">Gold</th>
+                <th className="num">Silver</th>
+                <th className="num">Invoice Amt</th>
+                <th className="num">Deposit</th>
                 <th className="num">Paid</th>
-                <th className="num">Balance</th>
+                <th className="num">Pending</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -952,6 +1053,8 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
               {filteredInvoices.map((inv) => {
                 const isPaid = (inv.balanceDue || 0) <= 0.01;
                 const isCancelled = inv.status === 'CANCELLED';
+                const weight = (metal: string) => inv.items.reduce((sum, item) =>
+                  sum + (item.metalType?.toLowerCase().startsWith(metal) ? item.netWeight || 0 : 0), 0);
                 return (
                   <tr key={inv.id} style={{ opacity: isCancelled ? 0.6 : 1 }}>
                     <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{inv.invoiceNo}</td>
@@ -961,9 +1064,10 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                       <div style={{ fontSize: 10, color: 'var(--muted)' }}>{inv.customer.mobile || inv.customer.phone}</div>
                     </td>
                     <td>{inv.items.length} item(s)</td>
-                    <td className="num">₹{(inv.taxableAmount || 0).toLocaleString('en-IN')}</td>
-                    <td className="num">₹{((inv.cgstTotal || 0) + (inv.sgstTotal || 0)).toLocaleString('en-IN')}</td>
-                    <td className="num" style={{ fontWeight: 700 }}>₹{(inv.totalAmount || 0).toLocaleString('en-IN')}</td>
+                    <td className="num">{weight('gold').toFixed(3)} g</td>
+                    <td className="num">{weight('silver').toFixed(3)} g</td>
+                    <td className="num" style={{ fontWeight: 700 }}>₹{(inv.grandTotal ?? inv.totalAmount ?? inv.productTotalValue).toLocaleString('en-IN')}</td>
+                    <td className="num">₹{(inv.metalAdvanceAdjusted ?? 0).toLocaleString('en-IN')}</td>
                     <td className="num amt-green">₹{(inv.paidAmount || 0).toLocaleString('en-IN')}</td>
                     <td className="num" style={{ fontWeight: 700, color: (inv.balanceDue || 0) > 0 ? 'var(--danger)' : 'var(--success)' }}>
                       ₹{(inv.balanceDue || 0).toLocaleString('en-IN')}
@@ -1019,6 +1123,8 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                             title="Cancel Order & Issue Credit Memo"
                             onClick={() => {
                               setSelectedInvoiceForCancel(inv);
+                              setCancelType('full');
+                              setCancelItemSelection({});
                               setCancelDeduction('0');
                               setCancelReason('');
                               setCancelRestock(true);
@@ -1034,7 +1140,7 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
               })}
               {!filteredInvoices.length && (
                 <tr>
-                  <td colSpan={11} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+                  <td colSpan={12} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
                     No orders matching filter.
                   </td>
                 </tr>
@@ -2521,24 +2627,24 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                   type="button"
                   className="btn btn-primary btn-sm"
                   onClick={() => {
-                    const amt = parseFloat(collectAmount) || (selectedInvoiceForView.balanceDue || 0);
-                    if (amt <= 0) return;
-                    const newPay = {
-                      id: `pay-${Date.now()}`,
-                      receiptNo: `PAY-2026-${String(((selectedInvoiceForView.payments || []).length || 2) + 1).padStart(5, '0')}`,
-                      date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-                      amount: amt,
-                      mode: collectMode.toUpperCase() as any,
+                    const amount = Number(collectAmount);
+                    const receiptId = crypto.randomUUID();
+                    const newPay: PaymentTransaction = {
+                      id: receiptId,
+                      receiptNo: 'PAY-' + new Date().getFullYear() + '-' + receiptId.slice(0, 8).toUpperCase(),
+                      date: new Date().toISOString(),
+                      amount,
+                      mode: collectMode.toUpperCase() as PaymentMode,
                       referenceNo: collectRef || undefined,
                       collectorName: 'Admin',
                       notes: collectNote || undefined
                     };
-                    const updatedOrder: SalesInvoice = {
-                      ...selectedInvoiceForView,
-                      paidAmount: (selectedInvoiceForView.paidAmount || 0) + amt,
-                      balanceDue: Math.max(0, (selectedInvoiceForView.balanceDue || 0) - amt),
-                      payments: [...(selectedInvoiceForView.payments || []), newPay]
-                    };
+                    const updatedOrder = applyInvoiceReceipt(selectedInvoiceForView, newPay);
+                    if (!updatedOrder) {
+                      alert('Enter a valid payment amount that does not exceed the amount due.');
+                      return;
+                    }
+                    onAddPayment(selectedInvoiceForView.id, newPay);
                     setSelectedInvoiceForView(updatedOrder);
                     setInvoicesList(prev => prev.map(inv => inv.id === updatedOrder.id ? updatedOrder : inv));
                     setCollectAmount('');
@@ -3112,9 +3218,11 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--gold)', borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 4 }}>
                   <span>Net Refund Due:</span>
-                  <strong>₹{Math.max(0, (selectedInvoiceForCancel.paidAmount || 0) - (parseFloat(cancelDeduction) || 0)).toLocaleString('en-IN')}</strong>
+                  <strong>{cancellationPreview && !('error' in cancellationPreview) ? '₹' + cancellationPreview.refundAmount.toLocaleString('en-IN') : '—'}</strong>
                 </div>
               </div>
+
+              {cancellationPreview && 'error' in cancellationPreview && <p className="helper">{cancellationPreview.error}</p>}
 
               {cancelType === 'partial' && (
                 <div style={{ marginBottom: 14 }}>
@@ -3194,7 +3302,7 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                 disabled={!cancelReason.trim()}
                 onClick={handleProcessCancellation}
               >
-                Confirm Cancellation & Issue Refund
+                Confirm Cancellation
               </button>
             </div>
           </div>
@@ -3305,57 +3413,45 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                 <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 6, borderTop: '1px solid var(--border)' }}>
                   <span style={{ fontWeight: 600, fontSize: 13 }}>Outstanding Balance:</span>
                   <strong style={{ fontSize: 15, color: 'var(--danger)' }}>
-                    ₹{(showPayLinkModal.balanceDue && showPayLinkModal.balanceDue > 0 ? showPayLinkModal.balanceDue : showPayLinkModal.totalAmount || 0).toLocaleString('en-IN')}
+                    ₹{linkAmount.toLocaleString('en-IN')}
                   </strong>
                 </div>
               </div>
 
               <div className="form-group">
-                <label className="label">Generated UPI Payment Link</label>
+                <label className="label" htmlFor="order-upi-link">Generated UPI Payment Link</label>
+                {!paymentLink && <p className="helper">
+                  {linkAmount <= 0 ? 'This invoice has no outstanding balance.' :
+                    'Save a valid showroom UPI ID in Shop Settings to generate a payment link.'}
+                </p>}
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <input 
-                    className="input" 
-                    readOnly
-                    value={`upi://pay?pa=dadhibaman@okaxis&pn=Dadhibaman+Jewellers&am=${showPayLinkModal.balanceDue || showPayLinkModal.totalAmount || 0}&tn=Invoice+${showPayLinkModal.invoiceNo}`}
-                    style={{ fontSize: 11, fontFamily: 'monospace' }}
-                  />
-                  <button 
-                    type="button" 
-                    className={`btn btn-sm ${copiedLink ? 'btn-gold' : 'btn-outline'}`}
-                    onClick={() => {
-                      const link = `upi://pay?pa=dadhibaman@okaxis&pn=Dadhibaman+Jewellers&am=${showPayLinkModal.balanceDue || showPayLinkModal.totalAmount || 0}&tn=Invoice+${showPayLinkModal.invoiceNo}`;
-                      navigator.clipboard?.writeText(link);
-                      setCopiedLink(true);
-                      setTimeout(() => setCopiedLink(false), 2500);
+                  <input id="order-upi-link" className="input mono" readOnly value={paymentLink} />
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline"
+                    disabled={!paymentLink}
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(paymentLink);
+                        setCopiedLink(true);
+                        setTimeout(() => setCopiedLink(false), 2500);
+                      } catch {
+                        alert('Copy the payment link manually from the field.');
+                      }
                     }}
                   >
                     <Copy size={13} /> {copiedLink ? 'Copied!' : 'Copy'}
                   </button>
                 </div>
               </div>
-
-              <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-                <button 
-                  type="button" 
-                  className="btn btn-sm btn-primary"
-                  style={{ flex: 1 }}
-                  onClick={() => {
-                    const mobile = showPayLinkModal.customer.mobile || showPayLinkModal.customer.phone || '';
-                    const amt = showPayLinkModal.balanceDue || showPayLinkModal.totalAmount || 0;
-                    const text = encodeURIComponent(`Dear ${showPayLinkModal.customer.name}, please complete payment of Rs ${amt} for invoice ${showPayLinkModal.invoiceNo} from Dadhibaman Jewellers: upi://pay?pa=dadhibaman@okaxis&pn=Dadhibaman+Jewellers&am=${amt}&tn=Invoice+${showPayLinkModal.invoiceNo}`);
-                    window.open(`https://api.whatsapp.com/send?phone=91${mobile}&text=${text}`, '_blank');
-                  }}
-                >
+              <div className="flex gap-2 mt-3">
+                <button type="button" className="btn btn-sm btn-primary flex-1" disabled={!paymentLink || !messagingNumber}
+                  onClick={() => window.open('https://api.whatsapp.com/send?' +
+                    new URLSearchParams({ phone: messagingNumber, text: paymentMessage }), '_blank', 'noopener,noreferrer')}>
                   <Send size={13} /> WhatsApp
                 </button>
-                <button 
-                  type="button" 
-                  className="btn btn-sm btn-outline"
-                  style={{ flex: 1 }}
-                  onClick={() => {
-                    alert(`SMS sent to ${showPayLinkModal.customer.mobile || showPayLinkModal.customer.phone || 'customer'}`);
-                  }}
-                >
+                <button type="button" className="btn btn-sm btn-outline flex-1" disabled={!paymentLink || !messagingNumber}
+                  onClick={() => { window.location.href = 'sms:+' + messagingNumber + '?body=' + encodeURIComponent(paymentMessage); }}>
                   <Share2 size={13} /> SMS Link
                 </button>
               </div>
@@ -3606,3 +3702,4 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
     </div>
   );
 };
+

@@ -7,7 +7,7 @@ import {
   AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, Coins, Clock, Lock
 } from 'lucide-react';
 import { SalesInvoice, Customer, StoreProfile, InventoryItem, GirviLoan } from '../../types';
-import { mockLoans, mockCustomers, mockInventory } from '../../data/mockData';
+import { invoiceReceipts } from '../../data/invoicePayments';
 
 interface ReportsClassicViewProps {
   store: StoreProfile;
@@ -18,28 +18,36 @@ interface ReportsClassicViewProps {
   onNavigate?: (module: string) => void;
 }
 
+const calendarDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' });
+const salesHeaders = ['Date', 'Orders', 'Revenue', 'Collected', 'Outstanding', 'GST'];
+
 type ReportTab = 'sales' | 'payments' | 'loans' | 'inventory' | 'outstanding';
 
 export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
   store,
   invoices = [],
-  customers = mockCustomers,
-  inventory = mockInventory,
-  loans = mockLoans,
+  customers = [],
+  inventory = [],
+  loans = [],
   onNavigate
 }) => {
   const [activeTab, setActiveTab] = useState<ReportTab>('sales');
   
+  const today = calendarDate.format(new Date());
+  const monthStart = today.slice(0, 7) + '-01';
+
   // Date filter inputs
-  const [fromDate, setFromDate] = useState('2026-11-01');
-  const [toDate, setToDate] = useState('2026-11-15');
+  const [fromDate, setFromDate] = useState(monthStart);
+  const [toDate, setToDate] = useState(today);
   
   // Applied filters (updated on clicking "Apply")
-  const [appliedFrom, setAppliedFrom] = useState('2026-11-01');
-  const [appliedTo, setAppliedTo] = useState('2026-11-15');
+  const [appliedFrom, setAppliedFrom] = useState(monthStart);
+  const [appliedTo, setAppliedTo] = useState(today);
   const [isAppliedNotice, setIsAppliedNotice] = useState(false);
 
-  const handleApply = () => {
+  const handleApply = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (fromDate && toDate && fromDate > toDate) return;
     setAppliedFrom(fromDate);
     setAppliedTo(toDate);
     setIsAppliedNotice(true);
@@ -49,24 +57,32 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
   // Filter invoices based on applied dates
   const filteredInvoices = useMemo(() => {
     return invoices.filter(inv => {
-      const rawDate = inv.date || inv.invoiceDate || '2026-11-15';
-      const invDate = new Date(rawDate);
-      const start = new Date(appliedFrom);
-      const end = new Date(appliedTo + 'T23:59:59Z');
-      return invDate >= start && invDate <= end;
+      const date = (inv.invoiceDate || inv.date || '').slice(0, 10);
+      return inv.status !== 'CANCELLED' && inv.status !== 'ESTIMATE' &&
+        Boolean(date) && (!appliedFrom || date >= appliedFrom) && (!appliedTo || date <= appliedTo);
     });
   }, [invoices, appliedFrom, appliedTo]);
 
-  // Calculations for Sales Report
-  const totalGrossSales = filteredInvoices.reduce((acc, inv) => acc + (inv.productTotalValue || inv.totalAmount || 0), 0);
-  const totalNetPayable = filteredInvoices.reduce((acc, inv) => acc + (inv.netPayable ?? inv.finalPayableAmount ?? inv.productTotalValue ?? 0), 0);
-  const totalTaxCollected = filteredInvoices.reduce((acc, inv) => {
-    const tax = (inv.items || []).reduce((s, itm) => s + (itm.cgstAmount || 0) + (itm.sgstAmount || 0), 0);
-    return acc + tax;
-  }, 0);
-  const totalOldGold = filteredInvoices.reduce((acc, inv) => acc + (inv.oldMetalExchangeCredit || 0), 0);
-  const totalPaid = filteredInvoices.reduce((acc, inv) => acc + (inv.paidAmount || 0), 0);
-  const totalDue = filteredInvoices.reduce((acc, inv) => acc + (inv.balanceDue || 0), 0);
+  const salesRows = useMemo(() => {
+    const byDate = new Map<string, [number, number, number, number, number]>();
+    for (const invoice of filteredInvoices) {
+      const date = (invoice.invoiceDate || invoice.date || '').slice(0, 10);
+      const row = byDate.get(date) ?? [0, 0, 0, 0, 0];
+      row[0]++;
+      row[1] += invoice.grandTotal ?? invoice.totalAmount ?? invoice.productTotalValue;
+      row[2] += invoiceReceipts(invoice)
+        .filter(receipt => !['OLD_GOLD_EXCHANGE', 'CUSTOMER_CREDIT'].includes(receipt.mode.toUpperCase()))
+        .reduce((sum, receipt) => sum + receipt.amount, 0);
+      row[3] += invoice.balanceDue;
+      row[4] += (invoice.cgstTotal ?? invoice.items.reduce((sum, item) => sum + item.cgstAmount, 0)) +
+        (invoice.sgstTotal ?? invoice.items.reduce((sum, item) => sum + item.sgstAmount, 0));
+      byDate.set(date, row);
+    }
+    return [...byDate].sort(([a], [b]) => b.localeCompare(a)).map(([date, amounts]) => [date, ...amounts] as const);
+  }, [filteredInvoices]);
+  const totalNetPayable = filteredInvoices.reduce((total, invoice) => total + (invoice.netPayable ?? invoice.grandTotal ?? invoice.totalAmount ?? invoice.productTotalValue), 0);
+  const totalOldGold = filteredInvoices.reduce((total, invoice) => total + (invoice.oldMetalExchangeCredit ?? 0), 0);
+  const totalDue = filteredInvoices.reduce((total, invoice) => total + invoice.balanceDue, 0);
 
   // Calculations for Payment Analysis
   const paymentAnalysis = useMemo(() => {
@@ -108,19 +124,7 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
     const wb = XLSX.utils.book_new();
 
     if (activeTab === 'sales') {
-      const rows = filteredInvoices.map((inv, idx) => ({
-        'S.No': idx + 1,
-        'Invoice No': inv.invoiceNo || inv.invoiceNumber,
-        'Date': inv.date || inv.invoiceDate,
-        'Customer': inv.customer?.fullName || inv.customer?.name,
-        'Gross Amount (₹)': inv.productTotalValue || inv.totalAmount,
-        'Tax (₹)': (inv.items || []).reduce((s, it) => s + (it.cgstAmount || 0) + (it.sgstAmount || 0), 0),
-        'Net Payable (₹)': inv.finalPayableAmount || inv.netPayable,
-        'Paid Amount (₹)': inv.paidAmount,
-        'Balance Due (₹)': inv.balanceDue,
-        'Payment Mode': inv.paymentMode
-      }));
-      const ws = XLSX.utils.json_to_sheet(rows);
+      const ws = XLSX.utils.aoa_to_sheet([salesHeaders, ...salesRows.map(row => [...row])]);
       XLSX.utils.book_append_sheet(wb, ws, 'Sales Report');
     } else if (activeTab === 'payments') {
       const rows = Object.entries(paymentAnalysis).map(([mode, data]) => ({
@@ -176,17 +180,8 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
     let rows: (string | number)[][] = [];
 
     if (activeTab === 'sales') {
-      headers = ['Invoice No', 'Date', 'Customer', 'Gross Amount', 'Net Payable', 'Paid', 'Due', 'Mode'];
-      rows = filteredInvoices.map(i => [
-        i.invoiceNo || i.invoiceNumber || '',
-        i.date || i.invoiceDate || '',
-        `"${i.customer?.fullName || i.customer?.name || ''}"`,
-        i.productTotalValue || i.totalAmount || 0,
-        i.finalPayableAmount || i.netPayable || 0,
-        i.paidAmount || 0,
-        i.balanceDue || 0,
-        i.paymentMode || 'CASH'
-      ]);
+      headers = salesHeaders;
+      rows = salesRows.map(row => [...row]);
     } else if (activeTab === 'payments') {
       headers = ['Payment Mode', 'Count', 'Total Amount'];
       rows = Object.entries(paymentAnalysis).map(([k, v]) => [k, v.count, v.total]);
@@ -218,7 +213,7 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
         <div className="flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
           <span className="text-xs font-medium text-amber-950">
-            ⚠️ Licence expires in 30 days (15-Dec-2026). Contact Kreya IT Consulting to renew.
+            ⚠️ Licence status is unavailable. Open Licence for verification details.
           </span>
         </div>
         <button 
@@ -279,7 +274,7 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
       </div>
 
       {/* Filter Card with Date Range Pickers & Required "Apply" Button */}
-      <div className="card" style={{ padding: '12px 16px', marginBottom: 14 }}>
+      <form onSubmit={handleApply} className="card" style={{ padding: '12px 16px', marginBottom: 14 }}>
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span className="label" style={{ margin: 0, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -290,6 +285,8 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
               <span className="helper" style={{ fontSize: 11, margin: 0 }}>From</span>
               <input
                 type="date"
+                aria-label="From date"
+                max={toDate || undefined}
                 value={fromDate}
                 onChange={e => setFromDate(e.target.value)}
                 className="input input-sm"
@@ -298,6 +295,8 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
               <span className="helper" style={{ fontSize: 11, margin: 0 }}>To</span>
               <input
                 type="date"
+                aria-label="To date"
+                min={fromDate || undefined}
                 value={toDate}
                 onChange={e => setToDate(e.target.value)}
                 className="input input-sm"
@@ -307,7 +306,7 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
 
             {/* Discovered "Apply" Button */}
             <button
-              onClick={handleApply}
+              type="submit"
               className="btn btn-primary btn-sm"
               style={{ fontWeight: 700, padding: '5px 14px' }}
               title="Apply date range filters to report"
@@ -324,7 +323,7 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
             )}
           </div>
         </div>
-      </div>
+      </form>
 
       {/* Required Tabs: "Sales Report", "Payment Analysis", "Loans", "Inventory", "Outstanding" */}
       <div className="tabs" style={{ marginBottom: 14 }}>
@@ -360,90 +359,25 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
         </button>
       </div>
 
-      {/* TAB 1: SALES REPORT */}
       {activeTab === 'sales' && (
-        <div>
-          {/* Summary KPIs */}
-          <div className="sum-grid" style={{ marginBottom: 14 }}>
-            <div className="sum-box">
-              <div className="sum-val">₹{totalGrossSales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
-              <div className="sum-lbl">Gross Sales ({filteredInvoices.length} invoices)</div>
-            </div>
-            <div className="sum-box">
-              <div className="sum-val" style={{ color: 'var(--primary)' }}>
-                ₹{totalNetPayable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="sum-lbl">Net Billed Value</div>
-            </div>
-            <div className="sum-box">
-              <div className="sum-val" style={{ color: 'var(--info)' }}>
-                ₹{totalTaxCollected.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="sum-lbl">GST Tax Collected (3%)</div>
-            </div>
-            <div className="sum-box">
-              <div className="sum-val" style={{ color: 'var(--gold-d)' }}>
-                ₹{totalPaid.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="sum-lbl">Collected Amount</div>
-            </div>
-          </div>
-
-          {/* Table */}
-          <div className="card" style={{ overflow: 'hidden' }}>
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="card-title">Invoices Register ({filteredInvoices.length} records)</span>
-              <span className="helper">Period: {appliedFrom} to {appliedTo}</span>
-            </div>
-            <div className="tbl-wrap">
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>INVOICE NO</th>
-                    <th>DATE</th>
-                    <th>CUSTOMER</th>
-                    <th className="num">GROSS (₹)</th>
-                    <th className="num">TAX (₹)</th>
-                    <th className="num">NET PAYABLE (₹)</th>
-                    <th className="num">PAID (₹)</th>
-                    <th className="num">BALANCE (₹)</th>
-                    <th>PAYMENT MODE</th>
+        <div className="card">
+          <div className="tbl-wrap">
+            <table className="tbl">
+              <thead>
+                <tr>{salesHeaders.map((header, index) => <th key={header} scope="col" className={index ? 'num' : undefined}>{header}</th>)}</tr>
+              </thead>
+              <tbody>
+                {salesRows.map(([date, orders, ...amounts]) => (
+                  <tr key={date}>
+                    <td>{date}</td><td className="num">{orders}</td>
+                    {amounts.map((amount, index) => <td key={index} className="num">
+                      {amount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                    </td>)}
                   </tr>
-                </thead>
-                <tbody>
-                  {filteredInvoices.map((inv) => (
-                    <tr key={inv.id || inv.invoiceNo}>
-                      <td style={{ fontWeight: 700, fontFamily: 'monospace' }}>{inv.invoiceNo || inv.invoiceNumber}</td>
-                      <td>{inv.date || inv.invoiceDate}</td>
-                      <td>{inv.customer?.fullName || inv.customer?.name || 'Walk-in'}</td>
-                      <td className="num">{(inv.productTotalValue || inv.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td className="num">
-                        {((inv.items || []).reduce((s, itm) => s + (itm.cgstAmount || 0) + (itm.sgstAmount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="num" style={{ fontWeight: 700 }}>
-                        {(inv.netPayable ?? inv.finalPayableAmount ?? inv.productTotalValue ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="num" style={{ color: 'var(--success)' }}>
-                        {(inv.paidAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="num" style={{ color: (inv.balanceDue || 0) > 0 ? 'var(--danger)' : 'var(--muted)' }}>
-                        {(inv.balanceDue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td>
-                        <span className="badge badge-gray">{inv.paymentMode || 'CASH'}</span>
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredInvoices.length === 0 && (
-                    <tr>
-                      <td colSpan={9} style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
-                        No sales invoices found for the selected period.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                ))}
+                {!salesRows.length && <tr><td className="empty" colSpan={salesHeaders.length}>No sales for the selected period.</td></tr>}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -751,3 +685,4 @@ export const ReportsClassicView: React.FC<ReportsClassicViewProps> = ({
 };
 
 export default ReportsClassicView;
+

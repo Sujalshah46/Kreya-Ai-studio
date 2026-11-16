@@ -16,7 +16,7 @@ export const StockValuationView: React.FC<StockValuationViewProps> = ({
   rates,
   inventory: initialInventory
 }) => {
-  const [activeTab, setActiveTab] = useState<'mtm' | 'overview' | 'purity' | 'item_valuation' | 'low_stock'>('mtm');
+  const [activeTab, setActiveTab] = useState<'mtm' | 'overview' | 'purity' | 'item_valuation' | 'low_stock'>('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [showExportModal, setShowExportModal] = useState(false);
   const [showRevaluationModal, setShowRevaluationModal] = useState(false);
@@ -24,59 +24,7 @@ export const StockValuationView: React.FC<StockValuationViewProps> = ({
   const [exportMethod, setExportMethod] = useState<'marked_to_market' | 'book_cost' | 'retail_mrp'>('marked_to_market');
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf' | 'xlsx'>('csv');
 
-  const dbSingleStockItem: InventoryItem = {
-    id: 'item-sbj-01',
-    itemCode: 'SBJCH-01',
-    barcode: '890123456001',
-    huid: 'ZX98YU',
-    itemName: 'Gold Chain 22K Rope',
-    category: 'gold',
-    subCategory: 'Chain',
-    metalType: 'Gold',
-    metalGroup: 'GOLD',
-    purityKarat: '22K (916)',
-    purityPercent: 91.60,
-    grossWeight: 12.350,
-    stoneWeight: 0.000,
-    netWeight: 12.350,
-    wastagePercent: 6.0,
-    makingMode: 'PER_NET_GRAM',
-    makingRate: 450.0,
-    makingType: 'per_gram',
-    costPrice: 88920.0,
-    retailPrice: 97812.0,
-    wholesalePrice: 92470.0,
-    mrp: 104500.0,
-    hsn: '7113',
-    quantity: 3,
-    minStock: 1,
-    itemSize: '20 in',
-    designNo: 'DS-CH-901',
-    gender: 'Unisex',
-    retailMarginPct: 25.0,
-    wholesaleMarginPct: 12.0,
-    stockQty: 3,
-    location: 'Main Showroom',
-    rackTray: 'Chain Tray 01',
-    stones: [],
-    status: 'IN_STOCK'
-  };
-
-  const inventory = React.useMemo(() => {
-    if (!initialInventory || initialInventory.length === 0) {
-      return [dbSingleStockItem];
-    }
-    const hasSbj = initialInventory.some(i => i.itemCode === 'SBJCH-01');
-    const mapped = initialInventory.map(item => item.itemCode === 'SBJCH-01' ? {
-      ...dbSingleStockItem,
-      ...item,
-      grossWeight: 12.350,
-      netWeight: 12.350,
-      quantity: item.quantity || 3,
-      stockQty: item.stockQty || 3
-    } : item);
-    return hasSbj ? mapped : [dbSingleStockItem, ...mapped];
-  }, [initialInventory]);
+  const inventory = initialInventory;
 
   const totalPieces = inventory.reduce((a, b) => a + b.stockQty, 0);
   const totalGrossWeight = inventory.reduce((a, b) => a + (b.grossWeight * b.stockQty), 0);
@@ -85,7 +33,7 @@ export const StockValuationView: React.FC<StockValuationViewProps> = ({
 
   const totalCostValuation = inventory.reduce((a, b) => a + (b.costPrice * b.stockQty), 0);
   const totalRetailValuation = inventory.reduce((a, b) => a + (b.retailPrice * b.stockQty), 0);
-  const totalMrpValuation = inventory.reduce((a, b) => a + ((b.mrp || b.retailPrice * 1.05) * b.stockQty), 0);
+  const totalMrpValuation = inventory.reduce((a, b) => a + ((b.mrp ?? 0) * b.stockQty), 0);
 
   // Live Market Rates
   const liveGoldRate24k = rates.gold24kPerGram || (rates.gold24kPer10g ? Math.round(rates.gold24kPer10g / 10) : 7850);
@@ -268,7 +216,7 @@ export const StockValuationView: React.FC<StockValuationViewProps> = ({
     const netWt = items.reduce((a, b) => a + (b.netWeight * b.stockQty), 0);
     const costVal = items.reduce((a, b) => a + (b.costPrice * b.stockQty), 0);
     const retailVal = items.reduce((a, b) => a + (b.retailPrice * b.stockQty), 0);
-    const mrpVal = items.reduce((a, b) => a + ((b.mrp || b.retailPrice * 1.05) * b.stockQty), 0);
+    const mrpVal = items.reduce((a, b) => a + ((b.mrp ?? 0) * b.stockQty), 0);
     
     const fineWt = cat === 'gold' 
       ? items.reduce((a, b) => a + (b.netWeight * (b.purityPercent / 100) * b.stockQty), 0)
@@ -471,7 +419,7 @@ export const StockValuationView: React.FC<StockValuationViewProps> = ({
       <div className="page-hdr">
         <div className="page-hdr-left">
           <h1>Stock & Valuation</h1>
-          <p>Marked-to-market bullion valuation across 24K, 22K, 18K, 14K Gold, 999 Pure Silver, and 925 Sterling Silver</p>
+          <p>Category totals, low stock and purity valuation</p>
         </div>
         <div className="btn-group">
           <button 
@@ -1148,3 +1096,4 @@ export const StockValuationView: React.FC<StockValuationViewProps> = ({
     </div>
   );
 };
+

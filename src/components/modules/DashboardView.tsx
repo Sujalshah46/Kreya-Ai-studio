@@ -3,7 +3,44 @@ import {
   TrendingUp, ShoppingCart, Activity, AlertTriangle, CreditCard, Users, 
   Package, Clock, Wrench, Calendar, ChevronDown, User, FileText, ChevronRight
 } from 'lucide-react';
-import { SalesInvoice, GirviLoan, RepairOrder, InventoryItem, DailyRates, StoreProfile, Customer } from '../../types';
+import { SalesInvoice, GirviLoan, RepairOrder, InventoryItem, DailyRates, StoreProfile, Customer, MetalBooking } from '../../types';
+
+const businessDate = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+});
+const orderDateLabel = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC'
+});
+const monthLabel = new Intl.DateTimeFormat('en-GB', {
+  month: 'short', year: 'numeric', timeZone: 'UTC'
+});
+const moneyFormat = new Intl.NumberFormat('en-IN');
+const otherPaymentColors = ['#537b9c', '#946787', '#797f49'];
+
+function dateKey(value?: string): string | undefined {
+  if (!value) return undefined;
+  // Date-only and local datetime values already represent the shop calendar.
+  const localDate = value.match(/^(\d{4}-\d{2}-\d{2})(?:$|[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$)/);
+  const date = new Date(localDate ? localDate[1] + 'T00:00:00Z' : value);
+  if (!Number.isFinite(date.getTime())) return undefined;
+  return localDate ? date.toISOString().slice(0, 10) : businessDate.format(date);
+}
+
+function chartTick(value: number, step: number): string {
+  if (value >= 100000) return '₹' + (step >= 100000 ? Math.round(value / 100000) : value / 100000) + 'L';
+  return '₹' + value / 1000 + 'k';
+}
+
+function donutSlice(start: number, sweep: number): string {
+  const point = (radius: number, angle: number) =>
+    [radius * Math.cos(angle), radius * Math.sin(angle)].join(' ');
+  const outerStart = point(66, start);
+  const outerEnd = point(66, start + sweep);
+  const innerStart = point(42, start);
+  const innerEnd = point(42, start + sweep);
+  const large = sweep > Math.PI ? 1 : 0;
+  return `M ${outerStart} A 66 66 0 ${large} 1 ${outerEnd} L ${innerEnd} A 42 42 0 ${large} 0 ${innerStart} Z`;
+}
 
 interface DashboardViewProps {
   store: StoreProfile;
@@ -13,6 +50,7 @@ interface DashboardViewProps {
   repairs: RepairOrder[];
   inventory: InventoryItem[];
   customers?: Customer[];
+  bookings?: MetalBooking[];
   onNavigate: (module: string) => void;
 }
 
@@ -24,84 +62,139 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   repairs = [],
   inventory = [],
   customers = [],
+  bookings = [],
   onNavigate
 }) => {
-  // Aggregate KPI figures
-  const totalInvoicesCount = invoices.length;
-  const todaySales = invoices.reduce((acc, inv) => acc + (inv.productTotalValue || 0), 0);
-  const monthlyRevenue = invoices.reduce((acc, inv) => acc + (inv.productTotalValue || 0), 0);
-  
-  // Total cash & payments received
-  const allPayments = invoices.flatMap(inv => inv.payments || []);
-  const todayCashIn = allPayments.reduce((acc, p) => acc + (p.amount || 0), 0) || invoices.reduce((acc, inv) => acc + (inv.paidAmount || 0), 0);
-  const totalOutstanding = invoices.reduce((acc, inv) => acc + (inv.balanceDue || 0), 0);
+  const today = businessDate.format(new Date());
+  const currentMonth = today.slice(0, 7);
+  const postedInvoices = invoices.filter(invoice =>
+    invoice.status !== 'CANCELLED' && invoice.status !== 'ESTIMATE'
+  );
+  const monthlyInvoices = postedInvoices.filter(invoice => {
+    const date = dateKey(invoice.invoiceDate ?? invoice.date);
+    return date?.slice(0, 7) === currentMonth && date <= today;
+  });
+  const todayInvoices = monthlyInvoices.filter(invoice => dateKey(invoice.invoiceDate ?? invoice.date) === today);
+  const todaySales = todayInvoices.reduce((total, invoice) => total + invoice.productTotalValue, 0);
+  const monthlyRevenue = monthlyInvoices.reduce((total, invoice) => total + invoice.productTotalValue, 0);
+  const totalOutstanding = postedInvoices.reduce((total, invoice) => total + invoice.balanceDue, 0);
 
-  const loanPortfolio = loans.reduce((acc, l) => acc + (l.principalDue || 0), 0);
-  const customerCount = customers.length > 0 ? customers.length : 2;
-  const openGoldWeight = 0.000;
-  const openSilverWeight = 0.000;
-  const pendingDelivery = invoices.filter(i => i.deliveryStatus === 'PENDING_COLLECTION').length || 1;
-  const pendingRepairs = repairs.filter(r => r.status !== 'delivered' && r.status !== 'DELIVERED').length;
-  const openBookings = 0;
-  const inventoryItemsCount = inventory.length > 0 ? inventory.length : 1;
+  const openLoans = loans.filter(loan => ['ACTIVE', 'OVERDUE', 'OPEN'].includes(loan.status.toUpperCase()));
+  const loanPortfolio = openLoans.reduce((total, loan) => total + loan.principalDue, 0);
+  const customerCount = customers.length;
+  const openGoldWeight = 0;
+  const openSilverWeight = 0;
+  const pendingDelivery = postedInvoices.filter(invoice => invoice.deliveryStatus === 'PENDING_COLLECTION').length;
+  const pendingRepairs = repairs.filter(repair => repair.status.toLowerCase() !== 'delivered').length;
+  const openBookings = bookings.filter(booking => ['ACTIVE', 'OPEN'].includes(booking.status.toUpperCase())).length;
+  const inventoryItemsCount = inventory.length;
 
   // Rate values for today
   const rate24k = rates.gold24kPer10g || (rates.gold24kPerGram ? rates.gold24kPerGram * 10 : 150000);
   const rate22k = rates.gold22kPer10g || (rates.gold22kPerGram ? rates.gold22kPerGram * 10 : Math.round(rate24k * 0.916));
   const rate18k = rates.gold18kPer10g || (rates.gold18kPerGram ? rates.gold18kPerGram * 10 : Math.round(rate24k * 0.75));
 
-  // Payment modes breakdown
-  const paymentModeMap: Record<string, number> = {};
-  allPayments.forEach(p => {
-    const m = (p.mode || 'CASH').toUpperCase();
-    paymentModeMap[m] = (paymentModeMap[m] || 0) + (p.amount || 0);
-  });
-  if (Object.keys(paymentModeMap).length === 0 && todayCashIn > 0) {
-    paymentModeMap['UPI'] = 100000;
-    paymentModeMap['CASH'] = 10000;
+  // Use dated invoice records for the chart and never substitute demo chart values.
+  const todayUtc = new Date(today + 'T00:00:00Z');
+  const firstMonth = new Date(todayUtc);
+  firstMonth.setUTCDate(1);
+  firstMonth.setUTCMonth(firstMonth.getUTCMonth() - 11);
+  const firstMonthKey = firstMonth.toISOString().slice(0, 7);
+  const paymentStart = new Date(todayUtc);
+  paymentStart.setUTCDate(paymentStart.getUTCDate() - 29);
+  const paymentStartKey = paymentStart.toISOString().slice(0, 10);
+  const months = new Map<string, { revenue: number; collected: number }>();
+  const paymentModes = new Map<string, number>();
+  const monthTotals = (date: string) => {
+    const key = date.slice(0, 7);
+    const totals = months.get(key) ?? { revenue: 0, collected: 0 };
+    months.set(key, totals);
+    return totals;
+  };
+
+  let todayCashIn = 0;
+  for (const invoice of invoices) {
+    const invoiceDate = dateKey(invoice.invoiceDate ?? invoice.date);
+    if (invoiceDate && invoiceDate <= today && invoiceDate.slice(0, 7) >= firstMonthKey &&
+        invoice.status !== 'CANCELLED' && invoice.status !== 'ESTIMATE' && Number.isFinite(invoice.productTotalValue)) {
+      monthTotals(invoiceDate).revenue += invoice.productTotalValue;
+    }
+    const payments = invoice.paymentTransactions?.length ? invoice.paymentTransactions : invoice.payments ?? [];
+    for (const payment of payments) {
+      const date = dateKey(payment.date) ?? dateKey(payment.timestamp);
+      if (!date || date > today || !Number.isFinite(payment.amount) || payment.amount <= 0) continue;
+      if (date === today) todayCashIn += payment.amount;
+      if (date.slice(0, 7) >= firstMonthKey) monthTotals(date).collected += payment.amount;
+      const mode = payment.mode?.trim().toUpperCase();
+      if (mode && date >= paymentStartKey) paymentModes.set(mode, (paymentModes.get(mode) ?? 0) + payment.amount);
+    }
   }
-  const totalPaymentSum = Object.values(paymentModeMap).reduce((a, b) => a + b, 0) || 1;
-  const paymentBreakdown = Object.entries(paymentModeMap).map(([mode, amt]) => ({
-    mode: mode === 'CASH' ? 'Cash' : mode,
-    amount: amt,
-    percent: Math.round((amt / totalPaymentSum) * 100)
-  })).sort((a, b) => b.amount - a.amount);
+
+  const chartMonths = [...months.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const highest = Math.max(0, ...chartMonths.flatMap(([, totals]) => [totals.revenue, totals.collected]));
+  const tickUnit = highest >= 100000 ? 50000 : 1000;
+  const step = Math.max(tickUnit, Math.ceil(highest / 4 / tickUnit) * tickUnit);
+  const ticks = [0, 1, 2, 3, 4].map(index => index * step);
+  const plotRef = React.useRef<HTMLDivElement>(null);
+  const [plotWidth, setPlotWidth] = React.useState(453);
+  React.useLayoutEffect(() => {
+    const element = plotRef.current;
+    if (!element) return;
+    const measure = () => setPlotWidth(Math.max(72, element.clientWidth));
+    const observer = new ResizeObserver(measure);
+    measure();
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  const plotRight = plotWidth - 8;
+  const chartCenter = (50 + plotRight) / 2;
+  const chartX = (index: number) => chartMonths.length === 1
+    ? chartCenter
+    : 50 + index * (plotRight - 50) / (chartMonths.length - 1);
+  const chartY = (amount: number) => 183 - amount / (4 * step) * 178;
+  const totalPaymentSum = [...paymentModes.values()].reduce((sum, amount) => sum + amount, 0);
+  let angle = 0;
+  let otherColorIndex = 0;
+  const paymentBreakdown = [...paymentModes.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([mode, amount]) => {
+      const sweep = 2 * Math.PI * amount / totalPaymentSum;
+      const gap = Math.min(2 * Math.PI / 180, sweep / 3);
+      const path = donutSlice(angle, sweep - gap);
+      angle += sweep;
+      return {
+        mode: mode === 'CASH' ? 'Cash' : mode,
+        amount,
+        percent: Math.round(amount / totalPaymentSum * 100),
+        color: mode === 'UPI' ? '#237a57' : mode === 'CASH' ? '#c5a46d' : otherPaymentColors[otherColorIndex++ % otherPaymentColors.length],
+        path
+      };
+    });
 
   // Top customers by purchase
   const customerSpendMap = new Map<string, { name: string; phone: string; total: number; orders: number }>();
-  invoices.forEach(inv => {
-    const custName = inv.customer?.name || 'Pakshal';
-    const custPhone = inv.customer?.mobile || '9876543210';
-    const existing = customerSpendMap.get(custName) || { name: custName, phone: custPhone, total: 0, orders: 0 };
+  postedInvoices.forEach(inv => {
+    const custName = inv.customer?.name || 'Unknown customer';
+    const custPhone = inv.customer?.mobile || '';
+    const key = inv.customer?.id || custName;
+    const existing = customerSpendMap.get(key) || { name: custName, phone: custPhone, total: 0, orders: 0 };
     existing.total += (inv.productTotalValue || 0);
     existing.orders += 1;
-    customerSpendMap.set(custName, existing);
+    customerSpendMap.set(key, existing);
   });
-  if (customerSpendMap.size === 0) {
-    customerSpendMap.set('Pakshal', { name: 'Pakshal', phone: '9876543210', total: 196532, orders: 1 });
-  }
-  const topCustomers = Array.from(customerSpendMap.values()).sort((a, b) => b.total - a.total);
+  const topCustomers = [...customerSpendMap.values()].sort((a, b) => b.total - a.total).slice(0, 10);
   const maxCustomerSpend = topCustomers[0]?.total || 1;
-
-  // Recent orders list
-  const recentOrders = invoices.length > 0 ? invoices.slice(0, 5) : [
-    {
-      id: 'inv-1',
-      invoiceNo: 'INV-2026-00001',
-      customer: { name: 'Pakshal' },
-      date: '15 Nov 2026',
-      productTotalValue: 196532,
-      status: 'partially paid'
-    }
-  ];
+  const recentOrders = [...postedInvoices].sort((a, b) =>
+    (dateKey(b.invoiceDate ?? b.date) ?? '').localeCompare(dateKey(a.invoiceDate ?? a.date) ?? '')
+  ).slice(0, 5);
 
   return (
-    <div className="flex flex-col gap-[14px]">
+    <>
       
       {/* 1. Licence Expiration Warning Banner Matching Screenshot */}
-      <div className="license-banner rounded-lg" style={{ background: '#fef8ee', borderColor: '#fde68a', borderWidth: 1 }}>
+      <div className="license-banner" role="status" style={{ background: '#fef8ee' }}>
         <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-        <span className="flex-1">Licence expires in 30 days (15-Dec-2026). Contact Kreya IT Consulting to renew.</span>
+        <span className="flex-1">Licence status is unavailable. Open Licence for verification details.</span>
         <button 
           onClick={() => onNavigate('licence')}
           className="font-semibold text-amber-900 hover:text-amber-950 cursor-pointer flex items-center gap-1 text-xs"
@@ -111,6 +204,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </button>
       </div>
 
+      <div className="page dash">
       {/* 2. TODAY'S RATES Strip Matching Original Software */}
       <div 
         className="dash-rates"
@@ -183,49 +277,49 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* TODAY'S SALES */}
         <div className="kpi-card" onClick={() => onNavigate('orders')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">TODAY'S SALES</span>
+            <span className="kpi-label">Today's Sales</span>
             <div className="kpi-ico good">
               <ShoppingCart className="w-4 h-4" />
             </div>
           </div>
           <div>
             <div className="kpi-value">₹{todaySales.toLocaleString('en-IN')}</div>
-            <div className="kpi-sub">{totalInvoicesCount} invoices today</div>
+            <div className="kpi-sub">{todayInvoices.length} invoices today</div>
           </div>
         </div>
 
         {/* MONTHLY REVENUE */}
         <div className="kpi-card" onClick={() => onNavigate('orders')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">MONTHLY REVENUE</span>
+            <span className="kpi-label">Monthly Revenue</span>
             <div className="kpi-ico">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
           <div>
             <div className="kpi-value">₹{monthlyRevenue.toLocaleString('en-IN')}</div>
-            <div className="kpi-sub">{totalInvoicesCount} orders this month</div>
+            <div className="kpi-sub">{monthlyInvoices.length} orders this month</div>
           </div>
         </div>
 
         {/* TODAY'S CASH IN */}
         <div className="kpi-card" onClick={() => onNavigate('payments')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">TODAY'S CASH IN</span>
+            <span className="kpi-label">Today's Cash In</span>
             <div className="kpi-ico good">
               <Activity className="w-4 h-4" />
             </div>
           </div>
           <div>
             <div className="kpi-value">₹{todayCashIn.toLocaleString('en-IN')}</div>
-            <div className="kpi-sub">Cash/UPI/card received, less refunds</div>
+            <div className="kpi-sub">Receipts recorded against invoices</div>
           </div>
         </div>
 
         {/* OUTSTANDING */}
         <div className="kpi-card" onClick={() => onNavigate('payments')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">OUTSTANDING</span>
+            <span className="kpi-label">Outstanding</span>
             <div className="kpi-ico">
               <AlertTriangle className="w-4 h-4" />
             </div>
@@ -240,11 +334,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* 4. Middle Row: Monthly Revenue & Payment Modes Charts */}
       <div 
         className="dash-row"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '2fr 1fr',
-          gap: '14px'
-        }}
       >
         {/* Monthly Revenue & Collections Panel with Real Area Chart */}
         <section 
@@ -268,7 +357,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               borderBottom: '1px solid #f0f2ef'
             }}
           >
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', fontWeight: 600, color: '#202522' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 650, color: '#202522' }}>
               <TrendingUp className="w-4 h-4 text-[#237a57]" />
               <span>Monthly Revenue & Collections</span>
             </h3>
@@ -276,12 +365,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="dash-panel-body" style={{ padding: '14px 18px', flex: 1 }}>
-            <div className="recharts-responsive-container" style={{ width: '100%', height: '240px', minWidth: 0, position: 'relative' }}>
+            <div ref={plotRef} className="recharts-responsive-container" style={{ width: '100%', height: '240px', minWidth: 0, position: 'relative' }}>
               <svg 
                 className="recharts-surface" 
                 width="100%" 
                 height="100%" 
-                viewBox="0 0 710 240" 
+                viewBox={`0 0 ${plotWidth} 240`} 
                 style={{ width: '100%', height: '100%', overflow: 'visible' }}
               >
                 <defs>
@@ -295,70 +384,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </linearGradient>
                 </defs>
 
-                {/* Grid horizontal lines */}
-                <g className="recharts-cartesian-grid">
-                  <line strokeDasharray="3 3" stroke="#e5e8e4" x1="50" y1="183" x2="702" y2="183" />
-                  <line strokeDasharray="3 3" stroke="#e5e8e4" x1="50" y1="138.5" x2="702" y2="138.5" />
-                  <line strokeDasharray="3 3" stroke="#e5e8e4" x1="50" y1="94" x2="702" y2="94" />
-                  <line strokeDasharray="3 3" stroke="#e5e8e4" x1="50" y1="49.5" x2="702" y2="49.5" />
-                  <line strokeDasharray="3 3" stroke="#e5e8e4" x1="50" y1="5" x2="702" y2="5" />
-                </g>
-
-                {/* X-Axis */}
-                <g className="xAxis">
-                  <text fontSize="11" x="376" y="202" textAnchor="middle" fill="#89918b">
-                    Nov 2026
+                {ticks.map(value => (
+                  <g key={value}>
+                    <line strokeDasharray="3 3" stroke="#e5e8e4" x1="50" y1={chartY(value)} x2={plotRight} y2={chartY(value)} />
+                    <text fontSize="11" x="42" y={chartY(value) + 4} textAnchor="end" fill="#89918b">{chartTick(value, step)}</text>
+                  </g>
+                ))}
+                {chartMonths.map(([month], index) => (
+                  <text key={month} fontSize="11" x={chartX(index)} y="202" textAnchor="middle" fill="#89918b">
+                    {monthLabel.format(new Date(month + '-01T00:00:00Z'))}
                   </text>
-                </g>
-
-                {/* Y-Axis */}
-                <g className="yAxis">
-                  <text fontSize="11" x="42" y="186" textAnchor="end" fill="#89918b">₹0k</text>
-                  <text fontSize="11" x="42" y="142" textAnchor="end" fill="#89918b">₹50k</text>
-                  <text fontSize="11" x="42" y="97" textAnchor="end" fill="#89918b">₹1L</text>
-                  <text fontSize="11" x="42" y="53" textAnchor="end" fill="#89918b">₹2L</text>
-                  <text fontSize="11" x="42" y="12" textAnchor="end" fill="#89918b">₹2L</text>
-                </g>
-
-                {/* Revenue Area (Emerald) */}
-                <path 
-                  d="M 50,183 L 376,8.08 L 702,183 Z" 
-                  fill="url(#gRev)" 
-                />
-                <path 
-                  d="M 50,183 L 376,8.08 L 702,183" 
-                  fill="none" 
-                  stroke="#237a57" 
-                  strokeWidth="2.5" 
-                />
-                <circle 
-                  cx="376" 
-                  cy="8.08" 
-                  r="4" 
-                  stroke="#237a57" 
-                  strokeWidth="2" 
-                  fill="#ffffff" 
-                />
-
-                {/* Collections Area (Champagne Gold) */}
-                <path 
-                  d="M 50,183 L 376,85.1 L 702,183 Z" 
-                  fill="url(#gCol)" 
-                />
-                <path 
-                  d="M 50,183 L 376,85.1 L 702,183" 
-                  fill="none" 
-                  stroke="#c5a46d" 
-                  strokeWidth="2.5" 
-                />
-                <circle 
-                  cx="376" 
-                  cy="85.1" 
-                  r="4" 
-                  stroke="#c5a46d" 
-                  strokeWidth="2" 
-                  fill="#ffffff" 
-                />
+                ))}
+                {([
+                  { key: 'revenue', label: 'Revenue', color: '#237a57', gradient: 'gRev' },
+                  { key: 'collected', label: 'Collected', color: '#c5a46d', gradient: 'gCol' }
+                ] as const).map(series => {
+                  const points = chartMonths.map(([month, totals], index) => ({
+                    month, amount: totals[series.key], x: chartX(index), y: chartY(totals[series.key])
+                  }));
+                  const line = points.map(({ x, y }) => `${x},${y}`).join(' L ');
+                  return (
+                    <g key={series.key}>
+                      {points.length > 1 && (
+                        <>
+                          <path d={`M ${points[0].x},183 L ${line} L ${points[points.length - 1].x},183 Z`} fill={`url(#${series.gradient})`} />
+                          <path d={`M ${line}`} fill="none" stroke={series.color} strokeWidth="2" />
+                        </>
+                      )}
+                      {points.map(point => (
+                        <circle key={point.month} cx={point.x} cy={point.y} r="3" fill={series.color}>
+                          <title>{`${series.label}: ₹${moneyFormat.format(point.amount)}`}</title>
+                        </circle>
+                      ))}
+                    </g>
+                  );
+                })}
+                {chartMonths.length === 0 && (
+                  <text x={chartCenter} y="100" textAnchor="middle" fill="#89918b">No revenue or collections in this period.</text>
+                )}
               </svg>
 
               {/* Bottom Chart Legend */}
@@ -376,11 +439,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#237a57', display: 'inline-block' }} />
-                  <span style={{ color: '#237a57', fontWeight: 500 }}>Revenue (₹{monthlyRevenue.toLocaleString('en-IN')})</span>
+                  <span style={{ color: '#237a57', fontWeight: 500 }}>Revenue</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#c5a46d', display: 'inline-block' }} />
-                  <span style={{ color: '#c5a46d', fontWeight: 500 }}>Collected (₹{todayCashIn.toLocaleString('en-IN')})</span>
+                  <span style={{ color: '#c5a46d', fontWeight: 500 }}>Collected</span>
                 </div>
               </div>
             </div>
@@ -409,28 +472,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               borderBottom: '1px solid #f0f2ef'
             }}
           >
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', fontWeight: 600, color: '#202522' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 650, color: '#202522' }}>
               <Clock className="w-4 h-4 text-[#c5a46d]" />
               <span>Payment Modes</span>
             </h3>
             <span className="helper" style={{ fontSize: '11.5px', color: '#89918b', margin: 0 }}>30 days</span>
           </div>
 
-          <div className="dash-panel-body" style={{ padding: '14px 18px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            {/* SVG Donut Chart Matching Live Production Exactly */}
-            <div style={{ width: '100%', height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="150" height="140" viewBox="0 0 150 140">
-                {/* UPI Slice (91% - Emerald #237a57) */}
-                <path 
-                  d="M 75,10 A 60,60 0 1,1 18,102 L 35,93 A 40,40 0 1,0 75,30 Z" 
-                  fill="#237a57" 
-                />
-                {/* Cash Slice (9% - Champagne Gold #c5a46d) */}
-                <path 
-                  d="M 18,102 A 60,60 0 0,1 75,10 L 75,30 A 40,40 0 0,0 35,93 Z" 
-                  fill="#c5a46d" 
-                />
-              </svg>
+          <div className="dash-panel-body" style={{ padding: '14px 18px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ width: '100%', height: '150px', display: 'grid', placeItems: 'center' }}>
+              {paymentBreakdown.length ? (
+                <svg width="100%" height="150" viewBox="-70 -75 140 150" role="img" aria-label="Payment modes over the last 30 days">
+                  {paymentBreakdown.length === 1 ? (
+                    <circle r="54" fill="none" stroke={paymentBreakdown[0].color} strokeWidth="24" />
+                  ) : paymentBreakdown.map(payment => (
+                    <path key={payment.mode} d={payment.path} fill={payment.color}>
+                      <title>{`${payment.mode}: ₹${moneyFormat.format(payment.amount)}`}</title>
+                    </path>
+                  ))}
+                </svg>
+              ) : <span className="helper">No payments in this period.</span>}
             </div>
 
             {/* Breakdown Rows Matching Screenshot */}
@@ -442,7 +503,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       width: '8px', 
                       height: '8px', 
                       borderRadius: '2px', 
-                      background: p.mode === 'Cash' ? '#c5a46d' : '#237a57', 
+                      background: p.color, 
                       flexShrink: 0 
                     }} 
                   />
@@ -461,23 +522,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* 5. 8 Operational Metric Boxes (.dash-kpis.small) */}
       <div className="dash-kpis small">
         {/* LOAN PORTFOLIO */}
-        <div className="kpi-card" onClick={() => onNavigate('loans')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card small" onClick={() => onNavigate('loans')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">LOAN PORTFOLIO</span>
+            <span className="kpi-label">Loan Portfolio</span>
             <div className="kpi-ico">
               <CreditCard className="w-3.5 h-3.5" />
             </div>
           </div>
           <div>
             <div className="kpi-value">₹{loanPortfolio.toLocaleString('en-IN')}</div>
-            <div className="kpi-sub">0 open loans</div>
+            <div className="kpi-sub">{openLoans.length} open loans</div>
           </div>
         </div>
 
         {/* CUSTOMERS */}
-        <div className="kpi-card" onClick={() => onNavigate('customers')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card small" onClick={() => onNavigate('customers')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">CUSTOMERS</span>
+            <span className="kpi-label">Customers</span>
             <div className="kpi-ico">
               <Users className="w-3.5 h-3.5" />
             </div>
@@ -489,9 +550,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* OPEN GOLD */}
-        <div className="kpi-card" onClick={() => onNavigate('metal-stock')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card small" onClick={() => onNavigate('metal-stock')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">OPEN GOLD</span>
+            <span className="kpi-label">Open Gold</span>
             <div className="kpi-ico gold">
               <Package className="w-3.5 h-3.5" />
             </div>
@@ -503,9 +564,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* OPEN SILVER */}
-        <div className="kpi-card" onClick={() => onNavigate('metal-stock')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card small" onClick={() => onNavigate('metal-stock')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">OPEN SILVER</span>
+            <span className="kpi-label">Open Silver</span>
             <div className="kpi-ico">
               <Package className="w-3.5 h-3.5" />
             </div>
@@ -517,9 +578,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* PENDING DELIVERY */}
-        <div className="kpi-card" onClick={() => onNavigate('orders')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card small" onClick={() => onNavigate('orders')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">PENDING DELIVERY</span>
+            <span className="kpi-label">Pending Delivery</span>
             <div className="kpi-ico">
               <Clock className="w-3.5 h-3.5" />
             </div>
@@ -531,9 +592,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* PENDING REPAIRS */}
-        <div className="kpi-card" onClick={() => onNavigate('repairs')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card small" onClick={() => onNavigate('repairs')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">PENDING REPAIRS</span>
+            <span className="kpi-label">Pending Repairs</span>
             <div className="kpi-ico">
               <Wrench className="w-3.5 h-3.5" />
             </div>
@@ -545,9 +606,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* OPEN BOOKINGS */}
-        <div className="kpi-card" onClick={() => onNavigate('metal-booking')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card small" onClick={() => onNavigate('metal-booking')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">OPEN BOOKINGS</span>
+            <span className="kpi-label">Open Bookings</span>
             <div className="kpi-ico">
               <Calendar className="w-3.5 h-3.5" />
             </div>
@@ -559,9 +620,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* INVENTORY ITEMS */}
-        <div className="kpi-card" onClick={() => onNavigate('inventory')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card small" onClick={() => onNavigate('inventory')} style={{ cursor: 'pointer' }}>
           <div className="kpi-top">
-            <span className="kpi-label">INVENTORY ITEMS</span>
+            <span className="kpi-label">Inventory Items</span>
             <div className="kpi-ico">
               <Package className="w-3.5 h-3.5" />
             </div>
@@ -576,11 +637,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* 6. 3 Bottom Cards (.dash-row.even) */}
       <div 
         className="dash-row even"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: '14px'
-        }}
       >
         {/* Top 10 Customers Panel */}
         <section 
@@ -604,7 +660,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               borderBottom: '1px solid #f0f2ef'
             }}
           >
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', fontWeight: 600, color: '#202522' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 650, color: '#202522' }}>
               <User className="w-4 h-4 text-emerald-700" />
               <span>Top 10 Customers</span>
             </h3>
@@ -702,7 +758,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               borderBottom: '1px solid #f0f2ef'
             }}
           >
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', fontWeight: 600, color: '#202522' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 650, color: '#202522' }}>
               <FileText className="w-4 h-4 text-emerald-700" />
               <span>Recent Orders</span>
             </h3>
@@ -723,18 +779,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="mono" style={{ fontWeight: 600, color: '#202522', fontSize: '13px' }}>
-                    {ord.invoiceNo || 'INV-2026-00001'}
+                    {ord.invoiceNo || ord.invoiceNumber || '—'}
                   </div>
                   <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#5f6661', fontSize: '12.5px' }}>
-                    {ord.customer?.name || 'Pakshal'}
+                    {ord.customer?.name || 'Unknown customer'}
                   </div>
                   <div style={{ fontSize: '11.5px', color: '#89918b', marginTop: '1px' }}>
-                    {ord.date || '15 Nov 2026'}
+                    {dateKey(ord.invoiceDate ?? ord.date) ? orderDateLabel.format(new Date(dateKey(ord.invoiceDate ?? ord.date)! + 'T00:00:00Z')) : '—'}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: '#202522' }}>
-                    ₹{(ord.productTotalValue || 196532).toLocaleString('en-IN')}
+                    ₹{moneyFormat.format(ord.productTotalValue)}
                   </div>
                   <span 
                     className="badge badge-yellow" 
@@ -749,7 +805,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       color: '#92400e'
                     }}
                   >
-                    partially paid
+                    {ord.status.toLowerCase().replace(/_/g, ' ')}
                   </span>
                 </div>
               </div>
@@ -779,17 +835,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               borderBottom: '1px solid #f0f2ef'
             }}
           >
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', fontWeight: 600, color: '#202522' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 650, color: '#202522' }}>
               <CreditCard className="w-4 h-4 text-emerald-700" />
-              <span>Open Loans (0)</span>
+              <span>Open Loans ({openLoans.length})</span>
             </h3>
           </div>
           <div className="dash-panel-body dash-empty" style={{ padding: '24px 18px', textAlign: 'center', color: '#89918b', fontSize: '13px' }}>
-            <p>No open loans.</p>
+            {openLoans.length === 0 ? <p>No open loans.</p> : openLoans.slice(0, 5).map(loan => (
+              <div className="dash-list-row justify-between" key={loan.id}>
+                <span>{loan.loanNo}</span>
+                <span>₹{moneyFormat.format(loan.principalDue)}</span>
+              </div>
+            ))}
           </div>
         </section>
       </div>
 
-    </div>
+      </div>
+    </>
   );
 };

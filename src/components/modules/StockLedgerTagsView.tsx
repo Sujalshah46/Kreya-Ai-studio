@@ -244,6 +244,8 @@ E
 
   const [activeMainTab, setActiveMainTab] = useState<'ledger' | 'stock_report' | 'print_tags'>('ledger');
   const [ledgerSearch, setLedgerSearch] = useState('');
+  const [ledgerFromDate, setLedgerFromDate] = useState('');
+  const [ledgerToDate, setLedgerToDate] = useState('');
 
   // Ledger entries derived from items
   const ledgerEntries = React.useMemo(() => {
@@ -318,10 +320,14 @@ E
     return list;
   }, [tagItems]);
 
-  const filteredLedger = ledgerEntries.filter(e => {
-    if (!ledgerSearch) return true;
-    const q = ledgerSearch.toLowerCase();
-    return e.itemCode.toLowerCase().includes(q) || e.itemName.toLowerCase().includes(q) || e.voucherNo.toLowerCase().includes(q);
+  const ledgerQuery = ledgerSearch.trim().toLowerCase();
+  const filteredLedger = ledgerEntries.filter(entry => {
+    const entryDate = entry.date.slice(0, 10);
+    const withinDateRange = (!ledgerFromDate || entryDate >= ledgerFromDate) &&
+      (!ledgerToDate || entryDate <= ledgerToDate);
+    const matchesSearch = !ledgerQuery || [entry.itemCode, entry.itemName, entry.voucherNo]
+      .some(field => field.toLowerCase().includes(ledgerQuery));
+    return withinDateRange && matchesSearch;
   });
 
   // Stock summary calculation
@@ -470,7 +476,7 @@ E
           className={`tab ${activeMainTab === 'ledger' ? 'active' : ''}`}
           onClick={() => setActiveMainTab('ledger')}
         >
-          Ledger ({ledgerEntries.length})
+          Ledger
         </button>
         <button 
           type="button"
@@ -484,24 +490,44 @@ E
           className={`tab ${activeMainTab === 'print_tags' ? 'active' : ''}`}
           onClick={() => setActiveMainTab('print_tags')}
         >
-          Print tags ({tagItems.length})
+          Print tags
         </button>
       </div>
 
       {/* TAB 1: LEDGER */}
       {activeMainTab === 'ledger' && (
         <div className="card">
-          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="card-title">Stock Transaction Ledger</span>
-            <div className="search-box" style={{ width: 260 }}>
+          <div className="card-header" style={{ justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+            <div className="search-box" style={{ flex: '1 1 240px' }}>
               <Search size={14} style={{ color: 'var(--muted)' }} />
-              <input 
-                type="text"
+              <input
+                type="search"
+                aria-label="Search stock ledger"
                 placeholder="Search voucher, item..."
                 value={ledgerSearch}
-                onChange={e => setLedgerSearch(e.target.value)}
+                onChange={event => setLedgerSearch(event.target.value)}
               />
             </div>
+            <label className="helper" style={{ margin: 0 }}>
+              From
+              <input
+                className="input input-sm"
+                type="date"
+                value={ledgerFromDate}
+                max={ledgerToDate || undefined}
+                onChange={event => setLedgerFromDate(event.target.value)}
+              />
+            </label>
+            <label className="helper" style={{ margin: 0 }}>
+              To
+              <input
+                className="input input-sm"
+                type="date"
+                value={ledgerToDate}
+                min={ledgerFromDate || undefined}
+                onChange={event => setLedgerToDate(event.target.value)}
+              />
+            </label>
           </div>
           <div className="tbl-wrap">
             <table className="tbl">
@@ -521,6 +547,11 @@ E
                 </tr>
               </thead>
               <tbody>
+                {filteredLedger.length === 0 && (
+                  <tr>
+                    <td colSpan={11} className="empty">No stock movements match the selected filters.</td>
+                  </tr>
+                )}
                 {filteredLedger.map(entry => (
                   <tr key={entry.id}>
                     <td className="mono" style={{ fontSize: 12 }}>{entry.date}</td>
@@ -1224,3 +1255,4 @@ E
     </div>
   );
 };
+

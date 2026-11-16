@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { readPreviewPreferences, savePreviewPreferences } from './previewPreferences';
 import { 
   Building2, Save, Check, FileText, Scale, Lock, Calculator, 
   ShieldCheck, CheckCircle2, AlertTriangle, Coins, Receipt, CreditCard,
@@ -28,97 +29,123 @@ export const BusinessSettingsView: React.FC<BusinessSettingsViewProps> = ({
   onNavigate
 }) => {
   const [activeTab, setActiveTab] = useState<BusinessTab>('gst');
-  const [saved, setSaved] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+
+  const storageKey = 'kreya:business-settings:' + store.id;
+  const [initial] = useState(() => readPreviewPreferences(storageKey, {
+    defaultGoldHsn: '7113',
+    defaultSilverHsn: '7113',
+    defaultMakingSac: '998719',
+    gstRateJewellery: '3.0',
+    gstRateMaking: '18.0',
+    ewayBillThreshold: '200000',
+    reverseChargeEnabled: false,
+    roundingMethod: 'nearest-rupee',
+    invoiceCopyCount: '2',
+    invoiceTerms: store.invoiceTerms ?? '1. Subject to Mumbai jurisdiction only.\n2. Goods once sold will not be taken back without original cash memo.\n3. Making charges and GST are not refundable under any return or exchange.\n4. Gold purity guaranteed as hallmarked by BIS HUID.',
+    showHuidOnPrint: true,
+    showBreakupOnPrint: true,
+    buybackGoldDeduction: '2.0',
+    buybackSilverDeduction: '5.0',
+    buybackSameStoreBonus: '100.0',
+    purityTolerance: '0.005',
+    mandateOpeningFloat: true,
+    requireSupervisorPinOnClose: true,
+    varianceToleranceRupees: '50',
+    defaultCreditDays: '30',
+    mandatePoApproval: true,
+    grnWeightTolerance: '0.002',
+    defaultMakingMarkup: '15.0',
+    goldRateBuffer: '50',
+    minDiamondMarkup: '25.0',
+    standardPurities: '24K, 22K, 18K, 14K',
+    hallmarkFeePerPiece: '45',
+    defaultGrossNetRatio: '98.5',
+    cashEnabled: true,
+    upiEnabled: true,
+    cardEnabled: true,
+    bankEnabled: true,
+    oldGoldEnabled: true,
+    creditEnabled: true,
+    chitSchemeEnabled: true,
+  }));
 
   // Tab 1: GST
-  const [defaultGoldHsn, setDefaultGoldHsn] = useState('7113');
-  const [defaultSilverHsn, setDefaultSilverHsn] = useState('7113');
-  const [defaultMakingSac, setDefaultMakingSac] = useState('998719');
-  const [gstRateJewellery, setGstRateJewellery] = useState('3.0');
-  const [gstRateMaking, setGstRateMaking] = useState('18.0');
-  const [ewayBillThreshold, setEwayBillThreshold] = useState('200000');
-  const [reverseChargeEnabled, setReverseChargeEnabled] = useState(false);
+  const [defaultGoldHsn, setDefaultGoldHsn] = useState(initial.defaultGoldHsn);
+  const [defaultSilverHsn, setDefaultSilverHsn] = useState(initial.defaultSilverHsn);
+  const [defaultMakingSac, setDefaultMakingSac] = useState(initial.defaultMakingSac);
+  const [gstRateJewellery, setGstRateJewellery] = useState(initial.gstRateJewellery);
+  const [gstRateMaking, setGstRateMaking] = useState(initial.gstRateMaking);
+  const [ewayBillThreshold, setEwayBillThreshold] = useState(initial.ewayBillThreshold);
+  const [reverseChargeEnabled, setReverseChargeEnabled] = useState(initial.reverseChargeEnabled);
 
   // Tab 2: Invoice
-  const [roundingMethod, setRoundingMethod] = useState('nearest-rupee');
-  const [invoiceCopyCount, setInvoiceCopyCount] = useState('2');
-  const [invoiceTerms, setInvoiceTerms] = useState(
-    '1. Subject to Mumbai jurisdiction only.\n2. Goods once sold will not be taken back without original cash memo.\n3. Making charges and GST are not refundable under any return or exchange.\n4. Gold purity guaranteed as hallmarked by BIS HUID.'
-  );
-  const [showHuidOnPrint, setShowHuidOnPrint] = useState(true);
-  const [showBreakupOnPrint, setShowBreakupOnPrint] = useState(true);
+  const [roundingMethod, setRoundingMethod] = useState(initial.roundingMethod);
+  const [invoiceCopyCount, setInvoiceCopyCount] = useState(initial.invoiceCopyCount);
+  const [invoiceTerms, setInvoiceTerms] = useState(initial.invoiceTerms);
+  const [showHuidOnPrint, setShowHuidOnPrint] = useState(initial.showHuidOnPrint);
+  const [showBreakupOnPrint, setShowBreakupOnPrint] = useState(initial.showBreakupOnPrint);
 
   // Tab 3: Payment modes
   const [enabledModes, setEnabledModes] = useState({
-    cash: true,
-    upi: true,
-    card: true,
-    bank: true,
-    oldGold: true,
-    credit: true,
-    chitScheme: true
+    cash: initial.cashEnabled,
+    upi: initial.upiEnabled,
+    card: initial.cardEnabled,
+    bank: initial.bankEnabled,
+    oldGold: initial.oldGoldEnabled,
+    credit: initial.creditEnabled,
+    chitScheme: initial.chitSchemeEnabled
   });
 
   // Tab 4: Buy-back
-  const [buybackGoldDeduction, setBuybackGoldDeduction] = useState('2.0');
-  const [buybackSilverDeduction, setBuybackSilverDeduction] = useState('5.0');
-  const [buybackSameStoreBonus, setBuybackSameStoreBonus] = useState('100.0');
-  const [purityTolerance, setPurityTolerance] = useState('0.005');
+  const [buybackGoldDeduction, setBuybackGoldDeduction] = useState(initial.buybackGoldDeduction);
+  const [buybackSilverDeduction, setBuybackSilverDeduction] = useState(initial.buybackSilverDeduction);
+  const [buybackSameStoreBonus, setBuybackSameStoreBonus] = useState(initial.buybackSameStoreBonus);
+  const [purityTolerance, setPurityTolerance] = useState(initial.purityTolerance);
 
   // Tab 5: Cash register
-  const [mandateOpeningFloat, setMandateOpeningFloat] = useState(true);
-  const [requireSupervisorPinOnClose, setRequireSupervisorPinOnClose] = useState(true);
-  const [varianceToleranceRupees, setVarianceToleranceRupees] = useState('50');
+  const [mandateOpeningFloat, setMandateOpeningFloat] = useState(initial.mandateOpeningFloat);
+  const [requireSupervisorPinOnClose, setRequireSupervisorPinOnClose] = useState(initial.requireSupervisorPinOnClose);
+  const [varianceToleranceRupees, setVarianceToleranceRupees] = useState(initial.varianceToleranceRupees);
 
   // Tab 6: Purchasing
-  const [defaultCreditDays, setDefaultCreditDays] = useState('30');
-  const [mandatePoApproval, setMandatePoApproval] = useState(true);
-  const [grnWeightTolerance, setGrnWeightTolerance] = useState('0.002');
+  const [defaultCreditDays, setDefaultCreditDays] = useState(initial.defaultCreditDays);
+  const [mandatePoApproval, setMandatePoApproval] = useState(initial.mandatePoApproval);
+  const [grnWeightTolerance, setGrnWeightTolerance] = useState(initial.grnWeightTolerance);
 
   // Tab 7: Pricing & margins
-  const [defaultMakingMarkup, setDefaultMakingMarkup] = useState('15.0');
-  const [goldRateBuffer, setGoldRateBuffer] = useState('50');
-  const [minDiamondMarkup, setMinDiamondMarkup] = useState('25.0');
+  const [defaultMakingMarkup, setDefaultMakingMarkup] = useState(initial.defaultMakingMarkup);
+  const [goldRateBuffer, setGoldRateBuffer] = useState(initial.goldRateBuffer);
+  const [minDiamondMarkup, setMinDiamondMarkup] = useState(initial.minDiamondMarkup);
 
   // Tab 8: Catalogue
-  const [standardPurities, setStandardPurities] = useState('24K, 22K, 18K, 14K');
-  const [hallmarkFeePerPiece, setHallmarkFeePerPiece] = useState('45');
-  const [defaultGrossNetRatio, setDefaultGrossNetRatio] = useState('98.5');
+  const [standardPurities, setStandardPurities] = useState(initial.standardPurities);
+  const [hallmarkFeePerPiece, setHallmarkFeePerPiece] = useState(initial.hallmarkFeePerPiece);
+  const [defaultGrossNetRatio, setDefaultGrossNetRatio] = useState(initial.defaultGrossNetRatio);
 
   const handleSave = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    const persisted = savePreviewPreferences(storageKey, {
+      defaultGoldHsn, defaultSilverHsn, defaultMakingSac, gstRateJewellery, gstRateMaking, ewayBillThreshold, reverseChargeEnabled, roundingMethod, invoiceCopyCount, invoiceTerms, showHuidOnPrint, showBreakupOnPrint, buybackGoldDeduction, buybackSilverDeduction, buybackSameStoreBonus, purityTolerance, mandateOpeningFloat, requireSupervisorPinOnClose, varianceToleranceRupees, defaultCreditDays, mandatePoApproval, grnWeightTolerance, defaultMakingMarkup, goldRateBuffer, minDiamondMarkup, standardPurities, hallmarkFeePerPiece, defaultGrossNetRatio,
+      cashEnabled: enabledModes.cash,
+      upiEnabled: enabledModes.upi,
+      cardEnabled: enabledModes.card,
+      bankEnabled: enabledModes.bank,
+      oldGoldEnabled: enabledModes.oldGold,
+      creditEnabled: enabledModes.credit,
+      chitSchemeEnabled: enabledModes.chitScheme
+    });
     if (onUpdateStore) {
       onUpdateStore({
         ...store,
         invoiceTerms
       });
     }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    setSaveMessage(persisted ? 'Settings saved in this browser.' : 'The browser could not save settings.');
   };
 
   return (
     <div className="page" style={{ padding: '16px 20px', maxWidth: '100%' }}>
-      {/* Licence Banner Parity */}
-      <div 
-        className="license-banner rounded-lg mb-3 flex items-center justify-between p-3" 
-        style={{ background: '#fef8ee', borderColor: '#fde68a', borderWidth: 1 }}
-      >
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-          <span className="text-xs font-medium text-amber-950">
-            ⚠️ Licence expires in 30 days (15-Dec-2026). Contact Kreya IT Consulting to renew.
-          </span>
-        </div>
-        <button 
-          onClick={() => onNavigate ? onNavigate('licence') : (window.location.pathname = '/admin/license')}
-          className="font-semibold text-amber-900 hover:text-amber-950 cursor-pointer flex items-center gap-1 text-xs px-2 py-1 bg-amber-100 hover:bg-amber-200 rounded border border-amber-300 transition-colors"
-        >
-          <span>Licence</span>
-          <span>→</span>
-        </button>
-      </div>
-
       {/* Page Header */}
       <div className="page-hdr" style={{ marginBottom: 14 }}>
         <div className="page-hdr-left">
@@ -150,10 +177,10 @@ export const BusinessSettingsView: React.FC<BusinessSettingsViewProps> = ({
         </div>
       </div>
 
-      {saved && (
+      {saveMessage && (
         <div style={{ padding: 12, background: 'var(--primary-xl)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--primary-d)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
           <CheckCircle2 size={16} />
-          <span style={{ fontWeight: 600 }}>Business settings successfully saved & applied across all POS terminals!</span>
+          <span role="status" style={{ fontWeight: 600 }}>{saveMessage}</span>
         </div>
       )}
 
@@ -605,3 +632,4 @@ export const BusinessSettingsView: React.FC<BusinessSettingsViewProps> = ({
 };
 
 export default BusinessSettingsView;
+

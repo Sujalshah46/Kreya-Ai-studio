@@ -407,7 +407,7 @@ export const DailyMetalRatesView: React.FC<DailyMetalRatesViewProps> = ({
                 onClick={() => setEditConfigModal({ ...config })}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
               >
-                ⚙ Change
+                Change
               </button>
             </span>
           </div>
@@ -444,7 +444,7 @@ export const DailyMetalRatesView: React.FC<DailyMetalRatesViewProps> = ({
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 maxLength={300}
-                placeholder="e.g. Morning opening rates, diwali market"
+                
               />
             </div>
           </div>
@@ -651,6 +651,7 @@ export const DailyMetalRatesView: React.FC<DailyMetalRatesViewProps> = ({
           }}
         >
           <span>{totalRates} rates</span>
+          {totalRates > pageSize && (<>
           <select
             className="input"
             value={pageSize}
@@ -703,8 +704,10 @@ export const DailyMetalRatesView: React.FC<DailyMetalRatesViewProps> = ({
               »
             </button>
           </div>
+          </>)}
         </div>
       </div>
     </div>
   );
 };
+

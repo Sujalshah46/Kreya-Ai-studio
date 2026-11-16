@@ -230,14 +230,14 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
   const [formEmail, setFormEmail] = useState('');
   const [formType, setFormType] = useState('retail');
   const [formOpeningBalance, setFormOpeningBalance] = useState('0');
-  const [formCreditLimit, setFormCreditLimit] = useState('50000');
+  const [formCreditLimit, setFormCreditLimit] = useState('0');
   const [formNotes, setFormNotes] = useState('');
 
   const [formStreet1, setFormStreet1] = useState('');
   const [formStreet2, setFormStreet2] = useState('');
-  const [formCity, setFormCity] = useState('Mumbai');
+  const [formCity, setFormCity] = useState('');
   const [formState, setFormState] = useState(store?.state || 'Maharashtra');
-  const [formPincode, setFormPincode] = useState('400057');
+  const [formPincode, setFormPincode] = useState('');
 
   const [formAadhaar, setFormAadhaar] = useState('');
   const [formPan, setFormPan] = useState('');
@@ -392,14 +392,14 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
     setFormEmail(cust.email || '');
     setFormType((cust.customerType || 'retail').toLowerCase());
     setFormOpeningBalance(((cust as any).opening_balance || cust.outstandingBalance || 0).toString());
-    setFormCreditLimit(((cust as any).credit_limit || (cust as any).creditLimit || 50000).toString());
+    setFormCreditLimit(((cust as any).credit_limit ?? (cust as any).creditLimit ?? 0).toString());
     setFormNotes((cust as any).notes || '');
 
     setFormStreet1((cust as any).street1 || cust.address || '');
     setFormStreet2((cust as any).street2 || '');
-    setFormCity(cust.city || 'Mumbai');
+    setFormCity(cust.city || '');
     setFormState(cust.state || 'Maharashtra');
-    setFormPincode(cust.pincode || '400057');
+    setFormPincode(cust.pincode || '');
 
     setFormAadhaar((cust as any).aadhar_no || cust.aadhaarNumber || '');
     setFormPan((cust as any).pan_no || cust.pan || cust.panNumber || '');
@@ -433,14 +433,14 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
     setFormEmail('');
     setFormType('retail');
     setFormOpeningBalance('0');
-    setFormCreditLimit('50000');
+    setFormCreditLimit('0');
     setFormNotes('');
 
     setFormStreet1('');
     setFormStreet2('');
-    setFormCity('Mumbai');
+    setFormCity('');
     setFormState(store?.state || 'Maharashtra');
-    setFormPincode('400057');
+    setFormPincode('');
 
     setFormAadhaar('');
     setFormPan('');
@@ -566,13 +566,13 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
       phone: cleanMobile(formMobile.trim()),
       phone2: formAltMobile.trim() ? cleanMobile(formAltMobile.trim()) : undefined,
       email: formEmail.trim() || undefined,
-      address: [formStreet1, formStreet2, formCity].filter(Boolean).join(', ') || 'Mumbai',
+      address: [formStreet1, formStreet2, formCity].filter(Boolean).join(', '),
       street1: formStreet1.trim(),
       street2: formStreet2.trim(),
-      city: formCity.trim() || 'Mumbai',
+      city: formCity.trim(),
       state: formState.trim() || 'Maharashtra',
       stateCode: (INDIAN_STATES.find(s => s.name.toLowerCase() === formState.toLowerCase())?.code) || '27',
-      pincode: formPincode.trim() || '400057',
+      pincode: formPincode.trim(),
       customerType: formType,
       pan: formPan.trim().toUpperCase() || undefined,
       panNumber: formPan.trim().toUpperCase() || undefined,
@@ -599,7 +599,7 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
         daughter_mobile: cleanMobile(formDaughterMobile.trim()),
         notes: formNotes.trim(),
         opening_balance: parseFloat(formOpeningBalance) || 0,
-        credit_limit: parseFloat(formCreditLimit) || 50000
+        credit_limit: parseFloat(formCreditLimit) || 0
       }
     };
 
@@ -2418,7 +2418,6 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                           value={formName}
                           onChange={(e) => setFormName(e.target.value)}
                           placeholder="Customer full name"
-                          autoFocus
                         />
                       </div>
                       <div className="form-group">
@@ -2447,7 +2446,7 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                           className="input"
                           value={formAltMobile}
                           onChange={(e) => setFormAltMobile(e.target.value)}
-                          placeholder="10 Digits"
+                          placeholder="10-digit mobile"
                           style={liveAltMobileError ? { borderColor: 'var(--danger)', background: 'var(--danger-l)' } : {}}
                         />
                         {liveAltMobileError && (
@@ -2518,7 +2517,7 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                         rows={2}
                         value={formNotes}
                         onChange={(e) => setFormNotes(e.target.value)}
-                        placeholder="Customer preferences, design notes..."
+                        aria-label="Notes"
                       />
                     </div>
                   </div>
@@ -2627,13 +2626,13 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                     <div className="g2" style={{ marginBottom: 14 }}>
                       <div className="form-group">
                         <label className="label">
-                          Aadhar Number <span className="label-optional">(optional — 12-digit UID)</span>
+                          Aadhar Number <span className="label-optional">(optional)</span>
                         </label>
                         <input
                           className="input"
                           value={formAadhaar}
                           onChange={(e) => setFormAadhaar(e.target.value)}
-                          placeholder="12-digit Aadhaar number"
+                          placeholder="XXXX XXXX XXXX"
                           style={liveAadhaarError && formAadhaar.trim().length > 0 ? { borderColor: 'var(--danger)', background: 'var(--danger-l)' } : {}}
                         />
                         {liveAadhaarError && formAadhaar.trim().length > 0 ? (
@@ -2798,3 +2797,4 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
     </div>
   );
 };
+

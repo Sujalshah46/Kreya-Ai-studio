@@ -40,7 +40,7 @@ export const SecurityView: React.FC<SecurityViewProps> = ({ onNavigate }) => {
         <div className="flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
           <span className="text-xs font-medium text-amber-950">
-            ⚠️ Licence expires in 30 days (15-Dec-2026). Contact Kreya IT Consulting to renew.
+            ⚠️ Licence status is unavailable. Open Licence for verification details.
           </span>
         </div>
         <button 
@@ -58,7 +58,7 @@ export const SecurityView: React.FC<SecurityViewProps> = ({ onNavigate }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <h1 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 20, fontWeight: 700, margin: 0 }}>
               <Shield size={22} style={{ color: 'var(--primary)' }} />
-              Security Settings
+              Security
             </h1>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#fef8ee] text-[#92400e] rounded-full border border-[#efdcb6] text-xs font-semibold shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse" />
@@ -88,7 +88,7 @@ export const SecurityView: React.FC<SecurityViewProps> = ({ onNavigate }) => {
       {saved && (
         <div style={{ padding: 12, background: 'var(--primary-xl)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--primary-d)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
           <CheckCircle2 size={16} />
-          <span style={{ fontWeight: 600 }}>11 Security safeguards & statutory controls successfully saved across all showroom terminals!</span>
+          <span style={{ fontWeight: 600 }}>Security choices recorded for this preview session.</span>
         </div>
       )}
 
@@ -288,8 +288,16 @@ export const SecurityView: React.FC<SecurityViewProps> = ({ onNavigate }) => {
           </div>
         </div>
       </div>
+      <section className="card mt-4">
+        <div className="card-header"><span className="card-title">Activity</span></div>
+        <div className="tbl-wrap"><table className="tbl">
+          <thead><tr>{['When', 'Who', 'Action', 'Record', 'Details', 'IP'].map(column => <th scope="col" key={column}>{column}</th>)}</tr></thead>
+          <tbody><tr><td colSpan={6} className="text-center py-8">No security activity source is connected.</td></tr></tbody>
+        </table></div>
+      </section>
     </div>
   );
 };
 
 export default SecurityView;
+

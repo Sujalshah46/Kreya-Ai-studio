@@ -1,3 +1,4 @@
+import type { PaymentTransaction } from '../../types';
 import React, { useState, useEffect } from 'react';
 import { 
   Wrench, Plus, Search, Printer, FileText, CheckCircle2, 
@@ -11,7 +12,7 @@ export interface RepairsViewProps {
   repairs: RepairOrder[];
   customers: Customer[];
   onSaveRepair: (repair: RepairOrder) => void;
-  onUpdateRepairStatus: (repairId: string, status: RepairStatus, balancePaid?: number) => void;
+  onUpdateRepairStatus: (repairId: string, status: RepairStatus, payment?: PaymentTransaction) => void;
 }
 
 interface NewRepairItemRow {
@@ -418,28 +419,32 @@ export const RepairsView: React.FC<RepairsViewProps> = ({
   const handleConfirmPayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRepair) return;
-    const pAmt = parseFloat(collectAmount) || 0;
-    const newBal = Math.max(0, selectedRepair.balanceDue - pAmt);
+    const amount = Number(collectAmount);
+    const paise = Math.round(amount * 100);
+    if (!Number.isSafeInteger(paise) || paise <= 0 || Math.abs(paise / 100 - amount) > 1e-9 ||
+        paise > Math.round(selectedRepair.balanceDue * 100)) {
+      alert('Enter a valid payment amount that does not exceed the repair balance.');
+      return;
+    }
+    const newBal = (Math.round(selectedRepair.balanceDue * 100) - paise) / 100;
     const newStatus: RepairStatus = newBal === 0 ? 'DELIVERED' : selectedRepair.status;
-
-    onUpdateRepairStatus(selectedRepair.id, newStatus, pAmt);
-
+    const id = crypto.randomUUID();
+    const payment: PaymentTransaction = {
+      id,
+      receiptNo: 'PAY-REC-' + id.slice(0, 8).toUpperCase(),
+      date: new Date().toISOString(),
+      amount,
+      mode: collectMode,
+      referenceNo: collectRef || undefined,
+      collectorName: 'Admin Counter'
+    };
+    onUpdateRepairStatus(selectedRepair.id, newStatus, payment);
     const updated: RepairOrder = {
       ...selectedRepair,
-      advancePaid: selectedRepair.advancePaid + pAmt,
+      advancePaid: Math.round((selectedRepair.advancePaid + amount) * 100) / 100,
       balanceDue: newBal,
       status: newStatus,
-      payments: [
-        ...(selectedRepair.payments || []),
-        {
-          id: `p-${Date.now()}`,
-          receiptNo: `PAY-REC-${Math.floor(1000 + Math.random() * 9000)}`,
-          date: new Date().toISOString().slice(0, 10),
-          amount: pAmt,
-          mode: collectMode,
-          collectorName: 'Admin Counter'
-        }
-      ]
+      payments: [...selectedRepair.payments, payment]
     };
 
     setSelectedRepair(updated);
@@ -1476,4 +1481,5 @@ export const RepairsView: React.FC<RepairsViewProps> = ({
 };
 
 export { RepairsView as RepairOrdersView };
+
 

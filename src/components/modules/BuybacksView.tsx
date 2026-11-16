@@ -540,22 +540,6 @@ export const BuybacksView: React.FC<BuybacksViewProps> = ({
         <div className="btn-group">
           <button
             type="button"
-            className="btn btn-outline"
-            onClick={handleExportCSV}
-            title="Export CSV"
-          >
-            CSV
-          </button>
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={handleExportExcel}
-            title="Export Excel"
-          >
-            Excel
-          </button>
-          <button
-            type="button"
             className="btn btn-primary"
             onClick={() => {
               setShowNewModal(true);
@@ -573,6 +557,22 @@ export const BuybacksView: React.FC<BuybacksViewProps> = ({
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
             New buy-back
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={handleExportCSV}
+            title="Export CSV"
+          >
+            CSV
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={handleExportExcel}
+            title="Export Excel"
+          >
+            Excel
           </button>
         </div>
       </div>
@@ -614,7 +614,8 @@ export const BuybacksView: React.FC<BuybacksViewProps> = ({
               </svg>
               <input
                 type="text"
-                placeholder="Search voucher, customer, invoice..."
+                aria-label="Search vouchers, customers, or invoices"
+                placeholder="Search…"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
@@ -1308,3 +1309,4 @@ export const BuybacksView: React.FC<BuybacksViewProps> = ({
 // Aliased export for compatibility with ReturnsBuybackView
 export const ReturnsBuybackView = BuybacksView;
 export default BuybacksView;
+

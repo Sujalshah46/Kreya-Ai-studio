@@ -29,6 +29,7 @@ export interface StoreProfile {
   email?: string;
   mobile?: string;
   invoicePrefix?: string;
+  upiId?: string;
   printerType?: string;
   huidRegistered?: boolean;
   bisLicenseNo?: string;
@@ -442,12 +443,16 @@ export interface MetalBooking {
   id: string;
   bookingNo: string; // "MB-2026-00008"
   bookingDate?: string;
+  occasion?: string;
+  advanceReceipts?: PaymentTransaction[];
   customer?: Customer;
   customerName?: string;
   customerPhone?: string;
   metalType: 'GOLD' | 'SILVER' | 'GOLD_22K' | 'GOLD_24K' | 'GOLD_18K' | string;
   bookedWeightGrams?: number;
   lockedGrams?: number;
+  lockedGoldGrams?: number;
+  lockedSilverGrams?: number;
   lockedRatePerGram?: number;
   bookedRatePerGram?: number;
   totalContractValue?: number;
@@ -504,6 +509,7 @@ export interface CreditMemoRecord {
   refundMode: string;
   refundStatus: 'pending' | 'issued';
   refundDate?: string;
+  refundReference?: string;
   notes?: string;
 }
 
@@ -896,3 +902,4 @@ export interface UserAccount {
   isActive: boolean;
   lastLogin: string;
 }
+

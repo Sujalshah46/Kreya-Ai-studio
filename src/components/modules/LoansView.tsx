@@ -11,7 +11,6 @@ interface LoansViewProps {
   loans: GirviLoan[];
   customers: Customer[];
   onSaveLoan: (loan: GirviLoan) => void;
-  onRecordRepayment: (loanId: string, principalPaid: number, interestPaid: number, mode: PaymentMode) => void;
 }
 
 interface NewPledgedItemForm {
@@ -50,8 +49,7 @@ export const LoansView: React.FC<LoansViewProps> = ({
   store,
   loans,
   customers,
-  onSaveLoan,
-  onRecordRepayment
+  onSaveLoan
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -462,7 +460,6 @@ export const LoansView: React.FC<LoansViewProps> = ({
     };
 
     onSaveLoan(updatedLoan);
-    onRecordRepayment(selectedLoan.id, pPaid, iPaid, repayMode);
     setSelectedLoan(updatedLoan);
 
     // Prepare repayment slip data
@@ -1840,3 +1837,4 @@ export const LoansView: React.FC<LoansViewProps> = ({
     </div>
   );
 };
+

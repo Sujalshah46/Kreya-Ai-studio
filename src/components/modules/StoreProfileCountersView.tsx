@@ -58,7 +58,7 @@ export const StoreProfileCountersView: React.FC<StoreProfileCountersViewProps> =
   const [accountNumber, setAccountNumber] = useState(initialStore?.bankDetails?.accountNumber || '50200084729104');
   const [ifscCode, setIfscCode] = useState(initialStore?.bankDetails?.ifscCode || 'HDFC0000123');
   const [branchName, setBranchName] = useState(initialStore?.bankDetails?.branch || 'Vile Parle East');
-  const [upiId, setUpiId] = useState('sbborana@hdfcbank');
+  const [upiId, setUpiId] = useState(initialStore?.upiId ?? '');
 
   // Feedback alerts
   const [saveAlert, setSaveAlert] = useState<string | null>(null);
@@ -121,6 +121,11 @@ export const StoreProfileCountersView: React.FC<StoreProfileCountersViewProps> =
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
+    const paymentAddress = upiId.trim();
+    if (paymentAddress && !/^[a-z0-9_.-]+@[a-z0-9.-]+$/i.test(paymentAddress)) {
+      alert('Enter a valid showroom UPI ID.');
+      return;
+    }
     if (onUpdateStore) {
       onUpdateStore({
         id: initialStore?.id || '1',
@@ -138,6 +143,7 @@ export const StoreProfileCountersView: React.FC<StoreProfileCountersViewProps> =
         email,
         mobile: phone,
         invoicePrefix: invPrefix,
+        upiId: paymentAddress || undefined,
         bisLicenseNo,
         huidRegistered: huidEnabled,
         bankDetails: {
@@ -244,7 +250,7 @@ export const StoreProfileCountersView: React.FC<StoreProfileCountersViewProps> =
         <div className="flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
           <span className="text-xs font-medium text-amber-950">
-            ⚠️ Licence expires in 30 days (15-Dec-2026). Contact Kreya IT Consulting to renew.
+            ⚠️ Licence status is unavailable. Open Licence for verification details.
           </span>
         </div>
         <button 
@@ -1123,3 +1129,4 @@ export const StoreProfileCountersView: React.FC<StoreProfileCountersViewProps> =
     </div>
   );
 };
+
