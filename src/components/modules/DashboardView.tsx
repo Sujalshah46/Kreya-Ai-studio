@@ -13,6 +13,17 @@ const orderDateLabel = new Intl.DateTimeFormat('en-GB', {
 });
 const moneyFormat = new Intl.NumberFormat('en-IN');
 
+const paymentColorPalette = ['#237a57', '#c5a46d', '#477c9c', '#626b65', '#b7791f', '#89918b', '#185b40', '#a98b59'];
+const paymentModeLabels: Record<string, string> = {
+  cash: "Cash",
+  upi: "UPI",
+  card: "Card",
+  cheque: "Cheque",
+  bank_transfer: "Bank Transfer",
+  old_gold: "Old Gold",
+  other: "Other"
+};
+
 function dateKey(value?: string): string | undefined {
   if (!value) return undefined;
   const localDate = value.match(/^(\d{4}-\d{2}-\d{2})(?:$|[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$)/);
@@ -21,15 +32,33 @@ function dateKey(value?: string): string | undefined {
   return localDate ? date.toISOString().slice(0, 10) : businessDate.format(date);
 }
 
-function donutSlice(start: number, sweep: number): string {
+function donutSlice(start: number, sweep: number, outerRadius = 66, innerRadius = 42): string {
   const point = (radius: number, angle: number) =>
     [radius * Math.cos(angle), radius * Math.sin(angle)].join(' ');
-  const outerStart = point(66, start);
-  const outerEnd = point(66, start + sweep);
-  const innerStart = point(42, start);
-  const innerEnd = point(42, start + sweep);
+  const outerStart = point(outerRadius, start);
+  const outerEnd = point(outerRadius, start + sweep);
+  const innerStart = point(innerRadius, start);
+  const innerEnd = point(innerRadius, start + sweep);
   const large = sweep > Math.PI ? 1 : 0;
-  return `M ${outerStart} A 66 66 0 ${large} 1 ${outerEnd} L ${innerEnd} A 42 42 0 ${large} 0 ${innerStart} Z`;
+  return `M ${outerStart} A ${outerRadius} ${outerRadius} 0 ${large} 1 ${outerEnd} L ${innerEnd} A ${innerRadius} ${innerRadius} 0 ${large} 0 ${innerStart} Z`;
+}
+
+function getSmoothCurvePath(points: { x: number; y: number }[]): string {
+  if (points.length === 0) return '';
+  if (points.length === 1) return `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+  let d = `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+  return d;
 }
 
 interface DashboardViewProps {
@@ -115,6 +144,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // SVG Chart Measurements
   const plotRef = useRef<HTMLDivElement>(null);
   const [plotWidth, setPlotWidth] = useState(710);
+  const [hoveredAreaPoint, setHoveredAreaPoint] = useState<{
+    label: string;
+    revenue: number;
+    collected: number;
+    sales: number;
+    purchases: number;
+    cx: number;
+    revY: number;
+    colY: number;
+  } | null>(null);
+  const [areaTooltipPos, setAreaTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
   useLayoutEffect(() => {
     const element = plotRef.current;
     if (!element) return;
@@ -132,16 +173,119 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     { label: 'Day 11-15', sales: 140000, purchases: 80000 },
     { label: 'Day 16-20', sales: 110000, purchases: 60000 },
     { label: 'Day 21-25', sales: 180000, purchases: 95000 },
-    { label: 'Day 26-30', sales: 564500, purchases: 160000 },
+    { label: 'Day 26-30', sales: monthlyRevenue, purchases: todayCollections },
   ];
 
+  const groupWidth = (plotWidth - 70) / chartDays.length;
+  const chartPoints = chartDays.map((d, idx) => {
+    const xBase = 55 + idx * groupWidth;
+    const barW = Math.max(6, Math.min(14, groupWidth * 0.22));
+    const cx = xBase + barW + 1.5;
+    const salesH = (d.sales / 600000) * 168;
+    const purH = (d.purchases / 600000) * 168;
+    return {
+      label: d.label,
+      sales: d.sales,
+      purchases: d.purchases,
+      revenue: d.sales,
+      collected: d.purchases,
+      cx,
+      revY: 183 - salesH,
+      colY: 183 - purH
+    };
+  });
+
+  const revLineD = getSmoothCurvePath(chartPoints.map(p => ({ x: p.cx, y: p.revY })));
+  const revAreaD = `${revLineD} L ${chartPoints[chartPoints.length - 1].cx.toFixed(1)},183 L ${chartPoints[0].cx.toFixed(1)},183 Z`;
+
+  const colLineD = getSmoothCurvePath(chartPoints.map(p => ({ x: p.cx, y: p.colY })));
+  const colAreaD = `${colLineD} L ${chartPoints[chartPoints.length - 1].cx.toFixed(1)},183 L ${chartPoints[0].cx.toFixed(1)},183 Z`;
+
+  const handleChartMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!plotRef.current) return;
+    const rect = plotRef.current.getBoundingClientRect();
+    const mouseX = ((e.clientX - rect.left) / rect.width) * plotWidth;
+    
+    let closest = chartPoints[0];
+    let minDiff = Infinity;
+    for (const pt of chartPoints) {
+      const diff = Math.abs(pt.cx - mouseX);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = pt;
+      }
+    }
+
+    setHoveredAreaPoint(closest);
+    const tooltipX = (closest.cx / plotWidth) * rect.width;
+    const topY = Math.min(closest.revY, closest.colY);
+    const tooltipY = Math.max(50, (topY / 240) * rect.height);
+    setAreaTooltipPos({ x: tooltipX, y: tooltipY });
+  };
+
   // Payment Breakdown
-  const paymentBreakdown = [
-    { mode: 'UPI', amount: 100000, percent: 63, color: '#237a57' },
-    { mode: 'Cash', amount: 60000, percent: 38, color: '#c5a46d' },
-    { mode: 'Card', amount: 0, percent: 0, color: '#477c9c' },
-    { mode: 'Net Banking', amount: 0, percent: 0, color: '#626b65' }
-  ];
+  const pieRef = useRef<HTMLDivElement>(null);
+  const [hoveredPieSlice, setHoveredPieSlice] = useState<{
+    mode: string;
+    modeName: string;
+    total: number;
+    color: string;
+  } | null>(null);
+  const [pieTooltipPos, setPieTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const paymentTotalsByMode: Record<string, number> = {};
+  for (const inv of postedInvoices) {
+    const payments = inv.paymentTransactions?.length ? inv.paymentTransactions : inv.payments ?? [];
+    for (const p of payments) {
+      if (Number.isFinite(p.amount) && p.amount > 0) {
+        const mode = (p.mode || 'other').toLowerCase();
+        paymentTotalsByMode[mode] = (paymentTotalsByMode[mode] || 0) + p.amount;
+      }
+    }
+  }
+
+  const hasInvoicePayments = Object.values(paymentTotalsByMode).some(amt => amt > 0);
+
+  const paymentModeData = hasInvoicePayments
+    ? Object.entries(paymentTotalsByMode).map(([mode, amt], idx) => ({
+        mode,
+        modeName: paymentModeLabels[mode] || mode.toUpperCase(),
+        total: amt,
+        color: paymentColorPalette[idx % paymentColorPalette.length]
+      }))
+    : [
+        { mode: 'upi', modeName: paymentModeLabels.upi, total: 100000, color: paymentColorPalette[0] },
+        { mode: 'cash', modeName: paymentModeLabels.cash, total: 60000, color: paymentColorPalette[1] },
+        { mode: 'card', modeName: paymentModeLabels.card, total: 0, color: paymentColorPalette[2] },
+        { mode: 'bank_transfer', modeName: 'Net Banking', total: 0, color: paymentColorPalette[3] }
+      ];
+
+  const totalPaymentsAmount = paymentModeData.reduce((acc, p) => acc + (p.total || 0), 0) || 160000;
+
+  const paymentBreakdown = paymentModeData.map(p => ({
+    mode: p.modeName,
+    rawMode: p.mode,
+    amount: p.total,
+    percent: totalPaymentsAmount > 0 ? Math.round((p.total / totalPaymentsAmount) * 100) : 0,
+    color: p.color
+  }));
+
+  const activeSlices = paymentModeData.filter(p => p.total > 0);
+  const activeSlicesTotal = activeSlices.reduce((sum, p) => sum + p.total, 0);
+
+  const paddingAngle = activeSlices.length > 1 ? 0.04 * Math.PI : 0;
+  const availableAngle = 2 * Math.PI - activeSlices.length * paddingAngle;
+  let runningAngle = 0;
+  const sliceArcs = activeSlices.map(s => {
+    const sweep = activeSlicesTotal > 0 ? (s.total / activeSlicesTotal) * availableAngle : (1 / activeSlices.length) * availableAngle;
+    const start = runningAngle;
+    runningAngle += sweep + paddingAngle;
+    return {
+      ...s,
+      start,
+      sweep
+    };
+  });
 
   // Top Customers by purchase
   const topCustomers = [
@@ -325,7 +469,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     viewBox={`0 0 ${plotWidth} 240`} 
                     role="img"
                     aria-label="Sales vs Purchases 30-day SVG bar chart"
-                    style={{ width: '100%', height: '100%', overflow: 'visible' }}
+                    style={{ width: '100%', height: '100%', overflow: 'visible', cursor: 'crosshair' }}
+                    onMouseMove={handleChartMouseMove}
+                    onMouseLeave={() => setHoveredAreaPoint(null)}
                   >
                     <defs>
                       <linearGradient id="gRev" x1="0" y1="0" x2="0" y2="1">
@@ -363,13 +509,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                     {/* 30-Day SVG Bar Chart for Sales vs Purchases */}
                     {chartDays.map((d, idx) => {
-                      const groupWidth = (plotWidth - 70) / chartDays.length;
                       const xBase = 55 + idx * groupWidth;
                       const barW = Math.max(6, Math.min(14, groupWidth * 0.22));
                       const salesH = (d.sales / 600000) * 168;
                       const purH = (d.purchases / 600000) * 168;
                       const salesY = 183 - salesH;
                       const purY = 183 - purH;
+                      const isHighlighted = hoveredAreaPoint && hoveredAreaPoint.label === d.label;
 
                       return (
                         <g key={d.label} className="bar-group">
@@ -381,7 +527,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             height={salesH} 
                             rx={3} 
                             fill="#237a57" 
-                            opacity={0.8}
+                            opacity={isHighlighted ? 1 : 0.8}
                           >
                             <title>{`Sales (${d.label}): ₹${moneyFormat.format(d.sales)}`}</title>
                           </rect>
@@ -393,7 +539,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             height={purH} 
                             rx={3} 
                             fill="#c5a46d" 
-                            opacity={0.8}
+                            opacity={isHighlighted ? 1 : 0.8}
                           >
                             <title>{`Purchases / Collected (${d.label}): ₹${moneyFormat.format(d.purchases)}`}</title>
                           </rect>
@@ -403,38 +549,123 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                     {/* Area path for Revenue & Collected */}
                     <path 
-                      d={`M 55,183 L 55,160 L ${plotWidth * 0.35},145 L ${plotWidth * 0.65},90 L ${plotWidth - 30},16 L ${plotWidth - 30},183 Z`} 
+                      d={revAreaD} 
                       fill="url(#gRev)" 
                     />
                     <path 
-                      d={`M 55,160 L ${plotWidth * 0.35},145 L ${plotWidth * 0.65},90 L ${plotWidth - 30},16`} 
+                      d={revLineD} 
                       fill="none" 
                       stroke="#237a57" 
                       strokeWidth={2} 
                     />
-                    <circle cx={plotWidth - 30} cy={16} r={4} fill="#237a57" stroke="#fff" strokeWidth={2}>
-                      <title>Revenue: ₹5,64,500</title>
-                    </circle>
 
                     <path 
-                      d={`M 55,183 L 55,170 L ${plotWidth * 0.35},165 L ${plotWidth * 0.65},150 L ${plotWidth - 30},136 L ${plotWidth - 30},183 Z`} 
+                      d={colAreaD} 
                       fill="url(#gCol)" 
                     />
                     <path 
-                      d={`M 55,170 L ${plotWidth * 0.35},165 L ${plotWidth * 0.65},150 L ${plotWidth - 30},136`} 
+                      d={colLineD} 
                       fill="none" 
                       stroke="#c5a46d" 
                       strokeWidth={2} 
                     />
-                    <circle cx={plotWidth - 30} cy={136} r={4} fill="#c5a46d" stroke="#fff" strokeWidth={2}>
-                      <title>Collected: ₹1,60,000</title>
-                    </circle>
+
+                    {/* Default endpoint dot when not hovered */}
+                    {!hoveredAreaPoint && (
+                      <>
+                        <circle cx={chartPoints[chartPoints.length - 1].cx} cy={chartPoints[chartPoints.length - 1].revY} r={4} fill="#237a57" stroke="#fff" strokeWidth={2}>
+                          <title>Revenue: ₹{monthlyRevenue.toLocaleString('en-IN')}</title>
+                        </circle>
+                        <circle cx={chartPoints[chartPoints.length - 1].cx} cy={chartPoints[chartPoints.length - 1].colY} r={4} fill="#c5a46d" stroke="#fff" strokeWidth={2}>
+                          <title>Collected: ₹{todayCollections.toLocaleString('en-IN')}</title>
+                        </circle>
+                      </>
+                    )}
+
+                    {/* Cursor vertical guide line & Active dots on curves when hovering */}
+                    {hoveredAreaPoint && (
+                      <g className="recharts-tooltip-cursor">
+                        <line 
+                          x1={hoveredAreaPoint.cx} 
+                          y1={15.5} 
+                          x2={hoveredAreaPoint.cx} 
+                          y2={183} 
+                          stroke="var(--border, #e5e8e4)" 
+                          strokeDasharray="3 3" 
+                          strokeWidth={1}
+                        />
+                        <circle 
+                          cx={hoveredAreaPoint.cx} 
+                          cy={hoveredAreaPoint.revY} 
+                          r={4} 
+                          fill="#237a57" 
+                          stroke="#fff" 
+                          strokeWidth={2} 
+                        />
+                        <circle 
+                          cx={hoveredAreaPoint.cx} 
+                          cy={hoveredAreaPoint.colY} 
+                          r={4} 
+                          fill="#c5a46d" 
+                          stroke="#fff" 
+                          strokeWidth={2} 
+                        />
+                      </g>
+                    )}
 
                     {/* X-axis tick */}
                     <text x={plotWidth / 2} y={202} textAnchor="middle" fontSize="11" fill="#89918b">
                       Nov 2026 (30-day Trend)
                     </text>
                   </svg>
+
+                  {/* Floating Tooltip Card for Area Chart */}
+                  {hoveredAreaPoint && (
+                    <div style={{
+                      position: 'absolute',
+                      left: areaTooltipPos.x,
+                      top: areaTooltipPos.y,
+                      transform: 'translate(-50%, -110%)',
+                      pointerEvents: 'none',
+                      background: "var(--surface, #fff)",
+                      border: "1px solid var(--border, #e5e8e4)",
+                      borderRadius: 10,
+                      padding: "10px 14px",
+                      boxShadow: "var(--sh-md, 0 8px 22px rgba(23,28,25,0.12))",
+                      fontSize: 12,
+                      zIndex: 100,
+                      whiteSpace: 'nowrap'
+                    }}>
+                      <div style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        marginBottom: 6,
+                        color: "var(--text, #202522)",
+                        borderBottom: "1px solid var(--border, #e5e8e4)",
+                        paddingBottom: 4
+                      }}>
+                        {hoveredAreaPoint.label || "Nov 2026"}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text2, #3f4742)", marginBottom: 2, display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <i style={{ width: 8, height: 8, borderRadius: 2, background: "var(--primary, #237a57)", display: "inline-block" }} />
+                          Revenue
+                        </span>
+                        <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                          ₹{hoveredAreaPoint.revenue.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text2, #3f4742)", marginBottom: 2, display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <i style={{ width: 8, height: 8, borderRadius: 2, background: "var(--champagne, #c5a46d)", display: "inline-block" }} />
+                          Collected
+                        </span>
+                        <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                          ₹{hoveredAreaPoint.collected.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Legend matching recharts-default-legend */}
                   <div 
@@ -472,35 +703,103 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
 
               <div className="dash-panel-body" style={{ display: 'flex', flexDirection: 'column' }}>
-                <div style={{ width: '100%', height: 150, display: 'grid', placeItems: 'center' }}>
+                <div 
+                  ref={pieRef} 
+                  style={{ width: '100%', height: 150, display: 'grid', placeItems: 'center', position: 'relative' }}
+                >
                   <svg 
                     width="100%" 
                     height="150" 
-                    viewBox="-70 -75 140 150" 
+                    viewBox="-75 -75 150 150" 
                     role="img" 
                     aria-label="Payment Modes SVG Donut Chart (Cash, UPI, Card, Net Banking)"
+                    style={{ overflow: 'visible' }}
+                    onMouseLeave={() => setHoveredPieSlice(null)}
                   >
-                    {/* UPI Donut Arc (63%) */}
-                    <path 
-                      d={donutSlice(0, Math.PI * 1.24)} 
-                      fill="#237a57"
-                    >
-                      <title>UPI: ₹1,00,000 (63%)</title>
-                    </path>
-                    {/* Cash Donut Arc (38%) */}
-                    <path 
-                      d={donutSlice(Math.PI * 1.28, Math.PI * 0.68)} 
-                      fill="#c5a46d"
-                    >
-                      <title>Cash: ₹60,000 (38%)</title>
-                    </path>
+                    {sliceArcs.map((slice) => {
+                      const isHovered = hoveredPieSlice?.mode === slice.mode;
+                      return (
+                        <path 
+                          key={slice.mode}
+                          d={donutSlice(slice.start, slice.sweep, isHovered ? 70 : 66, 42)} 
+                          fill={slice.color}
+                          stroke={isHovered ? "var(--surface, #fff)" : "none"}
+                          strokeWidth={isHovered ? 2 : 0}
+                          style={{ cursor: 'pointer', transition: 'all 0.15s ease' }}
+                          onMouseMove={(e) => {
+                            if (!pieRef.current) return;
+                            const rect = pieRef.current.getBoundingClientRect();
+                            setHoveredPieSlice(slice);
+                            setPieTooltipPos({
+                              x: e.clientX - rect.left,
+                              y: e.clientY - rect.top
+                            });
+                          }}
+                          onMouseLeave={() => setHoveredPieSlice(null)}
+                        >
+                          <title>{`${slice.modeName}: ₹${slice.total.toLocaleString('en-IN')}`}</title>
+                        </path>
+                      );
+                    })}
                   </svg>
+
+                  {/* Payment Modes Tooltip Card */}
+                  {hoveredPieSlice && (
+                    <div style={{
+                      position: 'absolute',
+                      left: pieTooltipPos.x,
+                      top: pieTooltipPos.y,
+                      transform: 'translate(-50%, -120%)',
+                      pointerEvents: 'none',
+                      background: '#fff',
+                      border: '1px solid var(--border, #e5e8e4)',
+                      borderRadius: 10,
+                      padding: '10px 14px',
+                      fontSize: 12,
+                      whiteSpace: 'nowrap',
+                      boxShadow: 'var(--sh-md)',
+                      zIndex: 100
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: 2, background: hoveredPieSlice.color }} />
+                        <span style={{ color: 'var(--text2)' }}>{hoveredPieSlice.modeName}</span>
+                        <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', marginLeft: 8 }}>
+                          ₹{parseFloat(String(hoveredPieSlice.total)).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Breakdown Rows */}
                 <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
                   {paymentBreakdown.map(p => (
-                    <div key={p.mode} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '12.5px' }}>
+                    <div 
+                      key={p.mode} 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 8, 
+                        fontSize: '12.5px',
+                        cursor: p.amount > 0 ? 'pointer' : 'default',
+                        padding: '2px 4px',
+                        borderRadius: 4,
+                        background: hoveredPieSlice?.modeName === p.mode ? 'rgba(0,0,0,0.04)' : 'transparent',
+                        transition: 'background 0.15s ease'
+                      }}
+                      onMouseEnter={() => {
+                        const matching = activeSlices.find(s => s.modeName === p.mode);
+                        if (matching && pieRef.current) {
+                          setHoveredPieSlice(matching);
+                          const rect = pieRef.current.getBoundingClientRect();
+                          setPieTooltipPos({
+                            x: rect.width / 2,
+                            y: rect.height / 2
+                          });
+                        }
+                      }}
+                      onMouseLeave={() => setHoveredPieSlice(null)}
+                    >
                       <span style={{ width: 8, height: 8, borderRadius: 2, background: p.color, flexShrink: 0 }} />
                       <span style={{ flex: 1, color: 'var(--text2)' }}>{p.mode}</span>
                       <span style={{ color: 'var(--muted2)', fontSize: '11.5px' }}>{p.percent}%</span>

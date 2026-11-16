@@ -254,6 +254,86 @@ export function App() {
     }
   };
 
+  // Align theme and typography root attributes to match live software
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-theme', 'light');
+    root.setAttribute('data-density', 'comfortable');
+    root.setAttribute('data-nav', 'sidebar');
+    root.setAttribute('data-zebra', 'off');
+    root.setAttribute('data-sidebar', 'light');
+
+    const themeVariables: Record<string, string> = {
+      '--primary': '#237a57',
+      '--primary-d': '#19583f',
+      '--primary-m': '#4b9275',
+      '--primary-l': '#e0ece7',
+      '--primary-xl': '#f2f7f5',
+      '--secondary': '#202522',
+      '--accent': '#c5a46d',
+      '--gold-m': '#c5a46d',
+      '--gold': '#a78b5d',
+      '--gold-d': '#6c5a3c',
+      '--gold-l': '#f6f1e9',
+      '--focus-ring': 'rgba(35,122,87,0.16)',
+      '--sh-colored': '0 6px 18px rgba(35,122,87,0.16)',
+      '--champagne': '#c5a46d',
+      '--champagne-l': '#f5efe5',
+      '--champagne-d': '#725f3f',
+      '--btn-bg': '#237a57',
+      '--btn-bg-hover': '#1e684a',
+      '--btn-shadow': '0 1px 2px rgba(23,28,25,.10)',
+      '--bg': '#f7f8f5',
+      '--surface': '#ffffff',
+      '--surface2': '#fbfbf9',
+      '--border': '#e5e8e4',
+      '--border2': '#d5dad4',
+      '--text': '#202522',
+      '--text2': '#3f4742',
+      '--muted': '#626b65',
+      '--muted2': '#89918b',
+      '--thead': '#f7f6f1',
+      '--input-bg': '#ffffff',
+      '--row-hover': '#f5f9f7',
+      '--zebra': '#fafaf8',
+      '--ivory': '#f5f2eb',
+      '--sk-base': '#eceee9',
+      '--sk-shine': '#f6f7f4',
+      '--success-l': '#e8f2ec',
+      '--danger-l': '#f8e9e8',
+      '--warn-l': '#fbf1de',
+      '--info-l': '#e8f0f5',
+      '--sb-bg': '#ffffff',
+      '--sb-solid': '#ffffff',
+      '--sb-text': '#3f4742',
+      '--sb-text-strong': '#202522',
+      '--sb-label': '#89918b',
+      '--sb-hover': '#f3f4f1',
+      '--sb-active': '#e9f2ee',
+      '--sb-active-text': '#237a57',
+      '--sb-border': '#e5e8e4',
+      '--sb-indicator': '#237a57',
+      '--font': "'Inter', system-ui, sans-serif",
+      '--font-display': "'Inter', system-ui, sans-serif",
+      '--fs': '14px',
+      '--pad-cell': '12px 13px',
+      '--pad-input': '10px 12px',
+      '--pad-btn': '9px 16px',
+      '--gap': '14px',
+      '--r-xs': '6px',
+      '--r-sm': '8px',
+      '--r': '10px',
+      '--r-lg': '14px',
+      '--r-xl': '16px',
+      '--r-2xl': '20px',
+      '--btn-radius': '9px',
+    };
+
+    Object.entries(themeVariables).forEach(([key, value]) => {
+      root.style.setProperty(key, value);
+    });
+  }, []);
+
   useEffect(() => {
     const onPopState = () => {
       setCurrentModule(getModuleFromPath(window.location.pathname));

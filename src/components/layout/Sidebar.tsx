@@ -145,9 +145,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   mobileOpen = false,
   onCloseMobile,
+  openLoansCount,
+  openRepairsCount,
+  activeSchemesCount,
+  pendingReceivablesCount,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const query = searchQuery.trim().toLowerCase();
+
+  const getItemCount = (mod: string): number | undefined => {
+    if (mod === 'loans' && openLoansCount && openLoansCount > 0) return openLoansCount;
+    if (mod === 'repairs' && openRepairsCount && openRepairsCount > 0) return openRepairsCount;
+    if (mod === 'schemes' && activeSchemesCount && activeSchemesCount > 0) return activeSchemesCount;
+    if (mod === 'payments-pending' && pendingReceivablesCount && pendingReceivablesCount > 0) return pendingReceivablesCount;
+    return undefined;
+  };
 
   // 9 Nav Groups open state
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
@@ -293,6 +305,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 group.filteredItems.map(item => {
                   const isActive = isNavActive(currentModule, item.mod);
                   const Icon = item.icon;
+                  const count = getItemCount(item.mod);
 
                   return (
                     <a
@@ -309,6 +322,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     >
                       <Icon size={16} />
                       {!isMini && <span className="nav-text">{item.label}</span>}
+                      {!isMini && count !== undefined && (
+                        <span className="counter-badge">{count}</span>
+                      )}
                     </a>
                   );
                 })}
