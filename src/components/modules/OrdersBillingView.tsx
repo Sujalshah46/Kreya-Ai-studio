@@ -87,7 +87,11 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<SalesInvoice | null>(null);
   const [selectedInvoiceForCancel, setSelectedInvoiceForCancel] = useState<SalesInvoice | null>(null);
-  const [orderDetailSubTab, setOrderDetailSubTab] = useState<'items' | 'payments' | 'old_gold' | 'deposits'>('items');
+  const [orderDetailSubTab, setOrderDetailSubTab] = useState<'items' | 'payments' | 'details' | 'old_gold' | 'deposits'>('items');
+  const [gstSplitMode, setGstSplitMode] = useState<boolean>(false);
+  const [posViewMode, setPosViewMode] = useState<'form' | 'catalog'>('form');
+  const [catalogCategory, setCatalogCategory] = useState<string>('all');
+  const [catalogSearch, setCatalogSearch] = useState<string>('');
   const [selectedReceiptFor80mm, setSelectedReceiptFor80mm] = useState<{ receipt: any; order: SalesInvoice } | null>(null);
   const [showTaxInvoiceModal, setShowTaxInvoiceModal] = useState<SalesInvoice | null>(null);
   const [collectAmount, setCollectAmount] = useState<string>('');
@@ -313,7 +317,9 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
     const matched = inventory.find(inv => 
       inv.barcode?.toLowerCase() === query ||
       inv.itemCode?.toLowerCase() === query ||
-      inv.huid?.toLowerCase() === query
+      inv.huid?.toLowerCase() === query ||
+      inv.itemName?.toLowerCase() === query ||
+      inv.itemName?.toLowerCase().includes(query)
     );
     if (matched) {
       handlePickStockItem(matched);
@@ -376,7 +382,18 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
     }
 
     const taxable = metalVal + makingVal + stoneVal + hmVal;
-    const gst = applyGst ? Math.round(taxable * ((item.gst_rate || 3) / 100)) : 0;
+    let gst = 0;
+    if (applyGst) {
+      if (gstSplitMode) {
+        // Split GST: 3% on gold/metal value + 5% on making charges + 3% on stone/hm
+        const gstMetal = Math.round(metalVal * 0.03);
+        const gstMaking = Math.round(makingVal * 0.05);
+        const gstOther = Math.round((stoneVal + hmVal) * 0.03);
+        gst = gstMetal + gstMaking + gstOther;
+      } else {
+        gst = Math.round(taxable * ((item.gst_rate || 3) / 100));
+      }
+    }
     const cgst = Math.round(gst / 2);
     const sgst = gst - cgst;
 
@@ -436,7 +453,11 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
     : (subtotalTaxable > 0 ? Math.round((subtotalTaxable * discountInput) / 100) : 0);
   
   const taxableAfterDiscount = Math.max(0, subtotalTaxable - discountAmount);
-  const finalGst = applyGst ? Math.round(taxableAfterDiscount * 0.03) : 0;
+  const finalGst = applyGst 
+    ? (gstSplitMode 
+        ? itemsCalculations.reduce((sum, c) => sum + c.gstVal, 0)
+        : Math.round(taxableAfterDiscount * 0.03)) 
+    : 0;
   const grandTotal = taxableAfterDiscount + finalGst;
 
   // Old Gold Exchange calculations
@@ -1251,15 +1272,27 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                 borderRadius: 8,
                 border: '1px solid var(--border)'
               }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, margin: 0, userSelect: 'none' }}>
-                  <input 
-                    type="checkbox" 
-                    id="gst_tog" 
-                    checked={applyGst} 
-                    onChange={(e) => setApplyGst(e.target.checked)} 
-                  />
-                  <span>Apply GST on this order</span>
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, margin: 0, userSelect: 'none' }}>
+                    <input 
+                      type="checkbox" 
+                      id="gst_tog" 
+                      checked={applyGst} 
+                      onChange={(e) => setApplyGst(e.target.checked)} 
+                    />
+                    <span>Apply GST on this order</span>
+                  </label>
+                  {applyGst && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600, margin: 0, userSelect: 'none', color: gstSplitMode ? 'var(--primary)' : 'var(--muted)' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={gstSplitMode} 
+                        onChange={(e) => setGstSplitMode(e.target.checked)} 
+                      />
+                      <span>Split GST (3% on Gold Metal + 5% on Making)</span>
+                    </label>
+                  )}
+                </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -1286,12 +1319,28 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                 </div>
               </div>
 
-              {/* SECTION: ITEMS */}
-              <div className="section-divider" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', margin: '20px 0 14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {/* SECTION: ITEMS & POS PRODUCT CATALOG */}
+              <div className="section-divider" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0 14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ width: 3, height: 14, background: 'var(--primary)', borderRadius: 2, display: 'inline-block' }}></span>
+                  <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.04em' }}>BILLING ITEMS</span>
+                  <div style={{ display: 'inline-flex', gap: 4, marginLeft: 10 }}>
+                    <button
+                      type="button"
+                      className={`btn btn-xs ${posViewMode === 'form' ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => setPosViewMode('form')}
+                    >
+                      ▥ Scan / Form ({saleItems.length})
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-xs ${posViewMode === 'catalog' ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => setPosViewMode('catalog')}
+                    >
+                      ⊞ POS Product Catalog ({inventory.length})
+                    </button>
+                  </div>
                 </div>
-                <span style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>ITEMS</span>
                 <button 
                   type="button" 
                   className="btn btn-xs btn-gold"
@@ -1300,6 +1349,130 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                   Pick from Stock
                 </button>
               </div>
+
+              {/* VISUAL POS PRODUCT CATALOG GRID */}
+              {posViewMode === 'catalog' && (
+                <div style={{ 
+                  background: 'var(--surface2, #f8fafc)', 
+                  border: '1px solid var(--border)', 
+                  borderRadius: 8, 
+                  padding: 14, 
+                  marginBottom: 16 
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {[
+                        ['all', 'All Items'],
+                        ['gold', 'Gold 22K/18K'],
+                        ['silver', 'Silver'],
+                        ['chain', 'Chains'],
+                        ['kada', 'Kadas'],
+                        ['ring', 'Rings'],
+                        ['bangle', 'Bangles']
+                      ].map(([catKey, catLabel]) => (
+                        <button
+                          key={catKey}
+                          type="button"
+                          className={`btn btn-xs ${catalogCategory === catKey ? 'btn-primary' : 'btn-outline'}`}
+                          onClick={() => setCatalogCategory(catKey)}
+                        >
+                          {catLabel}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ minWidth: 220 }}>
+                      <input 
+                        className="input input-sm"
+                        placeholder="Search product, SKU, HUID..."
+                        value={catalogSearch}
+                        onChange={(e) => setCatalogSearch(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', 
+                    gap: 12, 
+                    maxHeight: 380, 
+                    overflowY: 'auto',
+                    padding: 2
+                  }}>
+                    {inventory
+                      .filter(item => {
+                        const q = catalogSearch.toLowerCase();
+                        const matchQ = !q ||
+                          item.itemName.toLowerCase().includes(q) ||
+                          item.itemCode.toLowerCase().includes(q) ||
+                          (item.huid && item.huid.toLowerCase().includes(q));
+                        if (!matchQ) return false;
+                        if (catalogCategory === 'all') return true;
+                        if (catalogCategory === 'gold') return (item.metalType || '').toLowerCase().includes('gold');
+                        if (catalogCategory === 'silver') return (item.metalType || '').toLowerCase().includes('silver');
+                        if (catalogCategory === 'chain') return item.itemName.toLowerCase().includes('chain');
+                        if (catalogCategory === 'kada') return item.itemName.toLowerCase().includes('kada');
+                        if (catalogCategory === 'ring') return item.itemName.toLowerCase().includes('ring');
+                        if (catalogCategory === 'bangle') return item.itemName.toLowerCase().includes('bangle');
+                        return true;
+                      })
+                      .map(invItem => (
+                        <div 
+                          key={invItem.id}
+                          className="card" 
+                          style={{ 
+                            padding: 10, 
+                            border: '1px solid var(--border)', 
+                            borderRadius: 6,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            background: '#fff'
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                              <span style={{ fontFamily: 'monospace', fontSize: 10.5, fontWeight: 700, color: 'var(--primary)' }}>
+                                {invItem.itemCode}
+                              </span>
+                              <span className={`badge ${invItem.metalType?.toLowerCase() === 'gold' ? 'badge-yellow' : 'badge-gray'}`} style={{ fontSize: 9.5 }}>
+                                {invItem.purityKarat || invItem.purity || '22K 916'}
+                              </span>
+                            </div>
+                            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4, lineHeight: 1.3 }}>
+                              {invItem.itemName}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 2 }}>
+                              Gross: <strong>{(invItem.grossWeight || 0).toFixed(3)}g</strong> · Net: <strong>{(invItem.netWeight || 0).toFixed(3)}g</strong>
+                            </div>
+                            <div style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 6 }}>
+                              Making: ₹{invItem.makingRate || 450}/g · Wastage: {(invItem as any).wastagePct ?? 5}%
+                            </div>
+                            {invItem.huid && (
+                              <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--muted)', marginBottom: 6 }}>
+                                HUID: {invItem.huid}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+                            <span style={{ fontWeight: 800, fontSize: 13, color: 'var(--primary)' }}>
+                              ₹{(invItem.retailPrice || 0).toLocaleString('en-IN')}
+                            </span>
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-primary"
+                              onClick={() => {
+                                handlePickStockItem(invItem);
+                                setPosViewMode('form');
+                              }}
+                            >
+                              + Add to Sale
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
 
               {/* Monospace Barcode Scan Box (▥) with Pick from Stock */}
               <div className="scan-box" style={{ 
@@ -2360,6 +2533,22 @@ export const OrdersBillingView: React.FC<OrdersBillingViewProps> = ({
                   }}
                 >
                   Payments ({(selectedInvoiceForView.payments || []).length || 2})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrderDetailSubTab('details')}
+                  style={{
+                    padding: '8px 14px',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: orderDetailSubTab === 'details' ? '2.5px solid var(--primary)' : '2.5px solid transparent',
+                    color: orderDetailSubTab === 'details' ? 'var(--primary)' : 'var(--muted)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Details
                 </button>
                 <button
                   type="button"
