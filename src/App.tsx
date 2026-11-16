@@ -259,6 +259,61 @@ export function App() {
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
+
+  // Fetch initial live state from PostgreSQL backend API
+  useEffect(() => {
+    async function loadLiveData() {
+      try {
+        const [settingsRes, ratesRes, custRes, invRes, ordersRes] = await Promise.allSettled([
+          fetch('/api/v1/settings').then(r => r.ok ? r.json() : null),
+          fetch('/api/v1/daily-rates').then(r => r.ok ? r.json() : null),
+          fetch('/api/v1/customers').then(r => r.ok ? r.json() : null),
+          fetch('/api/v1/inventory/items').then(r => r.ok ? r.json() : null),
+          fetch('/api/v1/sales/orders').then(r => r.ok ? r.json() : null)
+        ]);
+
+        if (settingsRes.status === 'fulfilled' && settingsRes.value?.data?.shop_name) {
+          const s = settingsRes.value.data;
+          setStore(prev => ({
+            ...prev,
+            tradeName: s.shop_name || prev.tradeName,
+            legalName: s.owner_name || prev.legalName,
+            name: s.shop_name || prev.name,
+            shopName: s.shop_name || prev.shopName,
+            address: s.address || prev.address,
+            phone: s.phone || prev.phone,
+            gstin: s.gst_no || prev.gstin,
+            gstNo: s.gst_no || prev.gstNo
+          }));
+        }
+
+        if (ratesRes.status === 'fulfilled' && ratesRes.value?.data) {
+          const r = ratesRes.value.data;
+          const g24_10g = Number(r.gold_24k) || 150000;
+          const g22_10g = Number(r.gold_22k) || 137400;
+          const g18_10g = Number(r.gold_18k) || 112500;
+          const g14_10g = Number(r.gold_14k) || 87750;
+          const silv_10g = Number(r.silver || r.silver_fine) || 920;
+
+          setRates(prev => ({
+            ...prev,
+            gold24kPer10g: g24_10g,
+            gold24kPerGram: Math.round(g24_10g / 10),
+            gold22kPer10g: g22_10g,
+            gold22kPerGram: Math.round(g22_10g / 10),
+            gold18kPer10g: g18_10g,
+            gold18kPerGram: Math.round(g18_10g / 10),
+            gold14kPerGram: Math.round(g14_10g / 10),
+            silverPer10g: silv_10g,
+            silverPerGram: Math.round(silv_10g / 10)
+          }));
+        }
+      } catch (err) {
+        console.warn('API sync fallback to mock data:', err);
+      }
+    }
+    loadLiveData();
+  }, []);
   const [showOmnibar, setShowOmnibar] = useState<boolean>(false);
   const [omnibarQuery, setOmnibarQuery] = useState<string>('');
 
@@ -295,6 +350,13 @@ export function App() {
 
   // Handlers for state updates
   const handleSaveInvoice = (invoice: SalesInvoice) => {
+    // Persist to PostgreSQL API
+    fetch('/api/v1/sales/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(invoice)
+    }).catch(err => console.warn('Offline order sync:', err));
+
     const previous = invoices.find(existing => existing.id === invoice.id);
     setInvoices(current => previous
       ? current.map(existing => existing.id === invoice.id ? invoice : existing)
@@ -344,6 +406,13 @@ export function App() {
   };
 
   const handleAddItem = (item: InventoryItem) => {
+    // Persist to PostgreSQL API
+    fetch('/api/v1/inventory/items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(item)
+    }).catch(err => console.warn('Offline item sync:', err));
+
     setInventory([item, ...inventory]);
   };
 
