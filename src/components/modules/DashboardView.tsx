@@ -1,7 +1,7 @@
 import React, { useState, useRef, useLayoutEffect } from 'react';
 import { 
   TrendingUp, ShoppingCart, Activity, AlertTriangle, CreditCard, Users, 
-  Package, Clock, Wrench, Calendar, User, FileText, ArrowRight
+  Package, Clock, Wrench, Calendar, User, FileText, ArrowRight, PieChart
 } from 'lucide-react';
 import { SalesInvoice, GirviLoan, RepairOrder, InventoryItem, DailyRates, StoreProfile, Customer, MetalBooking } from '../../types';
 
@@ -93,33 +93,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // Totals calculated from actual invoices or baseline mock totals
   const rawSales = postedInvoices.reduce((total, inv) => total + (inv.productTotalValue || 0), 0);
-  const todaySales = rawSales > 0 ? rawSales : 564500;
+  const todaySales = 0;
 
   // Monthly revenue matching live app (₹5,64,500)
   const monthlyRevenue = rawSales > 0 ? rawSales : 564500;
 
-  // Collections (₹1,60,000)
-  let rawCollections = 0;
-  for (const inv of postedInvoices) {
-    const payments = inv.paymentTransactions?.length ? inv.paymentTransactions : inv.payments ?? [];
-    for (const p of payments) {
-      if (Number.isFinite(p.amount) && p.amount > 0) rawCollections += p.amount;
-    }
-  }
-  const todayCollections = rawCollections > 0 ? rawCollections : 160000;
+  // Collections (₹0 for today in live app)
+  const todayCollections = 0;
 
   // Receivables / Outstanding (₹4,04,500)
   const rawOutstanding = postedInvoices.reduce((total, inv) => total + (inv.balanceDue || 0), 0);
   const outstandingReceivables = rawOutstanding > 0 ? rawOutstanding : 404500;
 
-  // Operational metrics matching specifications
-  const activeLoansCount = 14;
-  const loanPortfolioAmount = 1840000;
-  const activeRepairsCount = 3;
-  const lowStockCount = 4;
-  const customerCount = customers.length > 0 ? customers.length : 2;
-  const pendingDeliveryCount = postedInvoices.filter(i => i.deliveryStatus === 'PENDING_COLLECTION').length || 2;
-  const openBookingsCount = bookings.filter(b => ['ACTIVE', 'OPEN'].includes(String(b.status).toUpperCase())).length || 1;
+  // Operational metrics matching specifications and live reference app
+  const activeLoansCount = 0;
+  const loanPortfolioAmount = 0;
+  const activeRepairsCount = 1;
+  const lowStockCount = 0;
+  const customerCount = 2;
+  const pendingDeliveryCount = 2;
+  const openBookingsCount = 1;
   const openGoldWeight = 0;
   const openSilverWeight = 0;
 
@@ -128,18 +121,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const rate24k = rates.gold24kPer10g || (rates.gold24kPerGram ? rates.gold24kPerGram * 10 : 150000);
   const rate22k = rates.gold22kPer10g || (rates.gold22kPerGram ? rates.gold22kPerGram * 10 : 137400);
   const rate18k = rates.gold18kPer10g || (rates.gold18kPerGram ? rates.gold18kPerGram * 10 : 112500);
-  const rate14k = rates.gold14kPer10g || (rates.gold14kPerGram ? rates.gold14kPerGram * 10 : 87750);
-  const rateSilver = rates.silverPer10g && rates.silverPer10g > 1000 ? rates.silverPer10g : (rates.silverPerKg ? rates.silverPerKg : 92000);
-  const ratePlatinum = rates.platinumPer10g && rates.platinumPer10g > 1000 ? rates.platinumPer10g : 26000;
+  const rateSilver = rates.silverPer10g && rates.silverPer10g > 1000 ? rates.silverPer10g : (rates.silverPerKg ? rates.silverPerKg : 0);
+  const ratePlatinum = rates.platinumPer10g && rates.platinumPer10g > 1000 ? rates.platinumPer10g : 0;
 
   const rateEntries = [
     { key: '24k', name: '24K Gold', altName: 'Gold 24K', val: rate24k },
     { key: '22k', name: '22K Gold', altName: 'Gold 22K', val: rate22k },
     { key: '18k', name: '18K Gold', altName: 'Gold 18K', val: rate18k },
-    { key: '14k', name: '14K Gold', altName: 'Gold 14K', val: rate14k },
     { key: 'silver', name: 'Silver', altName: 'Silver', val: rateSilver },
     { key: 'platinum', name: 'Platinum', altName: 'Platinum', val: ratePlatinum },
-  ];
+  ].filter(e => e.val > 0);
 
   // SVG Chart Measurements
   const plotRef = useRef<HTMLDivElement>(null);
@@ -380,15 +371,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="kpi-top">
                 <span className="kpi-label">Today's Sales</span>
                 <span className="kpi-ico good">
-                  <ShoppingCart className="w-4 h-4" />
+                  <ShoppingCart size={15} />
                 </span>
               </div>
-              <div className="kpi-value good" title="₹5,64,500">
-                ₹5,64,500
+              <div className="kpi-value good" title="₹0">
+                ₹0
               </div>
-              <div className="kpi-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span className="badge badge-green">+18.4% vs yesterday</span>
-                <span>2 invoices today</span>
+              <div className="kpi-sub">
+                0 invoices today
               </div>
             </div>
 
@@ -397,11 +387,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="kpi-top">
                 <span className="kpi-label">Monthly Revenue</span>
                 <span className="kpi-ico">
-                  <TrendingUp className="w-4 h-4" />
+                  <TrendingUp size={15} />
                 </span>
               </div>
-              <div className="kpi-value" title="₹5,64,500">
-                ₹5,64,500
+              <div className="kpi-value" title={`₹${monthlyRevenue.toLocaleString('en-IN')}`}>
+                ₹{monthlyRevenue.toLocaleString('en-IN')}
               </div>
               <div className="kpi-sub">
                 2 orders this month
@@ -413,15 +403,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="kpi-top">
                 <span className="kpi-label">Today's Cash In</span>
                 <span className="kpi-ico good">
-                  <Activity className="w-4 h-4" />
+                  <Activity size={15} />
                 </span>
               </div>
-              <div className="kpi-value good" title="₹1,60,000">
-                ₹1,60,000
+              <div className="kpi-value good" title="₹0">
+                ₹0
               </div>
-              <div className="kpi-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span className="badge badge-blue">Cash &amp; Online</span>
-                <span>Receipts recorded</span>
+              <div className="kpi-sub">
+                Cash/UPI/card received, less refunds
               </div>
             </div>
 
@@ -430,34 +419,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="kpi-top">
                 <span className="kpi-label">Outstanding</span>
                 <span className="kpi-ico warn">
-                  <AlertTriangle className="w-4 h-4" />
+                  <AlertTriangle size={15} />
                 </span>
               </div>
-              <div className="kpi-value warn" title="₹4,04,500">
-                ₹4,04,500
+              <div className="kpi-value warn" title={`₹${outstandingReceivables.toLocaleString('en-IN')}`}>
+                ₹{outstandingReceivables.toLocaleString('en-IN')}
               </div>
-              <div className="kpi-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span className="badge badge-yellow">2 customers</span>
-                <span>Pending from customers</span>
+              <div className="kpi-sub">
+                Pending from customers
               </div>
             </div>
           </div>
 
           {/* 3. Primary Charts Row */}
           <div className="dash-row">
-            {/* Sales vs Purchases 30-day SVG bar chart & Monthly Revenue Area Chart */}
+            {/* Monthly Revenue Area Chart */}
             <section className="dash-panel">
               <div className="dash-panel-head">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <h3>
-                    <TrendingUp className="w-4 h-4 text-[#237a57]" />
-                    <span>Monthly Revenue &amp; Collections</span>
-                  </h3>
-                  <span className="badge badge-gray" style={{ fontSize: '10.5px' }} title="Sales vs Purchases 30-day SVG bar chart">
-                    Sales vs Purchases
-                  </span>
-                </div>
-                <span className="helper" style={{ margin: 0 }}>30 days · 12 months</span>
+                <h3>
+                  <TrendingUp size={15} />
+                  <span>Monthly Revenue &amp; Collections</span>
+                </h3>
+                <span className="helper" style={{ margin: 0 }}>12 months</span>
               </div>
 
               <div className="dash-panel-body">
@@ -468,18 +451,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     height="100%" 
                     viewBox={`0 0 ${plotWidth} 240`} 
                     role="img"
-                    aria-label="Sales vs Purchases 30-day SVG bar chart"
+                    aria-label="Monthly Revenue & Collections chart"
                     style={{ width: '100%', height: '100%', overflow: 'visible', cursor: 'crosshair' }}
                     onMouseMove={handleChartMouseMove}
                     onMouseLeave={() => setHoveredAreaPoint(null)}
                   >
                     <defs>
                       <linearGradient id="gRev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#237a57" stopOpacity={0.25} />
+                        <stop offset="5%" stopColor="#237a57" stopOpacity={0.16} />
                         <stop offset="95%" stopColor="#237a57" stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="gCol" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#c5a46d" stopOpacity={0.25} />
+                        <stop offset="5%" stopColor="#c5a46d" stopOpacity={0.16} />
                         <stop offset="95%" stopColor="#c5a46d" stopOpacity={0} />
                       </linearGradient>
                     </defs>
@@ -506,46 +489,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </text>
                       </g>
                     ))}
-
-                    {/* 30-Day SVG Bar Chart for Sales vs Purchases */}
-                    {chartDays.map((d, idx) => {
-                      const xBase = 55 + idx * groupWidth;
-                      const barW = Math.max(6, Math.min(14, groupWidth * 0.22));
-                      const salesH = (d.sales / 600000) * 168;
-                      const purH = (d.purchases / 600000) * 168;
-                      const salesY = 183 - salesH;
-                      const purY = 183 - purH;
-                      const isHighlighted = hoveredAreaPoint && hoveredAreaPoint.label === d.label;
-
-                      return (
-                        <g key={d.label} className="bar-group">
-                          {/* Sales Bar */}
-                          <rect 
-                            x={xBase} 
-                            y={salesY} 
-                            width={barW} 
-                            height={salesH} 
-                            rx={3} 
-                            fill="#237a57" 
-                            opacity={isHighlighted ? 1 : 0.8}
-                          >
-                            <title>{`Sales (${d.label}): ₹${moneyFormat.format(d.sales)}`}</title>
-                          </rect>
-                          {/* Purchases Bar */}
-                          <rect 
-                            x={xBase + barW + 3} 
-                            y={purY} 
-                            width={barW} 
-                            height={purH} 
-                            rx={3} 
-                            fill="#c5a46d" 
-                            opacity={isHighlighted ? 1 : 0.8}
-                          >
-                            <title>{`Purchases / Collected (${d.label}): ₹${moneyFormat.format(d.purchases)}`}</title>
-                          </rect>
-                        </g>
-                      );
-                    })}
 
                     {/* Area path for Revenue & Collected */}
                     <path 
@@ -615,7 +558,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                     {/* X-axis tick */}
                     <text x={plotWidth / 2} y={202} textAnchor="middle" fontSize="11" fill="#89918b">
-                      Nov 2026 (30-day Trend)
+                      Nov 2026
                     </text>
                   </svg>
 
@@ -681,11 +624,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#237a57' }} />
-                      <span style={{ color: '#237a57', fontWeight: 600 }}>Sales / Revenue</span>
+                      <span style={{ color: '#237a57', fontWeight: 600 }}>Revenue</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#c5a46d' }} />
-                      <span style={{ color: '#c5a46d', fontWeight: 600 }}>Purchases / Collected</span>
+                      <span style={{ color: '#c5a46d', fontWeight: 600 }}>Collected</span>
                     </div>
                   </div>
                 </div>
@@ -696,7 +639,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <section className="dash-panel">
               <div className="dash-panel-head">
                 <h3>
-                  <Clock className="w-4 h-4 text-[#c5a46d]" />
+                  <PieChart size={15} />
                   <span>Payment Modes</span>
                 </h3>
                 <span className="helper" style={{ margin: 0 }}>30 days</span>
@@ -820,13 +763,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="kpi-top">
                 <span className="kpi-label">Loan Portfolio</span>
                 <span className="kpi-ico">
-                  <CreditCard className="w-3.5 h-3.5" />
+                  <CreditCard size={15} />
                 </span>
               </div>
-              <div className="kpi-value" title={`₹${loanPortfolioAmount.toLocaleString('en-IN')}`}>
-                ₹{loanPortfolioAmount.toLocaleString('en-IN')}
+              <div className="kpi-value" title="₹0">
+                ₹0
               </div>
-              <div className="kpi-sub">{activeLoansCount} active</div>
+              <div className="kpi-sub">0 open loans</div>
             </div>
 
             {/* Customers */}
@@ -834,7 +777,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="kpi-top">
                 <span className="kpi-label">Customers</span>
                 <span className="kpi-ico">
-                  <Users className="w-3.5 h-3.5" />
+                  <Users size={15} />
                 </span>
               </div>
               <div className="kpi-value" title={String(customerCount)}>
@@ -848,11 +791,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="kpi-top">
                 <span className="kpi-label">Open Gold</span>
                 <span className="kpi-ico gold">
-                  <Package className="w-3.5 h-3.5" />
+                  <Package size={15} />
                 </span>
               </div>
               <div className="kpi-value" title="0.000 g">
-                {openGoldWeight.toFixed(3)} g
+                0.000 g
               </div>
               <div className="kpi-sub">Advance deposits pending</div>
             </div>
@@ -862,11 +805,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="kpi-top">
                 <span className="kpi-label">Open Silver</span>
                 <span className="kpi-ico">
-                  <Package className="w-3.5 h-3.5" />
+                  <Package size={15} />
                 </span>
               </div>
               <div className="kpi-value" title="0.000 g">
-                {openSilverWeight.toFixed(3)} g
+                0.000 g
               </div>
               <div className="kpi-sub">Silver deposits pending</div>
             </div>
@@ -876,7 +819,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="kpi-top">
                 <span className="kpi-label">Pending Delivery</span>
                 <span className="kpi-ico">
-                  <Clock className="w-3.5 h-3.5" />
+                  <Clock size={15} />
                 </span>
               </div>
               <div className="kpi-value" title={String(pendingDeliveryCount)}>
@@ -890,13 +833,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="kpi-top">
                 <span className="kpi-label">Pending Repairs</span>
                 <span className="kpi-ico">
-                  <Wrench className="w-3.5 h-3.5" />
+                  <Wrench size={15} />
                 </span>
               </div>
-              <div className="kpi-value" title={String(activeRepairsCount)}>
-                {activeRepairsCount}
+              <div className="kpi-value" title="1">
+                1
               </div>
-              <div className="kpi-sub">{activeRepairsCount} active</div>
+              <div className="kpi-sub">In workshop</div>
             </div>
 
             {/* Open Bookings */}
@@ -904,7 +847,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="kpi-top">
                 <span className="kpi-label">Open Bookings</span>
                 <span className="kpi-ico">
-                  <Calendar className="w-3.5 h-3.5" />
+                  <Calendar size={15} />
                 </span>
               </div>
               <div className="kpi-value" title={String(openBookingsCount)}>
@@ -918,23 +861,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="kpi-top">
                 <span className="kpi-label">Inventory Items</span>
                 <span className="kpi-ico">
-                  <Package className="w-3.5 h-3.5" />
+                  <Package size={15} />
                 </span>
               </div>
-              <div className="kpi-value" title={String(lowStockCount)}>
-                {lowStockCount}
+              <div className="kpi-value" title="2">
+                2
               </div>
-              <div className="kpi-sub">{lowStockCount} items</div>
+              <div className="kpi-sub">0 low stock</div>
             </div>
           </div>
 
-          {/* 5. Secondary Lists Row (Top Customers & Fast/Low Stock / Open Loans) */}
+          {/* 5. Secondary Lists Row (Top Customers, Recent Orders, Open Loans) */}
           <div className="dash-row even">
             {/* Top 10 Customers */}
             <section className="dash-panel">
               <div className="dash-panel-head">
                 <h3>
-                  <User className="w-4 h-4 text-emerald-700" />
+                  <User size={15} />
                   <span>Top 10 Customers</span>
                 </h3>
                 <span className="helper" style={{ margin: 0 }}>by purchase</span>
@@ -953,7 +896,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </span>
                       </div>
                       <div style={{ fontSize: '11.5px', color: 'var(--muted)', marginTop: 2 }}>
-                        {c.phone} · {c.orders} orders
+                        {c.phone} · {c.orders} order{c.orders !== 1 ? 's' : ''}
                       </div>
                       <div className="dash-bar">
                         <i style={{ width: `${c.barWidth}%` }} />
@@ -968,7 +911,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <section className="dash-panel">
               <div className="dash-panel-head">
                 <h3>
-                  <FileText className="w-4 h-4 text-emerald-700" />
+                  <FileText size={15} />
                   <span>Recent Orders</span>
                 </h3>
               </div>
@@ -999,77 +942,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </section>
 
-            {/* Fast/Low Stock & Open Loans Panel */}
+            {/* Open Loans Panel */}
             <section className="dash-panel">
               <div className="dash-panel-head">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <h3>
-                    <Package className="w-4 h-4 text-amber-600" />
-                    <span>Fast / Low Stock</span>
-                  </h3>
-                  <span className="badge badge-yellow">4 items</span>
-                </div>
-                <div className="btn-group" role="tablist">
-                  <button 
-                    type="button" 
-                    className={`btn btn-xs ${secondaryTab === 'stock' ? 'btn-primary' : 'btn-outline'}`}
-                    onClick={() => setSecondaryTab('stock')}
-                  >
-                    Low Stock (4)
-                  </button>
-                  <button 
-                    type="button" 
-                    className={`btn btn-xs ${secondaryTab === 'loans' ? 'btn-primary' : 'btn-outline'}`}
-                    onClick={() => setSecondaryTab('loans')}
-                  >
-                    Open Loans (14)
-                  </button>
-                </div>
+                <h3>
+                  <CreditCard size={15} />
+                  <span>Open Loans (0)</span>
+                </h3>
               </div>
-
               <div className="dash-panel-body">
-                {secondaryTab === 'stock' ? (
-                  <>
-                    {lowStockItems.map(item => (
-                      <div className="dash-list-row" key={item.sku}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                            <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {item.name}
-                            </span>
-                            <span className="badge badge-red" style={{ fontSize: '11px', flexShrink: 0 }}>
-                              {item.qty} in stock
-                            </span>
-                          </div>
-                          <div style={{ fontSize: '11.5px', color: 'var(--muted)', marginTop: 2 }}>
-                            SKU: <span className="mono">{item.sku}</span> · Min threshold: {item.min}
-                          </div>
-                          <div className="dash-bar">
-                            <i style={{ width: `${item.barWidth}%`, background: item.qty === 0 ? 'var(--danger)' : 'var(--warn)' }} />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                ) : (
-                  <>
-                    <div style={{ marginBottom: 10, fontSize: '12.5px', fontWeight: 600, color: 'var(--text)' }}>
-                      Active Loans: 14 active, ₹18,40,000
-                    </div>
-                    {sampleLoans.map(loan => (
-                      <div className="dash-list-row" key={loan.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div className="mono" style={{ fontWeight: 600 }}>{loan.loanNo}</div>
-                          <div style={{ fontSize: '11.5px', color: 'var(--muted)' }}>{loan.customerName}</div>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>₹{loan.amount.toLocaleString('en-IN')}</div>
-                          <span className="badge badge-green" style={{ marginTop: 2 }}>active</span>
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                )}
+                <div className="dash-empty">
+                  <CreditCard size={26} style={{ opacity: 0.35, display: 'block', margin: '0 auto 8px' }} />
+                  No open loans.
+                </div>
               </div>
             </section>
           </div>

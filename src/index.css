@@ -18,20 +18,6 @@ body {
   line-height: 1.55;
 }
 
-@media (min-width: 1024px) {
-  .page.dash > .dash-rates {
-    min-height: 66px;
-  }
-
-  .page.dash > .dash-kpis:not(.small) > .kpi-card {
-    min-height: 133.2px;
-  }
-
-  .page.dash > .dash-kpis.small > .kpi-card {
-    min-height: 107.62px;
-  }
-}
-
 /* ==========================================================================
    Original Live Theme & Exact Sidebar Typography Alignment
    Matches: https://dom-app-developer-495779.run.colosoft.com/

@@ -172,12 +172,32 @@ export function App() {
     }
   };
 
+  const normalizeModule = (mod: string): string => {
+    switch (mod) {
+      case 'orders': return 'billing';
+      case 'payments': return 'payments-pending';
+      case 'metal-stock': return 'old-metal-stock';
+      case 'bookings': return 'metal-booking';
+      case 'license':
+      case 'settings-licence': return 'licence';
+      case 'audit':
+      case 'settings-audit': return 'audit-logs';
+      case 'errors':
+      case 'error':
+      case 'settings-error': return 'error-log';
+      default: return mod;
+    }
+  };
+
   const getPathFromModule = (mod: string): string => {
     switch (mod) {
       case 'daily-rates': return '/daily-rates';
       case 'customers': return '/customers';
+      case 'payments':
       case 'payments-pending': return '/payments';
+      case 'orders':
       case 'billing': return '/orders';
+      case 'bookings':
       case 'metal-booking': return '/bookings';
       case 'cancellations': return '/cancellations';
       case 'cash-register': return '/register';
@@ -198,6 +218,7 @@ export function App() {
       case 'tags':
       case 'stock-ledger': return '/stock-ledger';
       case 'inventory-verification': return '/stock-verification';
+      case 'metal-stock':
       case 'old-metal-stock': return '/metal-stock';
       case 'suppliers': return '/suppliers';
       case 'purchase-orders': return '/purchase-orders';
@@ -248,7 +269,8 @@ export function App() {
   });
 
   const navigateTo = (mod: string) => {
-    setCurrentModule(mod);
+    const canonicalMod = normalizeModule(mod);
+    setCurrentModule(canonicalMod);
     const path = getPathFromModule(mod);
     if (typeof window !== 'undefined' && window.location.pathname !== path) {
       window.history.pushState(null, '', path);

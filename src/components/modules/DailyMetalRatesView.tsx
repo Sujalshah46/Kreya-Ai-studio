@@ -76,6 +76,20 @@ const formatDateDisplay = (dateStr: string): string => {
   }
 };
 
+const DEFAULT_RATE_HISTORY: RateHistoryEntry[] = [
+  {
+    id: 'rate-1',
+    rate_date: '2026-11-15',
+    gold_24k: 150000,
+    gold_22k: 137400,
+    gold_18k: 112500,
+    gold_14k: 87750,
+    silver: undefined,
+    platinum: undefined,
+    notes: ''
+  }
+];
+
 export const DailyMetalRatesView: React.FC<DailyMetalRatesViewProps> = ({
   rates,
   onUpdateRates
@@ -99,8 +113,37 @@ export const DailyMetalRatesView: React.FC<DailyMetalRatesViewProps> = ({
   const [config, setConfig] = useState<SplitConfig>(DEFAULT_CONFIG);
   const [editConfigModal, setEditConfigModal] = useState<SplitConfig | null>(null);
 
-  // Rate history initial state - default empty matching production database dump
-  const [rateHistory, setRateHistory] = useState<RateHistoryEntry[]>([]);
+  // Rate history initial state - default initialized with 15 Nov 2026 entry matching live reference app
+  const [rateHistory, setRateHistory] = useState<RateHistoryEntry[]>(DEFAULT_RATE_HISTORY);
+
+  // Load from API if available
+  useEffect(() => {
+    async function loadRates() {
+      try {
+        const res = await fetch('/api/v1/daily-rates');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data) {
+            const list = Array.isArray(json.data) ? json.data : [json.data];
+            setRateHistory(list.map((r: any, idx: number) => ({
+              id: r.id ? String(r.id) : `rate-${idx + 1}`,
+              rate_date: String(r.rate_date).slice(0, 10),
+              gold_24k: r.gold_24k != null && Number(r.gold_24k) > 0 ? Number(r.gold_24k) : undefined,
+              gold_22k: r.gold_22k != null && Number(r.gold_22k) > 0 ? Number(r.gold_22k) : undefined,
+              gold_18k: r.gold_18k != null && Number(r.gold_18k) > 0 ? Number(r.gold_18k) : undefined,
+              gold_14k: r.gold_14k != null && Number(r.gold_14k) > 0 ? Number(r.gold_14k) : undefined,
+              silver: r.silver != null && Number(r.silver) > 0 ? Number(r.silver) : undefined,
+              platinum: r.platinum != null && Number(r.platinum) > 0 ? Number(r.platinum) : undefined,
+              notes: r.notes || undefined
+            })));
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch daily rates:', err);
+      }
+    }
+    loadRates();
+  }, []);
 
   // Pager state
   const [pageSize, setPageSize] = useState<number>(25);
@@ -237,6 +280,18 @@ export const DailyMetalRatesView: React.FC<DailyMetalRatesViewProps> = ({
       });
 
       setSuccessMsg(existingEntry ? 'Rates updated successfully!' : 'Rates saved successfully!');
+      // Reset form on success matching live original app
+      setRatesForm({
+        gold_24k: '',
+        gold_22k: '',
+        gold_18k: '',
+        gold_14k: '',
+        silver: '',
+        platinum: ''
+      });
+      setNotes('');
+      setSelectedDate(getTodayIST());
+      setHandTyped({});
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch {
       alert('Error saving rates');
