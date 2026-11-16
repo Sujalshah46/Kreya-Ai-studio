@@ -2,6 +2,8 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { handleApiRequest } from './server/apiRouter.js';
+import { initDatabase } from './server/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,7 +28,18 @@ const MIME_TYPES = {
   '.webp': 'image/webp'
 };
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
+  // Global CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
   // Healthcheck endpoint for Dokku / PaaS
   if (req.url === '/health' || req.url === '/healthz') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -36,7 +49,16 @@ const server = http.createServer((req, res) => {
 
   // Parse requested URL path
   const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  let safePath = path.normalize(decodeURIComponent(parsedUrl.pathname));
+  const pathname = parsedUrl.pathname;
+
+  // Route API requests to our backend router
+  if (pathname.startsWith('/api/')) {
+    const handled = await handleApiRequest(req, res, pathname, parsedUrl.searchParams);
+    if (handled) return;
+  }
+
+  // Serve Frontend SPA
+  let safePath = path.normalize(decodeURIComponent(pathname));
   if (safePath.startsWith('..')) safePath = '/';
 
   let filePath = path.join(DIST_DIR, safePath);
@@ -73,6 +95,7 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 KreyaJewel360 production server listening on http://0.0.0.0:${PORT}`);
+  await initDatabase();
 });
