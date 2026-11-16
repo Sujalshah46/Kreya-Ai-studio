@@ -612,8 +612,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       {/* 1. Exact Header */}
       <div className="page-hdr">
         <div className="page-hdr-left">
-          <h1>Inventory</h1>
-          <p>{inventory.length} item{inventory.length === 1 ? '' : 's'}</p>
+          <h1>Inventory stock</h1>
+          <p>Items with their diamonds and gems, stock in / out with reasons, and category-wise weights.</p>
         </div>
         <div className="btn-group">
           <button className="btn btn-outline" onClick={() => setShowExcelModal(true)}>
@@ -1821,7 +1821,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       {/* MODAL 2: Stock In / Out Adjustment */}
       {showStockMoveModal && activeItemForStock && (
         <div className="overlay" onClick={() => setShowStockMoveModal(false)}>
-          <div className="modal modal-md" onClick={(e) => e.stopPropagation()}>
+          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h3>Stock In / Out — {activeItemForStock.itemCode}</h3>
               <button 

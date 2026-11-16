@@ -240,7 +240,7 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
       <div className="page-hdr">
         <div className="page-hdr-left">
           <h1>Inventory Verification</h1>
-          <p>Physical stock audit, barcode/DataMatrix scanner verification & variance resolution</p>
+          <p>Scan every tag (barcode / Data Matrix gun, camera or by hand), or count category-wise on a sheet — compare with the stock in the system.</p>
         </div>
         <div className="btn-group">
           <button 
@@ -664,7 +664,7 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
       {/* MODAL: New Physical Audit Session */}
       {showNewAuditModal && (
         <div className="overlay" onClick={() => setShowNewAuditModal(false)}>
-          <div className="modal modal-md" onClick={(e) => e.stopPropagation()}>
+          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h3>Start New Inventory Verification Audit</h3>
               <button 
@@ -732,7 +732,7 @@ export const InventoryVerificationView: React.FC<InventoryVerificationViewProps>
       {/* MODAL 2: Reconcile Discrepancies */}
       {showReconcileModal && (
         <div className="overlay" onClick={() => setShowReconcileModal(false)}>
-          <div className="modal modal-md" onClick={(e) => e.stopPropagation()}>
+          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h3>Reconcile Audit Discrepancies — {auditNo}</h3>
               <button 

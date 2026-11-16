@@ -475,7 +475,7 @@ export const StockValuationView: React.FC<StockValuationViewProps> = ({
         </div>
       )}
 
-      {/* Top Benchmark Rate Strip */}
+      {/* Top Benchmark Rate Strip & Valuation Formula Comparison */}
       <div className="card" style={{ marginBottom: 14, background: 'var(--zebra)' }}>
         <div className="card-body" style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -489,6 +489,19 @@ export const StockValuationView: React.FC<StockValuationViewProps> = ({
             <span>14K: <b>₹{liveGoldRate14k.toLocaleString('en-IN')}/g</b></span>
             <span>999 Silver: <b>₹{liveSilver999Rate.toLocaleString('en-IN')}/g</b> (₹{(liveSilver999Rate * 1000).toLocaleString('en-IN')}/kg)</span>
             <span>925 Silver: <b>₹{liveSilver925Rate.toLocaleString('en-IN')}/g</b></span>
+          </div>
+        </div>
+        <div style={{ borderTop: '1px solid var(--border)', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, fontSize: 12, background: 'var(--surface)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Scale size={14} style={{ color: 'var(--primary)' }} />
+            <span style={{ fontWeight: 600 }}>Valuation Formulas:</span>
+            <span>Weighted Average Cost: <b>₹{totalNetWeight > 0 ? Math.round(totalCostValuation / totalNetWeight).toLocaleString('en-IN') : 0}/g</b> (Book Cost: ₹{Math.round(totalCostValuation).toLocaleString('en-IN')} ÷ {totalNetWeight.toFixed(3)}g)</span>
+          </div>
+          <div>
+            <span>Market Metal Rate Valuation: <b style={{ color: 'var(--primary)' }}>₹{totalNetWeight > 0 ? Math.round(totalMtmValuation / totalNetWeight).toLocaleString('en-IN') : 0}/g</b> (MTM Value: ₹{Math.round(totalMtmValuation).toLocaleString('en-IN')})</span>
+            <span style={{ marginLeft: 10, color: totalMtmUnrealizedGain >= 0 ? '#185b40' : '#b94a48', fontWeight: 600 }}>
+              Variance: {totalMtmUnrealizedGain >= 0 ? '+' : ''}₹{Math.round(totalMtmUnrealizedGain).toLocaleString('en-IN')} ({((totalMtmUnrealizedGain / (totalCostValuation || 1)) * 100).toFixed(1)}%)
+            </span>
           </div>
         </div>
       </div>

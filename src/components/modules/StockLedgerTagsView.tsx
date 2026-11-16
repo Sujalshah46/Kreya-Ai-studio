@@ -473,7 +473,7 @@ E
       <div className="page-hdr">
         <div className="page-hdr-left">
           <h1>Stock Ledger & Tags</h1>
-          <p>Item movement ledger, category stock reports, Dumbbell (84x14mm) and Rattail (95x14mm) thermal barcode tag designer</p>
+          <p>Every piece in and out — purchases, sales, returns, adjustments — with the running balance.</p>
         </div>
         <div className="btn-group">
           <button 
@@ -538,6 +538,38 @@ E
               </button>
             </>
           )}
+        </div>
+      </div>
+
+      {/* Stock Ledger Summary Cards */}
+      <div className="sum-grid">
+        <div className="sum-box">
+          <div className="sum-val">{filteredLedger.length}</div>
+          <div className="sum-lbl">Ledger Entries</div>
+        </div>
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: 'var(--primary)' }}>
+            +{ledgerEntries.reduce((sum, e) => sum + e.qtyIn, 0)} pcs
+          </div>
+          <div className="sum-lbl">Total Inward</div>
+        </div>
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: 'var(--danger)' }}>
+            -{ledgerEntries.reduce((sum, e) => sum + e.qtyOut, 0)} pcs
+          </div>
+          <div className="sum-lbl">Total Outward</div>
+        </div>
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: 'var(--gold, #a98b59)' }}>
+            {tagItems.reduce((sum, i) => sum + i.stockQty, 0)} pcs
+          </div>
+          <div className="sum-lbl">Closing Stock</div>
+        </div>
+        <div className="sum-box">
+          <div className="sum-val mono">
+            {tagItems.reduce((sum, i) => sum + (i.grossWeight * i.stockQty), 0).toFixed(3)}g
+          </div>
+          <div className="sum-lbl">Total Gross Wt</div>
         </div>
       </div>
 

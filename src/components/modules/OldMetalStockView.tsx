@@ -512,7 +512,7 @@ export const OldMetalStockView: React.FC<OldMetalStockViewProps> = ({
       <div className="page-hdr">
         <div className="page-hdr-left">
           <h1>Old Metal Stock</h1>
-          <p>Old gold & melted scrap pieces → refinery jobs (Gold & Silver) → 99.9% refined bullion to settle supplier bills</p>
+          <p>Old gold and melted buy-back pieces → refinery jobs (gold and silver separately) → refined metal, which can pay supplier bills.</p>
         </div>
         <div className="btn-group">
           <button 
