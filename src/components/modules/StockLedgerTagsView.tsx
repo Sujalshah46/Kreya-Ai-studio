@@ -53,21 +53,93 @@ export const StockLedgerTagsView: React.FC<StockLedgerTagsViewProps> = ({
     status: 'IN_STOCK' as const
   };
 
-  // Items for the tags ledger - guaranteed single DB stock item presence
+  const dbKadaStockItem: InventoryItem = {
+    id: 'item-sbj-02',
+    itemCode: 'SBJKD-01',
+    barcode: '890123456002',
+    huid: 'KD9988',
+    itemName: 'Gold Antique Kada 22K',
+    category: 'gold',
+    subCategory: 'Kada',
+    metalType: 'Gold',
+    metalGroup: 'GOLD' as MetalGroup,
+    purityKarat: '22K (916)',
+    purityPercent: 91.60,
+    grossWeight: 25.500,
+    stoneWeight: 0.500,
+    netWeight: 25.000,
+    wastagePercent: 5.0,
+    makingMode: 'PER_NET_GRAM',
+    makingRate: 550.0,
+    makingType: 'per_gram',
+    costPrice: 175000.0,
+    retailPrice: 195000.0,
+    wholesalePrice: 182000.0,
+    mrp: 210000.0,
+    hsn: '7113',
+    quantity: 1,
+    minStock: 1,
+    itemSize: '2.6',
+    designNo: 'DSG-002',
+    gender: 'Men',
+    retailMarginPct: 25.0,
+    wholesaleMarginPct: 12.0,
+    stockQty: 1,
+    location: 'Showcase A',
+    rackTray: 'Kada Tray 01',
+    stones: [
+      {
+        id: 'st-1',
+        group: 'Gemstone',
+        name: 'Ruby',
+        pieces: 2,
+        carats: 2.5,
+        ratePerCarat: 2000,
+        value: 5000,
+        deductWeight: true,
+        weightGrams: 0.500
+      }
+    ],
+    status: 'IN_STOCK' as const
+  };
+
+  // Items for the tags ledger - guaranteed both stock items presence
   const tagItems: InventoryItem[] = React.useMemo(() => {
-    if (!inventory || inventory.length === 0) {
-      return [dbSingleStockItem];
+    let list = inventory && inventory.length > 0 ? [...inventory] : [];
+    if (!list.some(i => i.itemCode === 'SBJCH-01')) {
+      list.unshift(dbSingleStockItem);
     }
-    const hasSbj = inventory.some(i => i.itemCode === 'SBJCH-01');
-    const mapped = inventory.map(item => item.itemCode === 'SBJCH-01' ? {
-      ...dbSingleStockItem,
-      ...item,
-      grossWeight: 12.350,
-      netWeight: 12.350,
-      quantity: item.quantity || 3,
-      stockQty: item.stockQty || 3
-    } : item);
-    return hasSbj ? mapped : [dbSingleStockItem, ...mapped];
+    if (!list.some(i => i.itemCode === 'SBJKD-01')) {
+      list.unshift(dbKadaStockItem);
+    }
+    return list.map(item => {
+      if (item.itemCode === 'SBJCH-01') {
+        return {
+          ...dbSingleStockItem,
+          ...item,
+          grossWeight: 12.350,
+          netWeight: 12.350,
+          huid: 'ZX98YU',
+          itemName: 'Gold Chain 22K Rope',
+          quantity: item.quantity || 3,
+          stockQty: item.stockQty || 3
+        };
+      }
+      if (item.itemCode === 'SBJKD-01') {
+        return {
+          ...dbKadaStockItem,
+          ...item,
+          grossWeight: 25.500,
+          netWeight: 25.000,
+          stoneWeight: 0.500,
+          huid: 'KD9988',
+          itemName: 'Gold Antique Kada 22K',
+          quantity: item.quantity || 1,
+          stockQty: item.stockQty || 1
+        };
+      }
+      return item;
+    });
   }, [inventory]);
 
   const [selectedIds, setSelectedIds] = useState<string[]>(tagItems.slice(0, 2).map(i => i.id));

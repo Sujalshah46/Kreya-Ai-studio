@@ -2,7 +2,7 @@
 
 export type MetalGroup = 'GOLD' | 'SILVER' | 'DIAMOND' | 'PLATINUM';
 export type MakingChargeMode = 'PERCENTAGE_OF_GOLD' | 'PER_NET_GRAM' | 'PER_GROSS_GRAM' | 'FIXED_PIECE' | 'FIXED_PER_PIECE' | 'PERCENTAGE_OF_TOTAL' | 'PERCENTAGE';
-export type PaymentMode = 'CASH' | 'UPI' | 'CARD' | 'NET_BANKING' | 'OLD_GOLD_EXCHANGE' | 'BANK_TRANSFER' | 'CHEQUE' | 'IMPS' | 'IMPS_TRANSFER' | 'CUSTOMER_CREDIT' | 'OTHER';
+export type PaymentMode = 'CASH' | 'UPI' | 'CARD' | 'NET_BANKING' | 'OLD_GOLD_EXCHANGE' | 'BANK_TRANSFER' | 'CHEQUE' | 'IMPS' | 'IMPS_TRANSFER' | 'CUSTOMER_CREDIT' | 'ADVANCE_ALLOCATION' | 'OTHER';
 export type OrderStatus = 'ESTIMATE' | 'PENDING' | 'COMPLETED' | 'CANCELLED' | 'PARTIALLY_PAID';
 export type RepairStatus = 
   | 'received' | 'assigned_karigar' | 'in_progress' | 'qc_passed' | 'ready' | 'delivered' | 'cancelled'
@@ -17,6 +17,7 @@ export interface StoreProfile {
   legalName: string;
   name?: string;
   shopName?: string;
+  ownerName?: string;
   gstin: string;
   gstNo?: string;
   pan?: string;
@@ -59,6 +60,7 @@ export interface DailyRates {
   gold22kPerGram: number; // 916
   gold18kPerGram: number; // 750
   gold14kPerGram?: number;
+  gold14kPer10g?: number;
   gold24kPer10g?: number;
   gold22kPer10g?: number;
   gold18kPer10g?: number;
@@ -75,12 +77,15 @@ export interface StoneItem {
   name: string;
   pieces: number;
   carats: number;
-  grams: number;
+  grams?: number;
   clarityCut?: string;
   ratePerCarat: number;
-  totalValue: number;
+  totalValue?: number;
+  value?: number;
   totalPrice?: number;
   certificateNo?: string;
+  deductWeight?: boolean;
+  weightGrams?: number;
 }
 
 export interface InventoryItem {
@@ -124,6 +129,7 @@ export interface InventoryItem {
   stones: StoneItem[];
   status: 'IN_STOCK' | 'SOLD' | 'IN_REPAIR' | 'PLEDGED';
   imageUrl?: string;
+  images?: string[];
   description?: string;
 }
 

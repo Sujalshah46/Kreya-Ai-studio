@@ -872,68 +872,32 @@ export const DataImportView: React.FC<DataImportViewProps> = ({
       </div>
 
       {/* Mode Tabs: Customers | Inventory / Stock | Export & Backup */}
-      <div className="tabs" style={{ display: 'flex', gap: 8, borderBottom: '1px solid var(--border)', marginBottom: 16 }}>
+      <div className="tabs">
         <button
           type="button"
           onClick={() => { setActiveTab('customers'); setPreviewRows(null); setImportSummary(null); }}
-          style={{
-            padding: '8px 16px',
-            fontSize: 13,
-            fontWeight: 600,
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'customers' ? '2.5px solid var(--primary, #237a57)' : '2.5px solid transparent',
-            color: activeTab === 'customers' ? 'var(--primary, #237a57)' : 'var(--muted)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6
-          }}
+          className={`tab ${activeTab === 'customers' ? 'active' : ''}`}
         >
-          <Users size={15} />
+          <Users size={14} style={{ marginRight: 6 }} />
           <span>Customers</span>
         </button>
 
         <button
           type="button"
           onClick={() => { setActiveTab('inventory'); setPreviewRows(null); setImportSummary(null); }}
-          style={{
-            padding: '8px 16px',
-            fontSize: 13,
-            fontWeight: 600,
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'inventory' ? '2.5px solid var(--primary, #237a57)' : '2.5px solid transparent',
-            color: activeTab === 'inventory' ? 'var(--primary, #237a57)' : 'var(--muted)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6
-          }}
+          className={`tab ${activeTab === 'inventory' ? 'active' : ''}`}
         >
-          <Package size={15} />
+          <Package size={14} style={{ marginRight: 6 }} />
           <span>Inventory / Stock Items Import</span>
         </button>
 
         <button
           type="button"
           onClick={() => { setActiveTab('export'); setPreviewRows(null); setImportSummary(null); }}
-          style={{
-            padding: '8px 16px',
-            fontSize: 13,
-            fontWeight: 600,
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'export' ? '2.5px solid var(--primary, #237a57)' : '2.5px solid transparent',
-            color: activeTab === 'export' ? 'var(--primary, #237a57)' : 'var(--muted)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6
-          }}
+          className={`tab ${activeTab === 'export' ? 'active' : ''}`}
         >
-          <Database size={15} />
-          <span>JSON & Excel Export Hub</span>
+          <Database size={14} style={{ marginRight: 6 }} />
+          <span>JSON &amp; Excel Export Hub</span>
         </button>
       </div>
 

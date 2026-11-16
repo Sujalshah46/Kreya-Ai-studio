@@ -8,6 +8,10 @@ import {
   Supplier, PurchaseOrder, GoodsReceipt, SupplierBill, 
   SupplierPayment, PaymentMode 
 } from "../../types";
+import { 
+  mockSuppliers, mockPurchaseOrders, mockGoodsReceipts, 
+  mockSupplierBills, mockSupplierPayments 
+} from "../../data/mockData";
 import { PurchaseOrdersView } from "./PurchaseOrdersView";
 import { GoodsReceiptsView } from "./GoodsReceiptsView";
 import { SupplierBillsView } from "./SupplierBillsView";
@@ -15,11 +19,11 @@ import { SupplierPaymentsView } from "./SupplierPaymentsView";
 
 interface SuppliersPurchasingViewProps {
   initialTab?: "suppliers" | "purchase-orders" | "goods-receipts" | "supplier-bills" | "supplier-payments";
-  suppliers: Supplier[];
-  purchaseOrders: PurchaseOrder[];
-  goodsReceipts: GoodsReceipt[];
-  supplierBills: SupplierBill[];
-  supplierPayments: SupplierPayment[];
+  suppliers?: Supplier[];
+  purchaseOrders?: PurchaseOrder[];
+  goodsReceipts?: GoodsReceipt[];
+  supplierBills?: SupplierBill[];
+  supplierPayments?: SupplierPayment[];
   onAddSupplier?: (sup: Supplier) => void;
   onAddPO?: (po: PurchaseOrder) => void;
   onRecordSupplierPayment?: (spay: SupplierPayment) => void;
@@ -27,11 +31,11 @@ interface SuppliersPurchasingViewProps {
 
 export const SuppliersPurchasingView: React.FC<SuppliersPurchasingViewProps> = ({
   initialTab = "suppliers",
-  suppliers: initialSuppliers,
-  purchaseOrders: initialPOs,
-  goodsReceipts: initialGRNs,
-  supplierBills: initialBills,
-  supplierPayments: initialPayments,
+  suppliers: initialSuppliers = mockSuppliers,
+  purchaseOrders: initialPOs = mockPurchaseOrders,
+  goodsReceipts: initialGRNs = mockGoodsReceipts,
+  supplierBills: initialBills = mockSupplierBills,
+  supplierPayments: initialPayments = mockSupplierPayments,
   onAddSupplier,
   onAddPO,
   onRecordSupplierPayment

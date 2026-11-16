@@ -8,7 +8,8 @@ import {
 
 export const mockStore: StoreProfile = {
   id: "store-001",
-  code: "SHOP0001",
+  code: "SBJ",
+  ownerName: "Sujal shah",
   tradeName: "S.B Borana Jewellers",
   legalName: "S.B Borana Jewellers",
   address: "3-5 Niwas, Vile parle east Mumbai",

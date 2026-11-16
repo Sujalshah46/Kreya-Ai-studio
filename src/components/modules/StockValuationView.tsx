@@ -493,38 +493,40 @@ export const StockValuationView: React.FC<StockValuationViewProps> = ({
         </div>
       </div>
 
-      {/* 4 Summary Cards */}
-      <div className="sum-grid">
+      {/* Stock Summary Cards (Total Pieces, Gross Weight, Net Weight, Fine Gold Weight, Stock Valuation at today's rates) */}
+      <div className="sum-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginBottom: 16 }}>
         <div className="sum-box">
           <div className="sum-val">{totalPieces} pcs</div>
-          <div className="sum-lbl">Catalog Stock Units</div>
+          <div className="sum-lbl">Total Pieces</div>
           <div className="helper" style={{ marginTop: 4 }}>Across {inventory.length} active SKUs</div>
         </div>
 
         <div className="sum-box">
+          <div className="sum-val">{totalGrossWeight.toFixed(3)} g</div>
+          <div className="sum-lbl">Gross Weight</div>
+          <div className="helper" style={{ marginTop: 4 }}>Total physical inventory</div>
+        </div>
+
+        <div className="sum-box">
           <div className="sum-val">{totalNetWeight.toFixed(3)} g</div>
-          <div className="sum-lbl">Net Metal Weight</div>
-          <div className="helper" style={{ marginTop: 4 }}>
-            Fine Gold: {totalFineGoldGrams.toFixed(3)}g · Silver: {totalFineSilverGrams.toFixed(3)}g
+          <div className="sum-lbl">Net Weight</div>
+          <div className="helper" style={{ marginTop: 4 }}>Net metal weight</div>
+        </div>
+
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: 'var(--gold, #a98b59)' }}>
+            {totalFineGoldGrams.toFixed(3)} g
           </div>
+          <div className="sum-lbl">Fine Gold Weight</div>
+          <div className="helper" style={{ marginTop: 4 }}>Pure 24K equivalent content</div>
         </div>
 
         <div className="sum-box">
           <div className="sum-val" style={{ color: 'var(--primary)', fontWeight: 800 }}>
             ₹{Math.round(totalMtmValuation).toLocaleString('en-IN')}
           </div>
-          <div className="sum-lbl">Marked-to-Market Valuation</div>
-          <div className="helper" style={{ marginTop: 4 }}>Pure bullion spot benchmark</div>
-        </div>
-
-        <div className="sum-box">
-          <div className="sum-val" style={{ color: totalMtmUnrealizedGain >= 0 ? '#185b40' : '#b94a48', fontWeight: 800 }}>
-            {totalMtmUnrealizedGain >= 0 ? '+' : ''}₹{Math.round(totalMtmUnrealizedGain).toLocaleString('en-IN')}
-          </div>
-          <div className="sum-lbl">Unrealized Bullion Gain</div>
-          <div className="helper" style={{ marginTop: 4 }}>
-            Cost: ₹{Math.round(totalCostValuation).toLocaleString('en-IN')} · Retail: ₹{Math.round(totalRetailValuation).toLocaleString('en-IN')}
-          </div>
+          <div className="sum-lbl">Stock Valuation (Live)</div>
+          <div className="helper" style={{ marginTop: 4 }}>At today's live benchmark rates</div>
         </div>
       </div>
 

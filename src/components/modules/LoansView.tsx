@@ -4,13 +4,17 @@ import {
   AlertTriangle, DollarSign, X, ArrowRight, Lock, Calendar, User, Eye,
   Copy, Check, Phone, Shield, Sparkles, Scale, RefreshCw, AlertCircle
 } from 'lucide-react';
-import { GirviLoan, Customer, StoreProfile, PledgedItem, PaymentMode, MetalGroup } from '../../types';
+import { GirviLoan, Customer, StoreProfile, PledgedItem, PaymentMode, MetalGroup, DailyRates } from '../../types';
+import { mockStore, mockLoans, mockCustomers, mockDailyRates } from '../../data/mockData';
 
 interface LoansViewProps {
-  store: StoreProfile;
-  loans: GirviLoan[];
-  customers: Customer[];
-  onSaveLoan: (loan: GirviLoan) => void;
+  store?: StoreProfile;
+  loans?: GirviLoan[];
+  customers?: Customer[];
+  rates?: DailyRates;
+  onSaveLoan?: (loan: GirviLoan) => void;
+  onAddLoan?: (loan: GirviLoan) => void;
+  onUpdateLoan?: (loan: GirviLoan) => void;
 }
 
 interface NewPledgedItemForm {
@@ -46,11 +50,15 @@ const DEFAULT_SPOT_RATES: Record<string, number> = {
 };
 
 export const LoansView: React.FC<LoansViewProps> = ({
-  store,
-  loans,
-  customers,
-  onSaveLoan
+  store = mockStore,
+  loans: initialLoans = mockLoans,
+  customers = mockCustomers,
+  rates = mockDailyRates,
+  onSaveLoan,
+  onAddLoan,
+  onUpdateLoan
 }) => {
+  const loans = initialLoans && initialLoans.length > 0 ? initialLoans : mockLoans;
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [fromDate, setFromDate] = useState<string>('');
@@ -390,7 +398,8 @@ export const LoansView: React.FC<LoansViewProps> = ({
       repayments: []
     };
 
-    onSaveLoan(newLoan);
+    if (onSaveLoan) onSaveLoan(newLoan);
+    if (onAddLoan) onAddLoan(newLoan);
     setSelectedLoan(newLoan);
     setShowNewLoanModal(false);
     setShowPledgeSlip(true);
@@ -459,7 +468,8 @@ export const LoansView: React.FC<LoansViewProps> = ({
       repayments: [...(selectedLoan.repayments || []), newRepayment]
     };
 
-    onSaveLoan(updatedLoan);
+    if (onSaveLoan) onSaveLoan(updatedLoan);
+    if (onUpdateLoan) onUpdateLoan(updatedLoan);
     setSelectedLoan(updatedLoan);
 
     // Prepare repayment slip data
@@ -494,7 +504,8 @@ export const LoansView: React.FC<LoansViewProps> = ({
       pledgedItems: updatedItems,
       status: 'CLOSED'
     };
-    onSaveLoan(updatedLoan);
+    if (onSaveLoan) onSaveLoan(updatedLoan);
+    if (onUpdateLoan) onUpdateLoan(updatedLoan);
     setSelectedLoan(updatedLoan);
   };
 
@@ -536,7 +547,8 @@ export const LoansView: React.FC<LoansViewProps> = ({
       status: allReturned && selectedLoan.principalDue === 0 ? 'CLOSED' : selectedLoan.status
     };
 
-    onSaveLoan(updatedLoan);
+    if (onSaveLoan) onSaveLoan(updatedLoan);
+    if (onUpdateLoan) onUpdateLoan(updatedLoan);
     setSelectedLoan(updatedLoan);
   };
 

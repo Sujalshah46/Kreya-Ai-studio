@@ -740,3 +740,7 @@ export const ShopSettingsUsersView: React.FC<ShopSettingsUsersViewProps> = ({
   );
 };
 
+export { ShopSettingsView } from './ShopSettingsView';
+export default ShopSettingsUsersView;
+
+

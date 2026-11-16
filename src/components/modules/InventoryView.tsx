@@ -23,7 +23,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onAddItem,
   onUpdateStock
 }) => {
-  // Default single stock item from the DB: 'SBJCH-01', 'Gold Chain 22K Rope', Gold 22K, HUID ZX98YU, gross 12.350g, net 12.350g, qty 3
+  // Default items from the DB:
+  // 1. SBJCH-01 (Gold Chain 22K Rope, 12.350g, HUID ZX98YU)
+  // 2. SBJKD-01 (Gold Antique Kada 22K, 25.500g, HUID KD9988)
   const dbSingleStockItem: InventoryItem = {
     id: 'item-sbj-01',
     itemCode: 'SBJCH-01',
@@ -62,30 +64,102 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     status: 'IN_STOCK' as const
   };
 
+  const dbKadaStockItem: InventoryItem = {
+    id: 'item-sbj-02',
+    itemCode: 'SBJKD-01',
+    barcode: '890123456002',
+    huid: 'KD9988',
+    itemName: 'Gold Antique Kada 22K',
+    category: 'gold',
+    subCategory: 'Kada',
+    metalType: 'Gold',
+    metalGroup: 'GOLD' as MetalGroup,
+    purityKarat: '22K (916)',
+    purityPercent: 91.60,
+    grossWeight: 25.500,
+    stoneWeight: 0.500,
+    netWeight: 25.000,
+    wastagePercent: 5.0,
+    makingMode: 'PER_NET_GRAM' as MakingChargeMode,
+    makingRate: 550.0,
+    makingType: 'per_gram' as const,
+    costPrice: 175000.0,
+    retailPrice: 195000.0,
+    wholesalePrice: 182000.0,
+    mrp: 210000.0,
+    hsn: '7113',
+    quantity: 1,
+    minStock: 1,
+    itemSize: '2.6',
+    designNo: 'DSG-002',
+    gender: 'Men',
+    retailMarginPct: 25.0,
+    wholesaleMarginPct: 12.0,
+    stockQty: 1,
+    location: 'Showcase A',
+    rackTray: 'Kada Tray 01',
+    stones: [
+      {
+        id: 'st-1',
+        group: 'Gemstone',
+        name: 'Ruby',
+        pieces: 2,
+        carats: 2.5,
+        grams: 0.500,
+        ratePerCarat: 2000,
+        totalValue: 5000,
+      }
+    ],
+    status: 'IN_STOCK' as const
+  };
+
   // Deletion tracker for items deleted in session
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
 
-  // Guaranteed single DB stock item presence
+  // Guaranteed DB stock items presence
   const rawInventory = React.useMemo(() => {
-    if (!initialInventory || initialInventory.length === 0) {
-      return [dbSingleStockItem];
+    let list = initialInventory && initialInventory.length > 0 ? [...initialInventory] : [];
+    if (!list.some(i => i.itemCode === 'SBJCH-01')) {
+      list.unshift(dbSingleStockItem);
     }
-    const hasSbj = initialInventory.some(i => i.itemCode === 'SBJCH-01');
-    const mapped = initialInventory.map(item => item.itemCode === 'SBJCH-01' ? {
-      ...dbSingleStockItem,
-      ...item,
-      itemCode: 'SBJCH-01',
-      itemName: 'Gold Chain 22K Rope',
-      purityKarat: '22K (916)',
-      metalType: 'Gold',
-      huid: 'ZX98YU',
-      grossWeight: 12.350,
-      netWeight: 12.350,
-      stoneWeight: 0.000,
-      quantity: item.quantity || 3,
-      stockQty: item.stockQty || 3
-    } : item);
-    return hasSbj ? mapped : [dbSingleStockItem, ...mapped];
+    if (!list.some(i => i.itemCode === 'SBJKD-01')) {
+      list.unshift(dbKadaStockItem);
+    }
+    return list.map(item => {
+      if (item.itemCode === 'SBJCH-01') {
+        return {
+          ...dbSingleStockItem,
+          ...item,
+          itemCode: 'SBJCH-01',
+          itemName: 'Gold Chain 22K Rope',
+          purityKarat: '22K (916)',
+          metalType: 'Gold',
+          huid: 'ZX98YU',
+          grossWeight: 12.350,
+          netWeight: 12.350,
+          stoneWeight: 0.000,
+          quantity: item.quantity || 3,
+          stockQty: item.stockQty || 3
+        };
+      }
+      if (item.itemCode === 'SBJKD-01') {
+        return {
+          ...dbKadaStockItem,
+          ...item,
+          itemCode: 'SBJKD-01',
+          itemName: 'Gold Antique Kada 22K',
+          purityKarat: '22K (916)',
+          metalType: 'Gold',
+          huid: 'KD9988',
+          grossWeight: 25.500,
+          netWeight: 25.000,
+          stoneWeight: 0.500,
+          quantity: item.quantity || 1,
+          stockQty: item.stockQty || 1
+        };
+      }
+      return item;
+    });
   }, [initialInventory]);
 
   const inventory = React.useMemo(() => {
@@ -164,6 +238,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [description, setDescription] = useState<string>('');
   const [stones, setStones] = useState<StoneItem[]>([]);
 
+  // Modal Tab State: General, Metal & Weights, Making & Margins, Pricing, Images
+  const [modalTab, setModalTab] = useState<'general' | 'metal_weights' | 'making_margins' | 'pricing' | 'images'>('general');
+  const [imageUrl, setImageUrl] = useState<string>('');
+  const [itemImages, setItemImages] = useState<string[]>([]);
+
   // Sample stock movement logs
   const [stockMovements, setStockMovements] = useState([
     { id: 'sm-1', date: '15 Nov 2026 11:30 AM', code: 'SBJCH-01', item: 'Gold Chain 22K Rope', type: 'IN', qty: 3, reason: 'Opening stock', by: 'Admin' },
@@ -219,6 +298,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   const handleOpenAdd = () => {
     setEditingItemId(null);
+    setModalTab('general');
+    setImageUrl('');
+    setItemImages([]);
     const randNum = Math.floor(1000 + Math.random() * 9000);
     setItemCode(`JW-${randNum}`);
     setBarcode(generateBarcodeValue());
@@ -255,6 +337,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   const handleOpenEdit = (item: InventoryItem) => {
     setEditingItemId(item.id);
+    setModalTab('general');
+    setImageUrl(item.imageUrl || '');
+    setItemImages(item.images || (item.imageUrl ? [item.imageUrl] : []));
     setItemCode(item.itemCode);
     setBarcode(item.barcode || '');
     setHuid(item.huid || '');
@@ -339,7 +424,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       rackTray,
       stones,
       status: 'IN_STOCK',
-      description
+      description,
+      imageUrl: imageUrl.trim() || undefined,
+      images: itemImages.length > 0 ? itemImages : undefined
     };
 
     onAddItem(newItem);
@@ -473,6 +560,53 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const totalCostValue = inventory.reduce((acc, item) => acc + (item.costPrice * item.stockQty), 0);
   const totalRetailValue = inventory.reduce((acc, item) => acc + (item.retailPrice * item.stockQty), 0);
 
+  // Fine Gold Weight (pure gold equivalent based on purity karat or percent)
+  const totalFineGoldWeight = inventory.reduce((acc, item) => {
+    const isGold = (item.metalType || item.category || '').toLowerCase().includes('gold') || (item.metalGroup === 'GOLD');
+    if (!isGold) return acc;
+    const factor = item.purityPercent 
+      ? item.purityPercent / 100 
+      : item.purityKarat?.includes('24') ? 1.0
+      : item.purityKarat?.includes('22') ? 0.916
+      : item.purityKarat?.includes('18') ? 0.750
+      : item.purityKarat?.includes('14') ? 0.585
+      : 0.916;
+    return acc + (item.netWeight * item.stockQty * factor);
+  }, 0);
+
+  // Live Rates Valuation at today's rates
+  const liveRate24k = rates?.gold24kPerGram || 15000;
+  const liveRate22k = rates?.gold22kPerGram || 13740;
+  const liveRate18k = rates?.gold18kPerGram || 11250;
+  const liveRate14k = rates?.gold14kPerGram || 8775;
+  const liveRateSilver = rates?.silverPerGram || 94;
+  const liveRatePlatinum = rates?.platinumPerGram || 3450;
+
+  const totalStockValuation = inventory.reduce((acc, item) => {
+    const qty = item.stockQty || 0;
+    if (qty <= 0) return acc;
+    const cat = (item.metalType || item.category || '').toLowerCase();
+    let perGram = liveRate22k;
+    if (cat.includes('gold')) {
+      if (item.purityKarat?.includes('24')) perGram = liveRate24k;
+      else if (item.purityKarat?.includes('18')) perGram = liveRate18k;
+      else if (item.purityKarat?.includes('14')) perGram = liveRate14k;
+      else perGram = liveRate22k;
+    } else if (cat.includes('silver')) {
+      perGram = liveRateSilver;
+    } else if (cat.includes('platinum')) {
+      perGram = liveRatePlatinum;
+    }
+    const metalVal = item.netWeight * perGram;
+    const makingVal = item.makingMode === 'PERCENTAGE_OF_GOLD' 
+      ? (metalVal * (item.makingRate || 0)) / 100
+      : item.makingMode === 'FIXED_PER_PIECE'
+      ? (item.makingRate || 0)
+      : (item.makingRate || 0) * item.netWeight;
+    const stoneVal = (item.stones || []).reduce((s, st) => s + (st.value || ((st.carats || 0) * (st.ratePerCarat || 0))), 0);
+    return acc + ((metalVal + makingVal + stoneVal) * qty);
+  }, 0);
+
   return (
     <div className="page">
       {/* 1. Exact Header */}
@@ -511,6 +645,34 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         >
           Summary
         </button>
+      </div>
+
+      {/* Stock Summary Cards (Total Pieces, Gross Weight, Net Weight, Fine Gold Weight, Stock Valuation at today's rates) */}
+      <div className="sum-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginBottom: 16 }}>
+        <div className="sum-box">
+          <div className="sum-val">{totalPieces} pcs</div>
+          <div className="sum-lbl">Total Pieces</div>
+        </div>
+        <div className="sum-box">
+          <div className="sum-val">{totalGrossWeight.toFixed(3)} g</div>
+          <div className="sum-lbl">Gross Weight</div>
+        </div>
+        <div className="sum-box">
+          <div className="sum-val">{totalNetWeight.toFixed(3)} g</div>
+          <div className="sum-lbl">Net Weight</div>
+        </div>
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: 'var(--gold, #a98b59)' }}>
+            {totalFineGoldWeight.toFixed(3)} g
+          </div>
+          <div className="sum-lbl">Fine Gold Weight</div>
+        </div>
+        <div className="sum-box">
+          <div className="sum-val" style={{ color: 'var(--primary, #237a57)' }}>
+            ₹{Math.round(totalStockValuation).toLocaleString('en-IN')}
+          </div>
+          <div className="sum-lbl">Stock Valuation (Live)</div>
+        </div>
       </div>
 
       {/* TAB 1: Items Table */}
@@ -779,24 +941,30 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       {/* TAB 3: Summary */}
       {activeTab === 'summary' && (
         <div>
-          <div className="sum-grid">
+          <div className="sum-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginBottom: 16 }}>
             <div className="sum-box">
               <div className="sum-val">{totalPieces} pcs</div>
-              <div className="sum-lbl">Total Catalog Units</div>
+              <div className="sum-lbl">Total Pieces</div>
             </div>
             <div className="sum-box">
               <div className="sum-val">{totalGrossWeight.toFixed(3)} g</div>
-              <div className="sum-lbl">Total Gross Weight</div>
+              <div className="sum-lbl">Gross Weight</div>
             </div>
             <div className="sum-box">
               <div className="sum-val">{totalNetWeight.toFixed(3)} g</div>
-              <div className="sum-lbl">Total Net Weight</div>
+              <div className="sum-lbl">Net Weight</div>
+            </div>
+            <div className="sum-box">
+              <div className="sum-val" style={{ color: 'var(--gold, #a98b59)' }}>
+                {totalFineGoldWeight.toFixed(3)} g
+              </div>
+              <div className="sum-lbl">Fine Gold Weight</div>
             </div>
             <div className="sum-box">
               <div className="sum-val" style={{ color: 'var(--primary)' }}>
-                ₹{Math.round(totalRetailValue).toLocaleString('en-IN')}
+                ₹{Math.round(totalStockValuation).toLocaleString('en-IN')}
               </div>
-              <div className="sum-lbl">Total Retail Valuation</div>
+              <div className="sum-lbl">Stock Valuation (Live)</div>
             </div>
           </div>
 
@@ -860,457 +1028,749 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </div>
             
             <form onSubmit={handleSaveItem}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                
-                {/* 1. General & Barcode */}
-                <div className="section-divider">
-                  <span>1. IDENTIFICATION & GENERAL ATTRIBUTES</span>
-                </div>
-                <div className="g4">
-                  <div className="form-group">
-                    <label className="label">Item Code / SKU *</label>
-                    <input 
-                      type="text" 
-                      className="input" 
-                      value={itemCode} 
-                      onChange={(e) => setItemCode(e.target.value.toUpperCase())}
-                      required 
-                    />
-                    <div className="helper">e.g. SBJCH-01</div>
-                  </div>
-
-                  <div className="form-group">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                      <label className="label" style={{ marginBottom: 0 }}>Barcode (EAN / Custom)</label>
-                      <button 
-                        type="button" 
-                        className="btn btn-outline btn-xs" 
-                        style={{ fontSize: 10, padding: '1px 6px' }}
-                        onClick={() => setBarcode(generateBarcodeValue())}
-                        title="Auto-generate 12-digit EAN Barcode"
-                      >
-                        Auto-Gen
-                      </button>
-                    </div>
-                    <input 
-                      type="text" 
-                      className="input mono" 
-                      value={barcode} 
-                      onChange={(e) => setBarcode(e.target.value)}
-                    />
-                    <div className="helper">e.g. 890123456001</div>
-                  </div>
-
-                  <div className="form-group">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                      <label className="label" style={{ marginBottom: 0 }}>HUID (Hallmark Unique ID)</label>
-                      <button 
-                        type="button" 
-                        className="btn btn-outline btn-xs" 
-                        style={{ fontSize: 10, padding: '1px 6px' }}
-                        onClick={() => setHuid(generateHuid())}
-                        title="Auto-generate BIS 6-Character Alphanumeric HUID"
-                      >
-                        Auto-Gen 6-Char
-                      </button>
-                    </div>
-                    <input 
-                      type="text" 
-                      className="input mono" 
-                      maxLength={6}
-                      value={huid} 
-                      onChange={(e) => setHuid(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
-                      placeholder="e.g. ZX98YU"
-                    />
-                    <div className="helper">6-character alphanumeric (BIS hallmarked)</div>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="label">HSN Code</label>
-                    <input 
-                      type="text" 
-                      className="input" 
-                      value={hsn} 
-                      onChange={(e) => setHsn(e.target.value)}
-                    />
-                    <div className="helper">Standard: 7113</div>
-                  </div>
-                </div>
-
-                <div className="g2">
-                  <div className="form-group">
-                    <label className="label">Item Name *</label>
-                    <input 
-                      type="text" 
-                      className="input" 
-                      value={itemName} 
-                      onChange={(e) => setItemName(e.target.value)}
-                      required 
-                    />
-                    <div className="helper">e.g. Gold Chain 22K Rope</div>
-                  </div>
-
-                  <div className="g2">
-                    <div className="form-group">
-                      <label className="label">Design No</label>
-                      <input 
-                        type="text" 
-                        className="input" 
-                        value={designNo} 
-                        onChange={(e) => setDesignNo(e.target.value)}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="label">Size / Length</label>
-                      <input 
-                        type="text" 
-                        className="input" 
-                        value={itemSize} 
-                        onChange={(e) => setItemSize(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Metal, Purity & Weights */}
-                <div className="section-divider">
-                  <span>2. METAL, PURITY & WEIGHT SPECIFICATIONS</span>
-                </div>
-                <div className="g4">
-                  <div className="form-group">
-                    <label className="label">Category</label>
-                    <select 
-                      className="input" 
-                      value={category} 
-                      onChange={(e) => setCategory(e.target.value)}
-                    >
-                      <option value="gold">Gold</option>
-                      <option value="silver">Silver</option>
-                      <option value="diamond">Diamond</option>
-                      <option value="platinum">Platinum</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="label">Sub-Category</label>
-                    <select 
-                      className="input" 
-                      value={subCategory} 
-                      onChange={(e) => setSubCategory(e.target.value)}
-                    >
-                      <option value="Chain">Chain</option>
-                      <option value="Ring">Ring</option>
-                      <option value="Bangle">Bangle</option>
-                      <option value="Necklace">Necklace</option>
-                      <option value="Earrings">Earrings</option>
-                      <option value="Pendant">Pendant</option>
-                      <option value="Bracelet">Bracelet</option>
-                      <option value="Coin">Coin / Bar</option>
-                      <option value="Mangalsutra">Mangalsutra</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="label">Purity / Karat</label>
-                    <select 
-                      className="input" 
-                      value={purityKarat} 
-                      onChange={(e) => setPurityKarat(e.target.value)}
-                    >
-                      <option value="24K (999)">24K (999 Pure)</option>
-                      <option value="22K (916)">22K (916 BIS)</option>
-                      <option value="18K (750)">18K (750)</option>
-                      <option value="14K (585)">14K (585)</option>
-                      <option value="Silver 999">Silver 999</option>
-                      <option value="Silver 925">Silver 925 Sterling</option>
-                      <option value="Platinum 950">Platinum 950</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="label">Wastage %</label>
-                    <input 
-                      type="number" 
-                      step="0.1" 
-                      min="0"
-                      className="input" 
-                      value={wastagePercent} 
-                      onChange={(e) => setWastagePercent(e.target.value)}
-                    />
-                    <div className="helper">e.g. 6.0%</div>
-                  </div>
-                </div>
-
-                <div className="g4">
-                  <div className="form-group">
-                    <label className="label">Gross Weight (g) *</label>
-                    <input 
-                      type="number" 
-                      step="0.001" 
-                      min="0.001"
-                      className="input" 
-                      value={grossWeight} 
-                      onChange={(e) => setGrossWeight(e.target.value)}
-                      required 
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="label">Stone Weight (g)</label>
-                    <input 
-                      type="number" 
-                      step="0.001" 
-                      min="0"
-                      className="input" 
-                      value={stoneWeight} 
-                      onChange={(e) => setStoneWeight(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="label">Net Weight (Computed)</label>
-                    <input 
-                      type="text" 
-                      className="input" 
-                      readOnly
-                      style={{ background: 'var(--zebra)', fontWeight: 700 }}
-                      value={`${netWeightComputed.toFixed(3)} g`} 
-                    />
-                    <div className="helper">Gross - Stones</div>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="label">Gender</label>
-                    <select 
-                      className="input" 
-                      value={gender} 
-                      onChange={(e) => setGender(e.target.value)}
-                    >
-                      <option value="Men">Men</option>
-                      <option value="Women">Women</option>
-                      <option value="Kids">Kids</option>
-                      <option value="Unisex">Unisex</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Live Metal Benchmark & Indicative Selling Price Calculator */}
-                <div style={{ background: '#fdfcf7', border: '1px solid #fde68a', borderRadius: '10px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 11, textTransform: 'uppercase', color: '#92400e', fontWeight: 700, letterSpacing: 0.5 }}>
-                      Live Benchmark Rate ({purityKarat}): ₹{liveRatePerGram.toLocaleString('en-IN')}/g
-                    </div>
-                    <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>
-                      Metal: ₹{indicativeMetalValue.toLocaleString('en-IN')} + Making: ₹{indicativeMakingCharge.toLocaleString('en-IN')}{stoneTotalValue > 0 ? ` + Stones: ₹${stoneTotalValue.toLocaleString('en-IN')}` : ''}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 10, color: 'var(--muted)' }}>EST. INDICATIVE SELLING</div>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--primary)' }}>
-                        ₹{indicativeTotalEstimate.toLocaleString('en-IN')}
-                      </div>
-                    </div>
-                    <button 
-                      type="button" 
-                      className="btn btn-outline btn-xs"
-                      onClick={() => setRetailPrice(indicativeTotalEstimate.toString())}
-                      title="Set Retail Price from Live Benchmark Rate"
-                    >
-                      Use Est. Price
-                    </button>
-                  </div>
-                </div>
-
-                {/* 3. Making Charges & Pricing */}
-                <div className="section-divider">
-                  <span>3. MAKING CHARGES & PRICING</span>
-                </div>
-                <div className="g4">
-                  <div className="form-group">
-                    <label className="label">Making Charge Mode</label>
-                    <select 
-                      className="input" 
-                      value={makingType} 
-                      onChange={(e) => setMakingType(e.target.value as any)}
-                    >
-                      <option value="per_gram">Per Gram (₹/g)</option>
-                      <option value="per_piece">Per Piece Flat (₹)</option>
-                      <option value="percent_of_metal">Percentage of Metal (%)</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="label">Making Rate</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      min="0"
-                      className="input" 
-                      value={makingRate} 
-                      onChange={(e) => setMakingRate(e.target.value)}
-                    />
-                    <div className="helper">
-                      {makingType === 'per_gram' ? '₹ per gram' : makingType === 'per_piece' ? '₹ flat fee' : '% of metal value'}
-                    </div>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="label">Cost Price (₹)</label>
-                    <input 
-                      type="number" 
-                      step="1" 
-                      className="input" 
-                      value={costPrice} 
-                      onChange={(e) => handleCostChange(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="label">Retail Price (₹)</label>
-                    <input 
-                      type="number" 
-                      step="1" 
-                      className="input" 
-                      value={retailPrice} 
-                      onChange={(e) => setRetailPrice(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="g4">
-                  <div className="form-group">
-                    <label className="label">Retail Margin %</label>
-                    <input 
-                      type="number" 
-                      step="0.1" 
-                      className="input" 
-                      value={retailMarginPct} 
-                      onChange={(e) => setRetailMarginPct(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="label">Wholesale Price (₹)</label>
-                    <input 
-                      type="number" 
-                      step="1" 
-                      className="input" 
-                      value={wholesalePrice} 
-                      onChange={(e) => setWholesalePrice(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="label">MRP (₹)</label>
-                    <input 
-                      type="number" 
-                      step="1" 
-                      className="input" 
-                      value={mrp} 
-                      onChange={(e) => setMrp(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="label">Quantity in Stock *</label>
-                    <input 
-                      type="number" 
-                      min="0"
-                      className="input" 
-                      value={quantity} 
-                      onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
-                      required 
-                    />
-                  </div>
-                </div>
-
-                {/* 4. Stock Location & Tray */}
-                <div className="section-divider">
-                  <span>4. STOCK LOCATION & REORDER ALERTS</span>
-                </div>
-                <div className="g4">
-                  <div className="form-group">
-                    <label className="label">Showroom Location</label>
-                    <input 
-                      type="text" 
-                      className="input" 
-                      value={location} 
-                      onChange={(e) => setLocation(e.target.value)}
-                    />
-                    <div className="helper">e.g. Main Showroom</div>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="label">Rack / Tray No</label>
-                    <input 
-                      type="text" 
-                      className="input" 
-                      value={rackTray} 
-                      onChange={(e) => setRackTray(e.target.value)}
-                    />
-                    <div className="helper">e.g. Chain Tray 01</div>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="label">Min Stock Alert Level</label>
-                    <input 
-                      type="number" 
-                      min="0"
-                      className="input" 
-                      value={minStock} 
-                      onChange={(e) => setMinStock(parseInt(e.target.value) || 1)}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="label">Tag Printing Action</label>
-                    <button 
-                      type="button" 
-                      className="btn btn-outline"
-                      style={{ width: '100%', marginTop: '2px' }}
-                      onClick={() => {
-                        const tempItem: InventoryItem = {
-                          id: editingItemId || 'item-preview',
-                          itemCode: itemCode || 'SBJCH-01',
-                          barcode: barcode || '890123456001',
-                          huid: huid || 'ZX98YU',
-                          itemName: itemName || 'Gold Chain 22K Rope',
-                          category,
-                          subCategory,
-                          metalType,
-                          metalGroup,
-                          purityKarat,
-                          purityPercent: 91.6,
-                          grossWeight: parsedGross,
-                          stoneWeight: parsedStone,
-                          netWeight: netWeightComputed,
-                          wastagePercent: parseFloat(wastagePercent) || 0,
-                          makingMode: 'PER_NET_GRAM',
-                          makingRate: parseFloat(makingRate) || 0,
-                          costPrice: parseFloat(costPrice) || 0,
-                          retailPrice: parseFloat(retailPrice) || 0,
-                          wholesalePrice: parseFloat(wholesalePrice) || 0,
-                          stockQty: quantity,
-                          location,
-                          rackTray,
-                          stones: [],
-                          status: 'IN_STOCK'
-                        };
-                        handleOpenTagPrint(tempItem);
-                      }}
-                    >
-                      <Printer size={14} />
-                      <span>Print Jewellery Tag</span>
-                    </button>
-                  </div>
-                </div>
-
+              {/* Modal Tabs Header: General, Metal & Weights, Making & Margins, Pricing, Images */}
+              <div className="tabs" style={{ padding: '0 20px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+                <button 
+                  type="button" 
+                  className={`tab ${modalTab === 'general' ? 'active' : ''}`}
+                  onClick={() => setModalTab('general')}
+                >
+                  General
+                </button>
+                <button 
+                  type="button" 
+                  className={`tab ${modalTab === 'metal_weights' ? 'active' : ''}`}
+                  onClick={() => setModalTab('metal_weights')}
+                >
+                  Metal &amp; Weights
+                </button>
+                <button 
+                  type="button" 
+                  className={`tab ${modalTab === 'making_margins' ? 'active' : ''}`}
+                  onClick={() => setModalTab('making_margins')}
+                >
+                  Making &amp; Margins
+                </button>
+                <button 
+                  type="button" 
+                  className={`tab ${modalTab === 'pricing' ? 'active' : ''}`}
+                  onClick={() => setModalTab('pricing')}
+                >
+                  Pricing
+                </button>
+                <button 
+                  type="button" 
+                  className={`tab ${modalTab === 'images' ? 'active' : ''}`}
+                  onClick={() => setModalTab('images')}
+                >
+                  Images
+                </button>
               </div>
 
-              <div className="modal-foot">
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 380, maxHeight: '65vh', overflowY: 'auto' }}>
+                {modalTab === 'general' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div className="g4">
+                      <div className="form-group">
+                        <label className="label">Item Code / SKU *</label>
+                        <input 
+                          type="text" 
+                          className="input" 
+                          value={itemCode} 
+                          onChange={(e) => setItemCode(e.target.value.toUpperCase())}
+                          required 
+                        />
+                        <div className="helper">e.g. SBJKD-01 / SBJCH-01</div>
+                      </div>
+
+                      <div className="form-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <label className="label" style={{ marginBottom: 0 }}>Barcode (EAN / Custom)</label>
+                          <button 
+                            type="button" 
+                            className="btn btn-outline btn-xs" 
+                            style={{ fontSize: 10, padding: '1px 6px' }}
+                            onClick={() => setBarcode(generateBarcodeValue())}
+                            title="Auto-generate 12-digit EAN Barcode"
+                          >
+                            Auto-Gen
+                          </button>
+                        </div>
+                        <input 
+                          type="text" 
+                          className="input mono" 
+                          value={barcode} 
+                          onChange={(e) => setBarcode(e.target.value)}
+                        />
+                        <div className="helper">e.g. 890123456001</div>
+                      </div>
+
+                      <div className="form-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <label className="label" style={{ marginBottom: 0 }}>HUID (Hallmark Unique ID)</label>
+                          <button 
+                            type="button" 
+                            className="btn btn-outline btn-xs" 
+                            style={{ fontSize: 10, padding: '1px 6px' }}
+                            onClick={() => setHuid(generateHuid())}
+                            title="Auto-generate BIS 6-Character Alphanumeric HUID"
+                          >
+                            Auto-Gen 6-Char
+                          </button>
+                        </div>
+                        <input 
+                          type="text" 
+                          className="input mono" 
+                          maxLength={6}
+                          value={huid} 
+                          onChange={(e) => setHuid(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+                          placeholder="e.g. KD9988 / ZX98YU"
+                        />
+                        <div className="helper">6-character alphanumeric (e.g. KD9988)</div>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">HSN Code</label>
+                        <input 
+                          type="text" 
+                          className="input" 
+                          value={hsn} 
+                          onChange={(e) => setHsn(e.target.value)}
+                        />
+                        <div className="helper">Standard: 7113 (Jewellery)</div>
+                      </div>
+                    </div>
+
+                    <div className="g2">
+                      <div className="form-group">
+                        <label className="label">Item Name *</label>
+                        <input 
+                          type="text" 
+                          className="input" 
+                          value={itemName} 
+                          onChange={(e) => setItemName(e.target.value)}
+                          required 
+                        />
+                        <div className="helper">e.g. Gold Antique Kada 22K</div>
+                      </div>
+
+                      <div className="g2">
+                        <div className="form-group">
+                          <label className="label">Design No</label>
+                          <input 
+                            type="text" 
+                            className="input" 
+                            value={designNo} 
+                            onChange={(e) => setDesignNo(e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="label">Size / Length</label>
+                          <input 
+                            type="text" 
+                            className="input" 
+                            value={itemSize} 
+                            onChange={(e) => setItemSize(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="g4">
+                      <div className="form-group">
+                        <label className="label">Category</label>
+                        <select 
+                          className="input" 
+                          value={category} 
+                          onChange={(e) => setCategory(e.target.value)}
+                        >
+                          <option value="gold">Gold</option>
+                          <option value="silver">Silver</option>
+                          <option value="diamond">Diamond</option>
+                          <option value="platinum">Platinum</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">Sub-Category</label>
+                        <select 
+                          className="input" 
+                          value={subCategory} 
+                          onChange={(e) => setSubCategory(e.target.value)}
+                        >
+                          <option value="Chain">Chain</option>
+                          <option value="Kada">Kada</option>
+                          <option value="Ring">Ring</option>
+                          <option value="Bangle">Bangle</option>
+                          <option value="Necklace">Necklace</option>
+                          <option value="Earrings">Earrings</option>
+                          <option value="Pendant">Pendant</option>
+                          <option value="Bracelet">Bracelet</option>
+                          <option value="Coin">Coin / Bar</option>
+                          <option value="Mangalsutra">Mangalsutra</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">Gender</label>
+                        <select 
+                          className="input" 
+                          value={gender} 
+                          onChange={(e) => setGender(e.target.value)}
+                        >
+                          <option value="Men">Men</option>
+                          <option value="Women">Women</option>
+                          <option value="Kids">Kids</option>
+                          <option value="Unisex">Unisex</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">Min Stock Alert Level</label>
+                        <input 
+                          type="number" 
+                          min="0"
+                          className="input" 
+                          value={minStock} 
+                          onChange={(e) => setMinStock(parseInt(e.target.value) || 1)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="g2">
+                      <div className="form-group">
+                        <label className="label">Showroom Location</label>
+                        <input 
+                          type="text" 
+                          className="input" 
+                          value={location} 
+                          onChange={(e) => setLocation(e.target.value)}
+                        />
+                        <div className="helper">e.g. Showcase A / Main Showroom</div>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">Rack / Tray No</label>
+                        <input 
+                          type="text" 
+                          className="input" 
+                          value={rackTray} 
+                          onChange={(e) => setRackTray(e.target.value)}
+                        />
+                        <div className="helper">e.g. Kada Tray 01 / Chain Tray 01</div>
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="label">Item Description &amp; Craft Details</label>
+                      <textarea 
+                        className="input" 
+                        rows={2}
+                        value={description} 
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Traditional antique finish, handcrafted filigree, rhodium accents..."
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {modalTab === 'metal_weights' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div className="g4">
+                      <div className="form-group">
+                        <label className="label">Metal Group</label>
+                        <select 
+                          className="input" 
+                          value={metalGroup} 
+                          onChange={(e) => setMetalGroup(e.target.value as MetalGroup)}
+                        >
+                          <option value="GOLD">Gold</option>
+                          <option value="SILVER">Silver</option>
+                          <option value="DIAMOND">Diamond</option>
+                          <option value="PLATINUM">Platinum</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">Metal Type</label>
+                        <select 
+                          className="input" 
+                          value={metalType} 
+                          onChange={(e) => setMetalType(e.target.value)}
+                        >
+                          <option value="gold">Yellow Gold</option>
+                          <option value="rose_gold">Rose Gold</option>
+                          <option value="white_gold">White Gold</option>
+                          <option value="silver">Silver</option>
+                          <option value="platinum">Platinum</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">Purity / Karat</label>
+                        <select 
+                          className="input" 
+                          value={purityKarat} 
+                          onChange={(e) => setPurityKarat(e.target.value)}
+                        >
+                          <option value="24K (999)">24K (999 Pure)</option>
+                          <option value="22K (916)">22K (916 BIS)</option>
+                          <option value="18K (750)">18K (750)</option>
+                          <option value="14K (585)">14K (585)</option>
+                          <option value="Silver 999">Silver 999</option>
+                          <option value="Silver 925">Silver 925 Sterling</option>
+                          <option value="Platinum 950">Platinum 950</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">Wastage %</label>
+                        <input 
+                          type="number" 
+                          step="0.1" 
+                          min="0"
+                          className="input" 
+                          value={wastagePercent} 
+                          onChange={(e) => setWastagePercent(e.target.value)}
+                        />
+                        <div className="helper">e.g. 5.0% - 6.0%</div>
+                      </div>
+                    </div>
+
+                    <div className="g4">
+                      <div className="form-group">
+                        <label className="label">Gross Weight (g) *</label>
+                        <input 
+                          type="number" 
+                          step="0.001" 
+                          min="0.001"
+                          className="input" 
+                          value={grossWeight} 
+                          onChange={(e) => setGrossWeight(e.target.value)}
+                          required 
+                        />
+                        <div className="helper">Total weight with stones</div>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">Stone Weight (g)</label>
+                        <input 
+                          type="number" 
+                          step="0.001" 
+                          min="0"
+                          className="input" 
+                          value={stoneWeight} 
+                          onChange={(e) => setStoneWeight(e.target.value)}
+                        />
+                        <div className="helper">Deducted stone weight</div>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">Net Weight (Computed)</label>
+                        <input 
+                          type="text" 
+                          className="input" 
+                          readOnly
+                          style={{ background: 'var(--zebra)', fontWeight: 700 }}
+                          value={`${netWeightComputed.toFixed(3)} g`} 
+                        />
+                        <div className="helper">Gross - Stones ({netWeightComputed.toFixed(3)}g)</div>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">Fine Gold Equiv. (g)</label>
+                        <input 
+                          type="text" 
+                          className="input" 
+                          readOnly
+                          style={{ background: 'var(--zebra)', fontWeight: 700, color: 'var(--gold)' }}
+                          value={`${(netWeightComputed * (purityKarat.includes('24') ? 1.0 : purityKarat.includes('22') ? 0.916 : purityKarat.includes('18') ? 0.75 : 0.916)).toFixed(3)} g`} 
+                        />
+                        <div className="helper">Pure metal content</div>
+                      </div>
+                    </div>
+
+                    {/* Stones breakdown list */}
+                    <div className="card" style={{ marginTop: 6 }}>
+                      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="card-title">Stones &amp; Diamonds Attached ({stones.length})</span>
+                        <button 
+                          type="button" 
+                          className="btn btn-outline btn-xs"
+                          onClick={() => {
+                            const newSt: StoneItem = {
+                              id: `st-${Date.now()}`,
+                              group: 'Gemstone',
+                              name: 'Ruby',
+                              pieces: 1,
+                              carats: 1.0,
+                              ratePerCarat: 1500,
+                              value: 1500,
+                              deductWeight: true,
+                              weightGrams: 0.200
+                            };
+                            setStones(prev => [...prev, newSt]);
+                            setStoneWeight((parseFloat(stoneWeight || '0') + 0.200).toFixed(3));
+                          }}
+                        >
+                          + Add Stone
+                        </button>
+                      </div>
+                      {stones.length > 0 ? (
+                        <div className="tbl-wrap">
+                          <table className="tbl">
+                            <thead>
+                              <tr>
+                                <th>Name / Type</th>
+                                <th>Group</th>
+                                <th style={{ textAlign: 'center' }}>Pcs</th>
+                                <th style={{ textAlign: 'right' }}>Carats</th>
+                                <th style={{ textAlign: 'right' }}>Weight (g)</th>
+                                <th style={{ textAlign: 'right' }}>Value (₹)</th>
+                                <th style={{ textAlign: 'center' }}>Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {stones.map((st, idx) => (
+                                <tr key={st.id || idx}>
+                                  <td style={{ fontWeight: 600 }}>{st.name}</td>
+                                  <td><span className="badge badge-gray">{st.group}</span></td>
+                                  <td style={{ textAlign: 'center' }}>{st.pieces}</td>
+                                  <td style={{ textAlign: 'right' }}>{st.carats || '—'}</td>
+                                  <td style={{ textAlign: 'right' }} className="mono">{st.weightGrams ? `${st.weightGrams.toFixed(3)} g` : '—'}</td>
+                                  <td style={{ textAlign: 'right' }} className="mono">₹{(st.value || 0).toLocaleString('en-IN')}</td>
+                                  <td style={{ textAlign: 'center' }}>
+                                    <button 
+                                      type="button" 
+                                      className="btn btn-outline btn-xs"
+                                      onClick={() => {
+                                        setStones(prev => prev.filter((_, i) => i !== idx));
+                                        if (st.weightGrams) {
+                                          const nextStoneWt = Math.max(0, (parseFloat(stoneWeight || '0') - st.weightGrams));
+                                          setStoneWeight(nextStoneWt.toFixed(3));
+                                        }
+                                      }}
+                                    >
+                                      ✕
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div style={{ padding: 14, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                          No studded stones. Item is counted as solid plain metal.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {modalTab === 'making_margins' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div className="g4">
+                      <div className="form-group">
+                        <label className="label">Making Charge Mode</label>
+                        <select 
+                          className="input" 
+                          value={makingType} 
+                          onChange={(e) => setMakingType(e.target.value as any)}
+                        >
+                          <option value="per_gram">Per Gram (₹/g)</option>
+                          <option value="per_piece">Per Piece Flat (₹)</option>
+                          <option value="percent_of_metal">Percentage of Metal (%)</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">Making Rate</label>
+                        <input 
+                          type="number" 
+                          step="0.01" 
+                          min="0"
+                          className="input" 
+                          value={makingRate} 
+                          onChange={(e) => setMakingRate(e.target.value)}
+                        />
+                        <div className="helper">
+                          {makingType === 'per_gram' ? '₹ per gram (e.g. ₹550)' : makingType === 'per_piece' ? '₹ flat fee' : '% of metal value'}
+                        </div>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">Retail Margin %</label>
+                        <input 
+                          type="number" 
+                          step="0.1" 
+                          className="input" 
+                          value={retailMarginPct} 
+                          onChange={(e) => setRetailMarginPct(e.target.value)}
+                        />
+                        <div className="helper">Added to cost for retail</div>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">Wholesale Margin %</label>
+                        <input 
+                          type="number" 
+                          step="0.1" 
+                          className="input" 
+                          value={wholesaleMarginPct} 
+                          onChange={(e) => setWholesaleMarginPct(e.target.value)}
+                        />
+                        <div className="helper">B2B buyer pricing</div>
+                      </div>
+                    </div>
+
+                    {/* Live Metal Benchmark & Indicative Selling Price Calculator */}
+                    <div style={{ background: '#fdfcf7', border: '1px solid #fde68a', borderRadius: '10px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 11, textTransform: 'uppercase', color: '#92400e', fontWeight: 700, letterSpacing: 0.5 }}>
+                          Live Benchmark Rate ({purityKarat}): ₹{liveRatePerGram.toLocaleString('en-IN')}/g
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 700, marginTop: 4 }}>
+                          Metal: ₹{indicativeMetalValue.toLocaleString('en-IN')} + Making: ₹{indicativeMakingCharge.toLocaleString('en-IN')}{stoneTotalValue > 0 ? ` + Stones: ₹${stoneTotalValue.toLocaleString('en-IN')}` : ''}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                          Calculated for net weight {netWeightComputed.toFixed(3)}g @ {purityKarat}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>EST. INDICATIVE SELLING</div>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--primary)' }}>
+                            ₹{indicativeTotalEstimate.toLocaleString('en-IN')}
+                          </div>
+                        </div>
+                        <button 
+                          type="button" 
+                          className="btn btn-outline btn-sm"
+                          onClick={() => setRetailPrice(indicativeTotalEstimate.toString())}
+                          title="Set Retail Price from Live Benchmark Rate"
+                        >
+                          Use Est. Price
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {modalTab === 'pricing' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div className="g4">
+                      <div className="form-group">
+                        <label className="label">Cost Price (₹)</label>
+                        <input 
+                          type="number" 
+                          step="1" 
+                          className="input" 
+                          value={costPrice} 
+                          onChange={(e) => handleCostChange(e.target.value)}
+                        />
+                        <div className="helper">Purchase / manufacturer cost</div>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">Retail Price (₹)</label>
+                        <input 
+                          type="number" 
+                          step="1" 
+                          className="input" 
+                          value={retailPrice} 
+                          onChange={(e) => setRetailPrice(e.target.value)}
+                        />
+                        <div className="helper">Showroom counter price</div>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">Wholesale Price (₹)</label>
+                        <input 
+                          type="number" 
+                          step="1" 
+                          className="input" 
+                          value={wholesalePrice} 
+                          onChange={(e) => setWholesalePrice(e.target.value)}
+                        />
+                        <div className="helper">B2B wholesale price</div>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">MRP (₹)</label>
+                        <input 
+                          type="number" 
+                          step="1" 
+                          className="input" 
+                          value={mrp} 
+                          onChange={(e) => setMrp(e.target.value)}
+                        />
+                        <div className="helper">Maximum retail tag price</div>
+                      </div>
+                    </div>
+
+                    <div className="g2">
+                      <div className="form-group">
+                        <label className="label">Quantity in Stock *</label>
+                        <input 
+                          type="number" 
+                          min="0"
+                          className="input" 
+                          value={quantity} 
+                          onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
+                          required 
+                        />
+                        <div className="helper">Available physical units</div>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="label">Tag Printing Action</label>
+                        <button 
+                          type="button" 
+                          className="btn btn-outline"
+                          style={{ width: '100%', marginTop: '2px' }}
+                          onClick={() => {
+                            const tempItem: InventoryItem = {
+                              id: editingItemId || 'item-preview',
+                              itemCode: itemCode || 'SBJKD-01',
+                              barcode: barcode || '890123456002',
+                              huid: huid || 'KD9988',
+                              itemName: itemName || 'Gold Antique Kada 22K',
+                              category,
+                              subCategory,
+                              metalType,
+                              metalGroup,
+                              purityKarat,
+                              purityPercent: 91.6,
+                              grossWeight: parsedGross,
+                              stoneWeight: parsedStone,
+                              netWeight: netWeightComputed,
+                              wastagePercent: parseFloat(wastagePercent) || 0,
+                              makingMode: 'PER_NET_GRAM',
+                              makingRate: parseFloat(makingRate) || 0,
+                              costPrice: parseFloat(costPrice) || 0,
+                              retailPrice: parseFloat(retailPrice) || 0,
+                              wholesalePrice: parseFloat(wholesalePrice) || 0,
+                              stockQty: quantity,
+                              location,
+                              rackTray,
+                              stones,
+                              status: 'IN_STOCK'
+                            };
+                            handleOpenTagPrint(tempItem);
+                          }}
+                        >
+                          <Printer size={14} />
+                          <span>Print Jewellery Tag</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {modalTab === 'images' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div className="form-group">
+                      <label className="label">Item Image URL</label>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input 
+                          type="url" 
+                          className="input" 
+                          placeholder="https://example.com/jewellery/kada.jpg"
+                          value={imageUrl} 
+                          onChange={(e) => setImageUrl(e.target.value)}
+                        />
+                        <button 
+                          type="button" 
+                          className="btn btn-outline btn-sm"
+                          onClick={() => {
+                            if (imageUrl.trim() && !itemImages.includes(imageUrl.trim())) {
+                              setItemImages(prev => [...prev, imageUrl.trim()]);
+                            }
+                          }}
+                        >
+                          Add to Gallery
+                        </button>
+                      </div>
+                      <div className="helper">Direct HTTPS link or select presets below</div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12 }}>
+                      {itemImages.length > 0 ? (
+                        itemImages.map((img, idx) => (
+                          <div 
+                            key={idx} 
+                            style={{ 
+                              position: 'relative', 
+                              borderRadius: 8, 
+                              overflow: 'hidden', 
+                              border: imageUrl === img ? '2px solid var(--primary)' : '1px solid var(--border)',
+                              aspectRatio: '1 / 1',
+                              background: 'var(--zebra)'
+                            }}
+                          >
+                            <img src={img} alt={`Item ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <div style={{ position: 'absolute', bottom: 4, right: 4, display: 'flex', gap: 4 }}>
+                              <button 
+                                type="button" 
+                                className="btn btn-xs btn-primary"
+                                style={{ padding: '2px 4px', fontSize: 10 }}
+                                onClick={() => setImageUrl(img)}
+                                title="Set as primary thumbnail"
+                              >
+                                {imageUrl === img ? '✓ Main' : 'Make Main'}
+                              </button>
+                              <button 
+                                type="button" 
+                                className="btn btn-xs btn-danger"
+                                style={{ padding: '2px 4px', fontSize: 10 }}
+                                onClick={() => {
+                                  setItemImages(prev => prev.filter((_, i) => i !== idx));
+                                  if (imageUrl === img) setImageUrl(itemImages.find((_, i) => i !== idx) || '');
+                                }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div style={{ gridColumn: '1 / -1', padding: 24, textAlign: 'center', background: 'var(--bg)', borderRadius: 10, border: '1px dashed var(--border2)' }}>
+                          <div style={{ fontSize: 13, color: 'var(--muted)' }}>No images uploaded yet.</div>
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 10 }}>
+                            <button 
+                              type="button" 
+                              className="btn btn-outline btn-xs"
+                              onClick={() => {
+                                const sample = 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400';
+                                setImageUrl(sample);
+                                setItemImages([sample]);
+                              }}
+                            >
+                              Load Sample Kada Photo
+                            </button>
+                            <button 
+                              type="button" 
+                              className="btn btn-outline btn-xs"
+                              onClick={() => {
+                                const sample = 'https://images.unsplash.com/photo-1611591475874-9543884391e6?w=400';
+                                setImageUrl(sample);
+                                setItemImages([sample]);
+                              }}
+                            >
+                              Load Sample Chain Photo
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-foot" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <button 
                   type="button" 
                   className="btn btn-outline"
@@ -1318,12 +1778,40 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 >
                   Cancel
                 </button>
-                <button 
-                  type="submit" 
-                  className="btn btn-primary"
-                >
-                  {editingItemId ? 'Update Item' : 'Save Item to Stock'}
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {modalTab !== 'general' && (
+                    <button 
+                      type="button" 
+                      className="btn btn-outline"
+                      onClick={() => {
+                        const tabs = ['general', 'metal_weights', 'making_margins', 'pricing', 'images'] as const;
+                        const curr = tabs.indexOf(modalTab);
+                        if (curr > 0) setModalTab(tabs[curr - 1]);
+                      }}
+                    >
+                      ← Previous
+                    </button>
+                  )}
+                  {modalTab !== 'images' ? (
+                    <button 
+                      type="button" 
+                      className="btn btn-outline"
+                      onClick={() => {
+                        const tabs = ['general', 'metal_weights', 'making_margins', 'pricing', 'images'] as const;
+                        const curr = tabs.indexOf(modalTab);
+                        if (curr < tabs.length - 1) setModalTab(tabs[curr + 1]);
+                      }}
+                    >
+                      Next →
+                    </button>
+                  ) : null}
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary"
+                  >
+                    {editingItemId ? 'Update Item' : 'Save Item to Stock'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

@@ -1,149 +1,198 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Building2, Search, Bell, User, Clock, TrendingUp, Monitor, 
-  ChevronDown, ChevronLeft, ChevronRight, RotateCw, X, Check, ShieldCheck 
+  Menu, X, Check, Monitor, KeyRound, Palette, Moon, LogOut 
 } from 'lucide-react';
 import { StoreProfile, DailyRates, Counter } from '../../types';
+import { NAV_GROUPS, isNavActive } from './Sidebar';
 
-interface HeaderProps {
+export interface HeaderProps {
   store: StoreProfile;
   rates: DailyRates;
   counters: Counter[];
   activeCounter: Counter;
   onSelectCounter: (counter: Counter) => void;
-  onOpenOmnibar: () => void;
+  onOpenOmnibar?: () => void;
   onNavigate: (module: string) => void;
   currentModule: string;
+  mobileOpen?: boolean;
+  onToggleMobile?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   store,
-  rates,
   counters,
   activeCounter,
   onSelectCounter,
-  onOpenOmnibar,
   onNavigate,
-  currentModule
+  currentModule,
+  mobileOpen = false,
+  onToggleMobile,
 }) => {
   const [showCounterModal, setShowCounterModal] = useState(false);
-  const [currentTime, setCurrentTime] = useState('Thu 12 Nov 12:38 PM');
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
+  // Close user dropdown on outside click or escape
   useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const day = days[now.getDay()];
-      const date = now.getDate();
-      const month = months[now.getMonth()];
-      let hours = now.getHours();
-      const minutes = now.getMinutes().toString().padStart(2, '0');
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      hours = hours % 12;
-      hours = hours ? hours : 12;
-      setCurrentTime(`${day} ${date} ${month} ${hours}:${minutes} ${ampm}`);
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
     };
-    updateTime();
-    const timer = setInterval(updateTime, 60000);
-    return () => clearInterval(timer);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
-  const getModuleTitle = () => {
-    switch (currentModule) {
-      case 'dashboard': return 'Main / Dashboard';
-      case 'daily-rates': return 'Main / Daily Metal Rates';
-      case 'customers': return 'Customers / Customers';
-      case 'payments-pending': return 'Customers / Payments & Pending';
-      case 'billing': return 'Sales / Orders & Billing';
-      case 'metal-booking': return 'Sales / Metal Advance Booking';
-      case 'cancellations': return 'Sales / Cancellations';
-      case 'cash-register': return 'Sales / Cash Register';
-      case 'returns-buyback':
-      case 'buyback': return 'Sales / Returns / Buy-back';
-      case 'shipments': return 'Sales / Shipments';
-      case 'repairs': return 'Services / Repair Orders';
-      case 'loans': return 'Finance / Gold & Silver Loans';
-      case 'old-metal': return 'Finance / Old Gold & Silver Purchase';
-      case 'schemes': return 'Finance / Savings Schemes';
-      case 'cash-outflows': return 'Finance / Cash Outflows';
-      case 'inventory': return 'Stock / Inventory';
-      case 'valuation': return 'Stock / Stock & Valuation';
-      case 'stock-ledger':
-      case 'tags': return 'Stock / Stock Ledger & Tags';
-      case 'inventory-verification': return 'Stock / Inventory Verification';
-      case 'old-metal-stock': return 'Stock / Old Metal Stock';
-      case 'suppliers': return 'Suppliers & Purchasing / Suppliers';
-      case 'purchase-orders': return 'Suppliers & Purchasing / Purchase Orders';
-      case 'goods-receipts': return 'Suppliers & Purchasing / Goods Receipts';
-      case 'supplier-bills': return 'Suppliers & Purchasing / Supplier Bills';
-      case 'supplier-payments': return 'Suppliers & Purchasing / Supplier Payments';
-      case 'purchase-reports': return 'Suppliers & Purchasing / Purchase Reports';
-      case 'sales-reports': return 'Reports / Sales Reports';
-      case 'gst-reports': return 'Reports / GST Reports';
-      case 'reports-classic': return 'Reports / Reports (classic)';
-      case 'backup-settings': return 'Reports / Export & Backup';
-      case 'import': return 'Reports / Data Import';
-      case 'sync': return 'Admin / Sync & Database Infrastructure';
-      case 'settings':
-      case 'shop-settings': return 'Admin / Shop Settings';
-      case 'profile': return 'Admin / Store Profile & Counters';
-      case 'business-settings': return 'Admin / Business Settings';
-      case 'integrations': return 'Admin / Integrations';
-      case 'users': return 'Admin / Users';
-      case 'roles-permissions': return 'Admin / Roles & Permissions';
-      case 'theme-layout': return 'Admin / Theme & Layout';
-      case 'login-page': return 'Admin / Login Page';
-      case 'security': return 'Admin / Security';
-      case 'licence': return 'Admin / Licence';
-      case 'audit-log': return 'Admin / Audit Log';
-      case 'audit-logs': return 'Admin / Audit Log';
-      case 'error-log': return 'Admin / Error Log';
-      default: return 'Main / Dashboard';
+  // Compute breadcrumbs and title matching live production app
+  const getBreadcrumb = (mod: string) => {
+    for (const g of NAV_GROUPS) {
+      for (const item of g.items) {
+        if (isNavActive(mod, item.mod)) {
+          return { group: g.group, title: item.label };
+        }
+      }
     }
+    return { group: 'Main', title: 'Dashboard' };
   };
+
+  const { group: groupName, title: moduleTitle } = getBreadcrumb(currentModule);
 
   return (
     <>
-      {/* Main Header Bar Matching Screenshot */}
-      <header className="h-[var(--header)] shrink-0 bg-white/[0.92] border-b border-[var(--border)] px-6 flex items-center justify-between sticky top-0 z-20 select-none">
-        {/* Left: Breadcrumb & Title */}
-        <div className="flex flex-col justify-center">
-          <div className="text-[11px] text-slate-400 font-medium">
-            {getModuleTitle()}
+      <header className="topbar">
+        {/* Topbar Left: Hamburger + Crumbs & Module Title */}
+        <div className="topbar-left">
+          <button
+            className="hamburger"
+            aria-label="Toggle navigation"
+            onClick={onToggleMobile}
+          >
+            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+          <div style={{ minWidth: 0 }}>
+            <div className="crumbs hidden-mobile">
+              <span>{groupName}</span>
+              <span aria-hidden="true">/</span>
+              <span>{moduleTitle}</span>
+            </div>
+            <span className="topbar-title">{moduleTitle}</span>
           </div>
-          <h1 className="text-base font-bold text-slate-900 leading-tight">
-            {getModuleTitle().split(' / ').slice(1).join(' / ') || 'Dashboard'}
-          </h1>
         </div>
 
-        {/* Right: Counter Pill & User Info */}
-        <div className="flex items-center space-x-4">
-          {/* Active Counter Badge Matching Screenshot */}
+        {/* Topbar Right: Active Counter Pill & User Menu Pill */}
+        <div className="topbar-right">
           <button
+            type="button"
             onClick={() => setShowCounterModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#fef8ee] hover:bg-[#fdf2dc] text-[#92400e] rounded-full border border-[#efdcb6] transition-colors text-xs font-semibold cursor-pointer whitespace-nowrap shadow-2xs"
-            title="Active counter & cash register session"
+            title={`Counter ${activeCounter?.code || 'MAIN'} · ${activeCounter?.activeRegisterId || 'REG-2026-00001'}. Click to switch.`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 7,
+              padding: '5px 11px',
+              borderRadius: 999,
+              fontSize: 12,
+              fontWeight: 600,
+              border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)',
+              cursor: 'pointer',
+              marginRight: 8,
+              whiteSpace: 'nowrap',
+              transition: 'background 0.15s',
+              background: 'var(--success-l)',
+              color: 'var(--primary-d)',
+            }}
           >
-            <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-            <span>Counter {activeCounter.code}</span>
-            {activeCounter.activeRegisterId && <span className="font-normal opacity-80"> · {activeCounter.activeRegisterId}</span>}
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: 'var(--success)',
+                flexShrink: 0,
+              }}
+            />
+            Counter {activeCounter?.code || 'MAIN'}
+            <span className="hidden-mobile" style={{ fontWeight: 500 }}>
+              {' '}· {activeCounter?.activeRegisterId || 'REG-2026-00001'}
+            </span>
           </button>
 
-          {/* User Badge Matching Screenshot */}
-          <div className="flex items-center space-x-2 pl-1">
-            <div className="w-8 h-8 rounded-full bg-[#111827] text-white flex items-center justify-center font-bold text-xs shadow-xs">
-              A
-            </div>
-            <div className="hidden md:block text-left">
-              <div className="text-xs font-bold text-slate-900 leading-none">Admin</div>
-              <div className="text-[11px] text-slate-400 mt-0.5 leading-none font-medium">Shop Owner</div>
-            </div>
+          <div className="user-menu" ref={userMenuRef}>
+            <button
+              className="user-pill"
+              aria-haspopup="menu"
+              aria-expanded={userMenuOpen}
+              onClick={() => setUserMenuOpen(prev => !prev)}
+            >
+              <div className="user-av">A</div>
+              <div className="user-pill-text hidden-mobile">
+                <strong>Admin</strong>
+                <small>Shop Owner</small>
+              </div>
+            </button>
+
+            {userMenuOpen && (
+              <div className="user-dropdown" role="menu">
+                <div className="user-dropdown-head">
+                  <strong>Admin</strong>
+                  <span>{store?.email || 'admin@sbjewellers.com'}</span>
+                </div>
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    onNavigate('profile');
+                  }}
+                >
+                  <KeyRound size={14} /> Change my password
+                </button>
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    onNavigate('theme-layout');
+                  }}
+                >
+                  <Palette size={14} /> Theme & layout
+                </button>
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                    document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+                  }}
+                >
+                  <Moon size={14} /> Dark mode (this device)
+                </button>
+                <button
+                  role="menuitem"
+                  className="danger"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    if (confirm('Sign out of KreyaJewel360?')) {
+                      window.location.reload();
+                    }
+                  }}
+                >
+                  <LogOut size={14} /> Sign out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Counter Switching Modal */}
+      {/* Showroom Counter Selection Modal */}
       {showCounterModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-100">
@@ -210,4 +259,3 @@ export const Header: React.FC<HeaderProps> = ({
     </>
   );
 };
-

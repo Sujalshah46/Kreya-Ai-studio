@@ -37,6 +37,8 @@ import { PurchaseReportsView } from './components/modules/PurchaseReportsView';
 import { SalesReportsView } from './components/modules/SalesReportsView';
 import { ReportsClassicView } from './components/modules/ReportsClassicView';
 import { ShopSettingsUsersView } from './components/modules/ShopSettingsUsersView';
+import { ShopSettingsView } from './components/modules/ShopSettingsView';
+import { GirviLoansView } from './components/modules/GirviLoansView';
 import { StoreProfileCountersView } from './components/modules/StoreProfileCountersView';
 import { UsersSecurityView } from './components/modules/UsersSecurityView';
 import { AuditLogsView } from './components/modules/AuditLogsView';
@@ -316,8 +318,29 @@ export function App() {
   }, []);
   const [showOmnibar, setShowOmnibar] = useState<boolean>(false);
   const [omnibarQuery, setOmnibarQuery] = useState<string>('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('kj_sb_collapsed') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [mobileOpen, setMobileOpen] = useState<boolean>(false);
 
-  // Global Keyboard Shortcuts (F1, F2, F9, Cmd+K)
+  useEffect(() => {
+    try {
+      localStorage.setItem('kj_sb_collapsed', sidebarCollapsed ? '1' : '0');
+    } catch {}
+  }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    document.body.style.overflow = mobileOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileOpen]);
+
+  // Global Keyboard Shortcuts (F1, F2, F9, Cmd+K, Ctrl+M)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -326,6 +349,11 @@ export function App() {
       }
       if (e.key === 'Escape') {
         setShowOmnibar(false);
+        setMobileOpen(false);
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'm' || e.key === 'M') && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        setSidebarCollapsed(prev => !prev);
       }
       if (e.key === 'F1') {
         e.preventDefault();
@@ -538,20 +566,32 @@ export function App() {
   };
 
   return (
-    <div className="h-screen w-screen flex antialiased overflow-hidden" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+    <div className={`layout${sidebarCollapsed ? ' sb-collapsed' : ''}`}>
       <a className="skip-link" href="#main">Skip to content</a>
+      <div 
+        className={`sidebar-overlay${mobileOpen ? ' visible' : ''}`}
+        onClick={() => setMobileOpen(false)}
+      />
       {/* Left Application Sidebar */}
       <Sidebar
         currentModule={currentModule}
-        onNavigate={navigateTo}
+        onNavigate={(mod) => {
+          setMobileOpen(false);
+          navigateTo(mod);
+        }}
+        store={store}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(prev => !prev)}
+        mobileOpen={mobileOpen}
+        onCloseMobile={() => setMobileOpen(false)}
         openLoansCount={loans.filter(l => l.status === 'ACTIVE').length}
         openRepairsCount={repairs.filter(r => r.status !== 'delivered').length}
         activeSchemesCount={schemes.filter(s => s.status === 'ACTIVE').length}
         pendingReceivablesCount={invoices.filter(i => i.balanceDue > 0).length}
       />
 
-      {/* Right Column: Top Header + Main Dynamic Module Workspace */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+      {/* Main Dynamic Module Workspace */}
+      <main className="main" id="main" tabIndex={-1}>
         <Header
           store={store}
           rates={rates}
@@ -561,9 +601,11 @@ export function App() {
           onOpenOmnibar={() => setShowOmnibar(true)}
           onNavigate={navigateTo}
           currentModule={currentModule}
+          mobileOpen={mobileOpen}
+          onToggleMobile={() => setMobileOpen(prev => !prev)}
         />
 
-        <main id="main" tabIndex={-1} className={`flex-1 overflow-y-auto ${currentModule === 'dashboard' ? '' : 'p-4 md:py-6 md:px-7'}`}>
+        <div className={`flex-1 ${currentModule === 'dashboard' ? '' : 'p-4 md:py-6 md:px-7'}`}>
           
           {/* 1. MAIN */}
           {currentModule === 'dashboard' && (
@@ -726,6 +768,7 @@ export function App() {
             <InventoryView
               store={store}
               inventory={inventory}
+              rates={rates}
               onAddItem={handleAddItem}
               onUpdateStock={handleUpdateStock}
             />
@@ -906,9 +949,8 @@ export function App() {
 
           {/* 9. ADMIN & SETTINGS */}
           {currentModule === 'settings' && (
-            <ShopSettingsUsersView
+            <ShopSettingsView
               store={store}
-              counters={counters}
               users={users}
               onUpdateStore={setStore}
               onAddUser={(u) => setUsers([...users, u])}
@@ -979,8 +1021,8 @@ export function App() {
             <ErrorLogView onNavigate={navigateTo} />
           )}
 
-        </main>
-      </div>
+        </div>
+      </main>
 
       {/* OMNIBAR SEARCH MODAL (Cmd+K) */}
       {showOmnibar && (
