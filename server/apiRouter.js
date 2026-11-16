@@ -14,10 +14,18 @@ export async function handleApiRequest(req, res, pathname, searchParams) {
   });
 
   try {
-    // 1. Health check
+    // 1. Health check & DB Migration Trigger
     if (pathname === '/api/v1/health') {
       res.writeHead(200);
       res.end(JSON.stringify({ status: 'ok', db: !!pool }));
+      return true;
+    }
+
+    if (pathname === '/api/v1/db/migrate' || pathname === '/api/v1/admin/seed') {
+      const { initDatabase } = await import('./db.js');
+      const migrated = await initDatabase(true);
+      res.writeHead(200);
+      res.end(JSON.stringify({ status: 'ok', migrated }));
       return true;
     }
 

@@ -40,25 +40,27 @@ export async function query(text, params) {
   return { rows: [] };
 }
 
-export async function initDatabase() {
+export async function initDatabase(force = false) {
   if (!pool) return false;
 
   try {
-    const check = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' AND table_name = 'users'
-      );
-    `);
-
-    const hasTables = check.rows[0]?.exists;
-    if (hasTables) {
-      const tableCountRes = await pool.query(`
-        SELECT COUNT(*) as count FROM information_schema.tables 
-        WHERE table_schema = 'public';
+    if (!force) {
+      const check = await pool.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' AND table_name = 'users'
+        );
       `);
-      console.log(`✅ PostgreSQL database ready. ${tableCountRes.rows[0]?.count || 94} tables active.`);
-      return true;
+
+      const hasTables = check.rows[0]?.exists;
+      if (hasTables) {
+        const tableCountRes = await pool.query(`
+          SELECT COUNT(*) as count FROM information_schema.tables 
+          WHERE table_schema = 'public';
+        `);
+        console.log(`✅ PostgreSQL database ready. ${tableCountRes.rows[0]?.count || 94} tables active.`);
+        return true;
+      }
     }
 
     console.log('⚙️ PostgreSQL database is empty. Seeding initial schema and data from clean SQL dump...');
