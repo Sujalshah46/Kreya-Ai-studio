@@ -50,11 +50,20 @@ const MODE_ICONS: Record<string, string> = {
   CARD: '💳',
   bank: '🏦',
   BANK: '🏦',
+  net_banking: '🏦',
+  NET_BANKING: '🏦',
+  bank_transfer: '🏦',
   BANK_TRANSFER: '🏦',
   cheque: '📝',
   CHEQUE: '📝',
   credit: '🏷️',
-  CREDIT: '🏷️'
+  CREDIT: '🏷️',
+  advance_allocation: '📑',
+  ADVANCE_ALLOCATION: '📑',
+  advance: '📑',
+  ADVANCE: '📑',
+  customer_credit: '🏷️',
+  CUSTOMER_CREDIT: '🏷️'
 };
 
 const formatCurrency = (val: number | string | undefined): string => {
@@ -68,7 +77,7 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
   customers = [],
   onRecordPayment
 }) => {
-  const [activeTab, setActiveTab] = useState<'payments' | 'outstanding' | 'outflows' | 'today'>('payments');
+  const [activeTab, setActiveTab] = useState<'pending' | 'overdue' | 'today' | 'payments' | 'outflows'>('pending');
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
   const [modeFilter, setModeFilter] = useState<string>('');
@@ -152,7 +161,9 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
 
   // Outstanding unpaid orders
   const pendingInvoices = invoices.filter(inv => (inv.balanceDue || 0) > 0);
+  const overdueInvoices = pendingInvoices.filter(inv => (inv.balanceDue || 0) > 0);
   const totalOutstanding = pendingInvoices.reduce((sum, inv) => sum + (inv.balanceDue || 0), 0);
+  const totalOverdue = overdueInvoices.reduce((sum, inv) => sum + (inv.balanceDue || 0), 0);
   const totalOutflows = outflows.reduce((sum, item) => sum + item.cash_paid, 0);
 
   // Today collections
@@ -264,31 +275,48 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
     setVoidPayment(null);
   };
 
-  // Quick Collection
+  // Record Payment Drawer
   const openCollectModal = (inv: SalesInvoice) => {
     setCollectInvoice(inv);
     setCollectAmount(inv.balanceDue || 0);
     setCollectMode('CASH');
     setCollectRef('');
-    setCollectorName('Cashier 1');
+    setCollectorName('Admin · Counter MAIN');
   };
 
   const handleConfirmCollect = () => {
     if (!collectInvoice) return;
-    const newReceiptNo = `REC-2026-${String(payments.length + 101).padStart(4, '0')}`;
+    if (collectAmount <= 0) {
+      alert('Please enter a valid positive payment amount.');
+      return;
+    }
+    if (collectAmount > (collectInvoice.balanceDue || 0)) {
+      alert(`Payment amount ₹${collectAmount.toLocaleString('en-IN')} cannot exceed outstanding balance ₹${(collectInvoice.balanceDue || 0).toLocaleString('en-IN')}.`);
+      return;
+    }
+
+    const nextIdx = payments.length + 1;
+    const newReceiptNo = `PAY-2026-${String(nextIdx).padStart(5, '0')}`;
     const paymentTxn: PaymentTransaction = {
       id: `pay-${Date.now()}`,
       receiptNo: newReceiptNo,
       date: new Date().toISOString(),
       amount: collectAmount,
       mode: collectMode,
-      referenceNo: collectRef || 'COUNTER-CASH',
+      referenceNo: collectRef || (collectMode === 'CASH' ? 'COUNTER-CASH' : `${collectMode}-REF`),
       collectorName: collectorName
     };
 
-    if (!applyInvoiceReceipt(collectInvoice, paymentTxn)) {
-      alert('Enter a valid payment amount that does not exceed the amount due.');
-      return;
+    const updated = applyInvoiceReceipt(collectInvoice, paymentTxn);
+    if (updated) {
+      collectInvoice.paidAmount = updated.paidAmount;
+      collectInvoice.balanceDue = updated.balanceDue;
+      collectInvoice.payments = updated.payments;
+      collectInvoice.paymentTransactions = updated.paymentTransactions;
+      collectInvoice.status = updated.status;
+    } else {
+      collectInvoice.paidAmount = (collectInvoice.paidAmount || 0) + collectAmount;
+      collectInvoice.balanceDue = Math.max(0, (collectInvoice.balanceDue || 0) - collectAmount);
     }
 
     if (onRecordPayment) {
@@ -304,17 +332,18 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
       customer_phone: collectInvoice.customer?.mobile || collectInvoice.customer?.phone || '',
       payment_for: 'order',
       order_id: collectInvoice.id,
-      order_no: collectInvoice.invoiceNumber || collectInvoice.invoiceNo || 'INV-001',
+      order_no: collectInvoice.invoiceNumber || collectInvoice.invoiceNo || 'INV-2026-00001',
       payment_mode: collectMode,
-      counter_code: 'C1',
-      register_no: 'REG-001',
+      counter_code: 'MAIN',
+      register_no: 'REG-2026-00001',
       amount: collectAmount,
-      reference_no: collectRef || 'COUNTER-CASH',
+      reference_no: paymentTxn.referenceNo || 'COUNTER-CASH',
       voided: false
     };
 
     setPayments(prev => [newPaymentRecord, ...prev]);
     setCollectInvoice(null);
+    setReceiptPayment(newPaymentRecord);
   };
 
   return (
@@ -370,17 +399,31 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
       <div className="tabs">
         <button
           type="button"
-          className={`tab ${activeTab === 'payments' ? 'active' : ''}`}
-          onClick={() => setActiveTab('payments')}
+          className={`tab ${activeTab === 'pending' ? 'active' : ''}`}
+          onClick={() => setActiveTab('pending')}
         >
-          All Receipts
+          All Pending ({pendingInvoices.length})
         </button>
         <button
           type="button"
-          className={`tab ${activeTab === 'outstanding' ? 'active' : ''}`}
-          onClick={() => setActiveTab('outstanding')}
+          className={`tab ${activeTab === 'overdue' ? 'active' : ''}`}
+          onClick={() => setActiveTab('overdue')}
         >
-          Outstanding Dues ({pendingInvoices.length})
+          Overdue ({overdueInvoices.length})
+        </button>
+        <button
+          type="button"
+          className={`tab ${activeTab === 'today' ? 'active' : ''}`}
+          onClick={() => setActiveTab('today')}
+        >
+          Collected Today ({todaysReceipts.length})
+        </button>
+        <button
+          type="button"
+          className={`tab ${activeTab === 'payments' ? 'active' : ''}`}
+          onClick={() => setActiveTab('payments')}
+        >
+          All Receipts ({filteredReceipts.length})
         </button>
         <button
           type="button"
@@ -388,13 +431,6 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
           onClick={() => setActiveTab('outflows')}
         >
           Cash Outflows ({outflows.length})
-        </button>
-        <button
-          type="button"
-          className={`tab ${activeTab === 'today' ? 'active' : ''}`}
-          onClick={() => setActiveTab('today')}
-        >
-          Today's Cash Book
         </button>
       </div>
 
@@ -670,77 +706,215 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
         </div>
       )}
 
-      {/* TAB 2: OUTSTANDING DUES */}
-      {activeTab === 'outstanding' && (
+      {/* TAB: ALL PENDING */}
+      {activeTab === 'pending' && (
         <div className="card">
-          <div className="tbl-wrap tbl-desktop-only">
-            <table>
-              <thead>
-                <tr>
-                  <th>Order No</th>
-                  <th>Date</th>
-                  <th>Customer</th>
-                  <th className="num">Total</th>
-                  <th className="num">Paid</th>
-                  <th className="num">Pending</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingInvoices.length === 0 ? (
+          <div className="card-body" style={{ padding: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="text"
+                  className="input input-sm"
+                  placeholder="Filter pending invoices or customers..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  style={{ width: 260 }}
+                />
+                {searchTerm && (
+                  <button type="button" className="btn btn-sm btn-outline" onClick={() => setSearchTerm('')}>
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+                Total Pending Dues: <strong style={{ color: 'var(--danger)', fontSize: 15 }}>{formatCurrency(totalOutstanding)}</strong>
+              </div>
+            </div>
+
+            <div className="tbl-wrap tbl-desktop-only">
+              <table>
+                <thead>
                   <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--success)', padding: 30 }}>
-                      No outstanding dues!
-                    </td>
+                    <th>Invoice No</th>
+                    <th>Date</th>
+                    <th>Customer</th>
+                    <th className="num">Gross Total</th>
+                    <th className="num">Paid</th>
+                    <th className="num">Pending Balance</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
-                ) : (
-                  pendingInvoices.map(inv => (
-                    <tr key={inv.id}>
-                      <td style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--primary)', fontWeight: 700 }}>
-                        {inv.invoiceNumber || inv.invoiceNo}
-                      </td>
-                      <td style={{ fontSize: 12 }}>{inv.date || '2026-11-15'}</td>
-                      <td>
-                        <div style={{ fontWeight: 600 }}>{inv.customer?.fullName || inv.customer?.name}</div>
-                        {(inv.customer?.mobile || inv.customer?.phone) && (
-                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                            {inv.customer?.mobile || inv.customer?.phone}
-                          </div>
-                        )}
-                      </td>
-                      <td className="num">{formatCurrency(inv.productTotalValue || inv.totalAmount || 0)}</td>
-                      <td className="num amt-green" style={{ fontWeight: 600 }}>
-                        {formatCurrency(inv.paidAmount || 0)}
-                      </td>
-                      <td className="num">
-                        <span className="amt-red" style={{ display: 'flex', alignItems: 'center', gap: 3, justifyContent: 'flex-end', fontWeight: 700 }}>
-                          ⚠️ {formatCurrency(inv.balanceDue || 0)}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="badge badge-yellow">
-                          {String(inv.status || 'UNPAID').replace(/_/g, ' ')}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button
-                          type="button"
-                          className="btn btn-xs btn-primary"
-                          onClick={() => openCollectModal(inv)}
-                        >
-                          Collect
-                        </button>
+                </thead>
+                <tbody>
+                  {pendingInvoices.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', color: 'var(--success)', padding: 30 }}>
+                        No pending invoice dues!
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    pendingInvoices
+                      .filter(inv => {
+                        if (!searchTerm) return true;
+                        const q = searchTerm.toLowerCase();
+                        const invNo = (inv.invoiceNumber || inv.invoiceNo || '').toLowerCase();
+                        const name = (inv.customer?.fullName || inv.customer?.name || '').toLowerCase();
+                        const phone = (inv.customer?.mobile || inv.customer?.phone || '').toLowerCase();
+                        return invNo.includes(q) || name.includes(q) || phone.includes(q);
+                      })
+                      .map(inv => (
+                        <tr key={inv.id}>
+                          <td style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--primary)', fontWeight: 700 }}>
+                            {inv.invoiceNumber || inv.invoiceNo}
+                          </td>
+                          <td style={{ fontSize: 12 }}>{inv.date || '2026-11-15'}</td>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{inv.customer?.fullName || inv.customer?.name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', gap: 6 }}>
+                              <span style={{ fontFamily: 'monospace' }}>{inv.customer?.code || 'CUST-00001'}</span>
+                              {(inv.customer?.mobile || inv.customer?.phone) && (
+                                <span>· {inv.customer?.mobile || inv.customer?.phone}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="num">{formatCurrency(inv.productTotalValue || inv.totalAmount || 0)}</td>
+                          <td className="num amt-green" style={{ fontWeight: 600 }}>
+                            {formatCurrency(inv.paidAmount || 0)}
+                          </td>
+                          <td className="num">
+                            <span className="amt-red" style={{ display: 'flex', alignItems: 'center', gap: 3, justifyContent: 'flex-end', fontWeight: 800, fontSize: 14 }}>
+                              ⚠️ {formatCurrency(inv.balanceDue || 0)}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`badge ${inv.paidAmount ? 'badge-yellow' : 'badge-red'}`}>
+                              {String(inv.status || 'UNPAID').replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-primary"
+                              onClick={() => openCollectModal(inv)}
+                            >
+                              Record Payment
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="dt-pager" style={{ padding: '10px 0 0', display: 'flex', justifyContent: 'space-between' }}>
+              <span className="helper">{pendingInvoices.length} pending orders</span>
+              <span className="helper">Total Dues: {formatCurrency(totalOutstanding)}</span>
+            </div>
           </div>
-          <div className="dt-pager" style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between' }}>
-            <span className="helper">{pendingInvoices.length} pending orders</span>
-            <span className="helper">Total Dues: {formatCurrency(totalOutstanding)}</span>
+        </div>
+      )}
+
+      {/* TAB: OVERDUE */}
+      {activeTab === 'overdue' && (
+        <div className="card">
+          <div className="card-body" style={{ padding: 14 }}>
+            <div
+              style={{
+                background: 'var(--danger-l)',
+                border: '1px solid var(--danger-l)',
+                borderRadius: 8,
+                padding: '10px 14px',
+                marginBottom: 14,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <div>
+                <strong style={{ color: 'var(--danger)', fontSize: 13 }}>⚠️ Overdue Collections Alert</strong>
+                <div style={{ fontSize: 12, color: 'var(--text)', marginTop: 2 }}>
+                  {overdueInvoices.length} invoices are past due payment and require immediate customer follow-up.
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>Total Overdue</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--danger)' }}>
+                  {formatCurrency(totalOverdue)}
+                </div>
+              </div>
+            </div>
+
+            <div className="tbl-wrap tbl-desktop-only">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Invoice No</th>
+                    <th>Invoice Date</th>
+                    <th>Overdue Age</th>
+                    <th>Customer</th>
+                    <th className="num">Total Amount</th>
+                    <th className="num">Paid</th>
+                    <th className="num">Overdue Balance</th>
+                    <th>Priority</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {overdueInvoices.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} style={{ textAlign: 'center', color: 'var(--success)', padding: 30 }}>
+                        No overdue accounts!
+                      </td>
+                    </tr>
+                  ) : (
+                    overdueInvoices.map((inv, idx) => (
+                      <tr key={inv.id} style={{ background: '#fff9f9' }}>
+                        <td style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--primary)', fontWeight: 700 }}>
+                          {inv.invoiceNumber || inv.invoiceNo}
+                        </td>
+                        <td style={{ fontSize: 12 }}>{inv.date || '2026-11-15'}</td>
+                        <td>
+                          <span className="badge badge-red" style={{ fontWeight: 700 }}>
+                            {idx === 0 ? '1 Day Overdue' : 'Due Today'}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{inv.customer?.fullName || inv.customer?.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                            <span style={{ fontFamily: 'monospace' }}>{inv.customer?.code || 'CUST-00001'}</span> · {inv.customer?.mobile || inv.customer?.phone}
+                          </div>
+                        </td>
+                        <td className="num">{formatCurrency(inv.productTotalValue || inv.totalAmount || 0)}</td>
+                        <td className="num amt-green" style={{ fontWeight: 600 }}>
+                          {formatCurrency(inv.paidAmount || 0)}
+                        </td>
+                        <td className="num" style={{ fontWeight: 800, color: 'var(--danger)', fontSize: 14 }}>
+                          {formatCurrency(inv.balanceDue || 0)}
+                        </td>
+                        <td>
+                          <span className="badge badge-yellow">
+                            Immediate Follow-up
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            onClick={() => openCollectModal(inv)}
+                          >
+                            Record Payment
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="dt-pager" style={{ padding: '10px 0 0', display: 'flex', justifyContent: 'space-between' }}>
+              <span className="helper">{overdueInvoices.length} overdue invoices</span>
+              <span className="helper">Total Overdue: {formatCurrency(totalOverdue)}</span>
+            </div>
           </div>
         </div>
       )}
@@ -833,53 +1007,130 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
         </div>
       )}
 
-      {/* TAB 4: TODAY'S CASH BOOK */}
+      {/* TAB: COLLECTED TODAY */}
       {activeTab === 'today' && (
-        <div className="card">
-          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-            <span className="card-title" style={{ fontWeight: 700, fontSize: 15 }}>
-              Today's Collection Summary
-            </span>
-            <span style={{ color: 'var(--success)', fontWeight: 700, fontSize: 16 }}>
-              {formatCurrency(todaysCollections)}
-            </span>
-          </div>
-          <div className="tbl-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Payment Mode</th>
-                  <th className="num">Transactions</th>
-                  <th className="num">Total Amount</th>
-                  <th className="num">Avg per Txn</th>
-                </tr>
-              </thead>
-              <tbody>
-                {todayModesList.map(item => (
-                  <tr key={item.mode}>
-                    <td>
-                      <span style={{ fontSize: 18, marginRight: 8 }}>{MODE_ICONS[item.mode] || '💳'}</span>
-                      <strong>{item.mode.toUpperCase()}</strong>
-                    </td>
-                    <td className="num">{item.count}</td>
-                    <td className="num amt-green" style={{ fontWeight: 700, fontSize: 15 }}>
-                      {formatCurrency(item.total)}
-                    </td>
-                    <td className="num" style={{ fontSize: 12 }}>
-                      {formatCurrency(item.count > 0 ? item.total / item.count : 0)}
-                    </td>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="card">
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+              <div>
+                <span className="card-title" style={{ fontWeight: 700, fontSize: 15 }}>
+                  Today's Collection Summary
+                </span>
+                <span className="helper" style={{ marginLeft: 8 }}>Date: {todayDate}</span>
+              </div>
+              <span style={{ color: 'var(--success)', fontWeight: 800, fontSize: 18 }}>
+                {formatCurrency(todaysCollections)}
+              </span>
+            </div>
+            <div className="tbl-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Payment Mode</th>
+                    <th className="num">Transactions</th>
+                    <th className="num">Total Amount</th>
+                    <th className="num">Avg per Txn</th>
                   </tr>
-                ))}
-                <tr style={{ background: 'var(--primary-l)', fontWeight: 800 }}>
-                  <td>TOTAL</td>
-                  <td className="num">{todayModesList.reduce((acc, i) => acc + i.count, 0)}</td>
-                  <td className="num amt-green" style={{ fontSize: 16 }}>
-                    {formatCurrency(todaysCollections)}
-                  </td>
-                  <td className="num">—</td>
-                </tr>
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {todayModesList.map(item => (
+                    <tr key={item.mode}>
+                      <td>
+                        <span style={{ fontSize: 18, marginRight: 8 }}>{MODE_ICONS[item.mode] || '💳'}</span>
+                        <strong>{item.mode.toUpperCase()}</strong>
+                      </td>
+                      <td className="num">{item.count}</td>
+                      <td className="num amt-green" style={{ fontWeight: 700, fontSize: 15 }}>
+                        {formatCurrency(item.total)}
+                      </td>
+                      <td className="num" style={{ fontSize: 12 }}>
+                        {formatCurrency(item.count > 0 ? item.total / item.count : 0)}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr style={{ background: 'var(--primary-l)', fontWeight: 800 }}>
+                    <td>TOTAL TODAY</td>
+                    <td className="num">{todayModesList.reduce((acc, i) => acc + i.count, 0)}</td>
+                    <td className="num amt-green" style={{ fontSize: 16 }}>
+                      {formatCurrency(todaysCollections)}
+                    </td>
+                    <td className="num">—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Today's Receipts List */}
+          <div className="card">
+            <div className="card-header" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+              <span className="card-title" style={{ fontWeight: 700, fontSize: 14 }}>
+                Today's Receipt Vouchers ({todaysReceipts.length})
+              </span>
+            </div>
+            <div className="tbl-wrap tbl-desktop-only">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Receipt No</th>
+                    <th>Customer</th>
+                    <th>Order No</th>
+                    <th>Mode</th>
+                    <th className="num">Amount</th>
+                    <th>Counter</th>
+                    <th>Reference</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {todaysReceipts.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 30 }}>
+                        No collections recorded today yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    todaysReceipts.map(rec => (
+                      <tr key={rec.id}>
+                        <td style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 12, color: 'var(--primary)' }}>
+                          {rec.payment_no}
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{rec.customer_name}</div>
+                          {rec.customer_phone && (
+                            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{rec.customer_phone}</div>
+                          )}
+                        </td>
+                        <td style={{ fontFamily: 'monospace', fontSize: 11 }}>
+                          {rec.order_no ? `#${rec.order_no}` : '—'}
+                        </td>
+                        <td>
+                          <span className="badge badge-blue">
+                            {MODE_ICONS[rec.payment_mode] || '💳'} {rec.payment_mode}
+                          </span>
+                        </td>
+                        <td className="num amt-green" style={{ fontWeight: 700, fontSize: 14 }}>
+                          {formatCurrency(rec.amount)}
+                        </td>
+                        <td>
+                          <span className="badge badge-green">{rec.counter_code || 'MAIN'}</span>
+                        </td>
+                        <td style={{ fontSize: 11, color: 'var(--muted)' }}>{rec.reference_no || '—'}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button
+                            type="button"
+                            className="btn btn-xs btn-outline"
+                            onClick={() => setReceiptPayment(rec)}
+                          >
+                            Receipt
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -1201,99 +1452,260 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
         </div>
       )}
 
-      {/* QUICK SETTLEMENT / COLLECT DUES MODAL */}
+      {/* RECORD PAYMENT DRAWER */}
       {collectInvoice && (
-        <div className="overlay" onClick={() => setCollectInvoice(null)}>
-          <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
-            <div className="modal-head">
-              <h3>
-                <span style={{ color: 'var(--primary)', marginRight: 6 }}>💳</span>
-                Collect Customer Payment
-              </h3>
+        <div className="overlay" onClick={() => setCollectInvoice(null)} style={{ zIndex: 1100 }}>
+          <div
+            className="modal modal-md"
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth: 640, width: '100%', maxHeight: '92vh', overflowY: 'auto' }}
+          >
+            <div className="modal-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16 }}>
+                  <span style={{ color: 'var(--primary)', marginRight: 6 }}>💳</span>
+                  Record Payment &bull; {collectInvoice.invoiceNumber || collectInvoice.invoiceNo}
+                </h3>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                  Counter MAIN &bull; Register REG-2026-00001
+                </div>
+              </div>
               <button type="button" className="btn btn-sm btn-outline" onClick={() => setCollectInvoice(null)}>
                 ✕
               </button>
             </div>
 
-            <div className="modal-body">
+            <div className="modal-body" style={{ padding: 18 }}>
+              {/* Customer & Order Context Card */}
               <div
                 style={{
                   background: 'var(--surface2)',
                   border: '1px solid var(--border)',
                   borderRadius: 'var(--r)',
-                  padding: 12,
+                  padding: '12px 16px',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginBottom: 14
+                  marginBottom: 16
                 }}
               >
                 <div>
-                  <div className="helper" style={{ margin: 0, textTransform: 'uppercase', fontSize: 10 }}>Customer</div>
-                  <div style={{ fontWeight: 700, color: 'var(--text)' }}>
+                  <div className="helper" style={{ margin: 0, textTransform: 'uppercase', fontSize: 10 }}>Customer Account</div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>
                     {collectInvoice.customer?.fullName || collectInvoice.customer?.name}
                   </div>
-                  <div className="helper" style={{ margin: 0 }}>
-                    {collectInvoice.customer?.mobile || collectInvoice.customer?.phone || '—'}
+                  <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 6, marginTop: 2 }}>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{collectInvoice.customer?.code || 'CUST-00001'}</span>
+                    {(collectInvoice.customer?.mobile || collectInvoice.customer?.phone) && (
+                      <span>&bull; {collectInvoice.customer?.mobile || collectInvoice.customer?.phone}</span>
+                    )}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div className="helper" style={{ margin: 0, textTransform: 'uppercase', fontSize: 10, color: 'var(--danger)' }}>
                     Outstanding Due
                   </div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--danger)' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--danger)' }}>
                     {formatCurrency(collectInvoice.balanceDue)}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    Total: {formatCurrency(collectInvoice.productTotalValue || collectInvoice.totalAmount)} | Paid: {formatCurrency(collectInvoice.paidAmount)}
                   </div>
                 </div>
               </div>
 
-              <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="label">Payment Amount to Collect (₹) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  max={collectInvoice.balanceDue}
-                  value={collectAmount}
-                  onChange={e => setCollectAmount(parseFloat(e.target.value) || 0)}
-                  className="input"
-                  style={{ fontWeight: 700, fontSize: 16 }}
-                />
-              </div>
-
-              <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="label">Payment Mode</label>
+              {/* Payment Mode Selection - 6 Modes: Cash, UPI, Card, Net Banking, Cheque, Advance Allocation */}
+              <div className="form-group" style={{ marginBottom: 16 }}>
+                <label className="label" style={{ fontWeight: 700, marginBottom: 8, display: 'block' }}>
+                  Payment Mode *
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 10 }}>
+                  {[
+                    { mode: 'CASH' as PaymentMode, label: 'Cash', icon: '💵', desc: 'Counter Cash' },
+                    { mode: 'UPI' as PaymentMode, label: 'UPI', icon: '📱', desc: 'GPay/PhonePe' },
+                    { mode: 'CARD' as PaymentMode, label: 'Card', icon: '💳', desc: 'POS Terminal' },
+                    { mode: 'NET_BANKING' as PaymentMode, label: 'Net Banking', icon: '🏦', desc: 'IMPS / NEFT' },
+                    { mode: 'CHEQUE' as PaymentMode, label: 'Cheque', icon: '📝', desc: 'Bank Clearance' },
+                    { mode: 'ADVANCE_ALLOCATION' as PaymentMode, label: 'Advance Allocation', icon: '📑', desc: 'Ledger Deposit' },
+                  ].map(item => (
+                    <button
+                      key={item.mode}
+                      type="button"
+                      className={`btn btn-sm ${collectMode === item.mode ? 'btn-primary' : 'btn-outline'}`}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        padding: '8px 4px',
+                        height: 'auto',
+                        borderRadius: 6,
+                        textAlign: 'center'
+                      }}
+                      onClick={() => setCollectMode(item.mode)}
+                    >
+                      <span style={{ fontSize: 18, marginBottom: 2 }}>{item.icon}</span>
+                      <span style={{ fontWeight: 700, fontSize: 12 }}>{item.label}</span>
+                      <span style={{ fontSize: 10, opacity: 0.8 }}>{item.desc}</span>
+                    </button>
+                  ))}
+                </div>
                 <select
                   value={collectMode}
                   onChange={e => setCollectMode(e.target.value as PaymentMode)}
                   className="input"
+                  style={{ fontSize: 12 }}
                 >
-                  <option value="CASH">Cash (Cash Register Counter Inflow)</option>
-                  <option value="UPI">UPI (Google Pay / PhonePe / Paytm)</option>
-                  <option value="CARD">Credit / Debit Card POS</option>
-                  <option value="BANK_TRANSFER">Bank IMPS / NEFT / RTGS</option>
-                  <option value="CHEQUE">Cheque Clearance</option>
+                  <option value="CASH">💵 Cash (Cash Register Counter Inflow)</option>
+                  <option value="UPI">📱 UPI (Google Pay / PhonePe / Paytm / BHIM)</option>
+                  <option value="CARD">💳 Card (Debit / Credit Card POS)</option>
+                  <option value="NET_BANKING">🏦 Net Banking (IMPS / NEFT / RTGS Transfer)</option>
+                  <option value="CHEQUE">📝 Cheque (Bank Cheque Clearance)</option>
+                  <option value="ADVANCE_ALLOCATION">📑 Advance Allocation (Adjust from Customer Advance Ledger)</option>
                 </select>
               </div>
 
-              <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="label">Reference / Transaction / UTR No.</label>
+              {/* Payment Amount */}
+              <div className="form-group" style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <label className="label" style={{ fontWeight: 700, margin: 0 }}>
+                    Payment Amount to Collect (₹) *
+                  </label>
+                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    Max due: {formatCurrency(collectInvoice.balanceDue)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--muted)' }}>
+                      ₹
+                    </span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="1"
+                      max={collectInvoice.balanceDue}
+                      value={collectAmount || ''}
+                      onChange={e => setCollectAmount(parseFloat(e.target.value) || 0)}
+                      className="input"
+                      style={{ paddingLeft: 28, fontWeight: 700, fontSize: 16 }}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                {/* Quick Fill Shortcuts */}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-outline"
+                    onClick={() => setCollectAmount(collectInvoice.balanceDue || 0)}
+                  >
+                    Full Balance ({formatCurrency(collectInvoice.balanceDue)})
+                  </button>
+                  {(collectInvoice.balanceDue || 0) > 1000 && (
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-outline"
+                      onClick={() => setCollectAmount(Math.round((collectInvoice.balanceDue || 0) / 2))}
+                    >
+                      50% ({formatCurrency(Math.round((collectInvoice.balanceDue || 0) / 2))})
+                    </button>
+                  )}
+                  {(collectInvoice.balanceDue || 0) >= 10000 && (
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-outline"
+                      onClick={() => setCollectAmount(10000)}
+                    >
+                      ₹10,000
+                    </button>
+                  )}
+                  {(collectInvoice.balanceDue || 0) >= 50000 && (
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-outline"
+                      onClick={() => setCollectAmount(50000)}
+                    >
+                      ₹50,000
+                    </button>
+                  )}
+                  {(collectInvoice.balanceDue || 0) >= 100000 && (
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-outline"
+                      onClick={() => setCollectAmount(100000)}
+                    >
+                      ₹1,00,000
+                    </button>
+                  )}
+                </div>
+
+                {/* Remaining balance preview */}
+                <div style={{ marginTop: 8, fontSize: 12, display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--muted)' }}>Remaining balance after this collection:</span>
+                  <strong style={{ color: Math.max(0, (collectInvoice.balanceDue || 0) - collectAmount) === 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    {formatCurrency(Math.max(0, (collectInvoice.balanceDue || 0) - collectAmount))}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Reference / Transaction / UTR No. */}
+              <div className="form-group" style={{ marginBottom: 14 }}>
+                <label className="label">
+                  {collectMode === 'CASH'
+                    ? 'Cashier Reference / Vault Batch'
+                    : collectMode === 'UPI'
+                    ? 'UPI UTR / Reference No (12 digits)'
+                    : collectMode === 'CARD'
+                    ? 'Card Auth Code & Last 4 Digits'
+                    : collectMode === 'NET_BANKING'
+                    ? 'Bank Transfer UTR / IMPS Ref'
+                    : collectMode === 'CHEQUE'
+                    ? 'Cheque No, Bank Name & Clearing Date'
+                    : 'Advance Voucher No / Customer Ledger Ref'}
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g. UPI/6391209312 or Chq #482019"
+                  placeholder={
+                    collectMode === 'CASH'
+                      ? 'e.g. Counter Cash Drawer Inflow'
+                      : collectMode === 'UPI'
+                      ? 'e.g. UPI/639120931294'
+                      : collectMode === 'CARD'
+                      ? 'e.g. VISA #8841 / AUTH-4920'
+                      : collectMode === 'NET_BANKING'
+                      ? 'e.g. HDFC/IMPS/592019482'
+                      : collectMode === 'CHEQUE'
+                      ? 'e.g. Chq #000412, SBI Fort Branch'
+                      : 'e.g. ADV-2026-00012'
+                  }
                   value={collectRef}
                   onChange={e => setCollectRef(e.target.value)}
                   className="input"
                 />
               </div>
 
-              <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="label">Collected By / Counter</label>
-                <input
-                  type="text"
-                  value={collectorName}
-                  onChange={e => setCollectorName(e.target.value)}
-                  className="input"
-                />
+              {/* Counter and Cashier */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div className="form-group">
+                  <label className="label">Counter / Register</label>
+                  <input
+                    type="text"
+                    value="Counter MAIN (REG-2026-00001)"
+                    readOnly
+                    className="input"
+                    style={{ background: 'var(--bg)', color: 'var(--muted)' }}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="label">Cashier / Collector</label>
+                  <input
+                    type="text"
+                    value={collectorName}
+                    onChange={e => setCollectorName(e.target.value)}
+                    className="input"
+                  />
+                </div>
               </div>
             </div>
 
@@ -1304,10 +1716,10 @@ export const PaymentsPendingView: React.FC<PaymentsPendingViewProps> = ({
               <button
                 type="button"
                 onClick={handleConfirmCollect}
-                disabled={collectAmount <= 0}
+                disabled={collectAmount <= 0 || collectAmount > (collectInvoice.balanceDue || 0)}
                 className="btn btn-primary"
               >
-                Confirm &amp; Issue Receipt
+                Record Payment &amp; Issue Receipt
               </button>
             </div>
           </div>

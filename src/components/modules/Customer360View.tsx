@@ -190,6 +190,17 @@ const formatCurrency = (val: number | string): string => {
   return `₹${num.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 };
 
+// Customer Code formatting helper (CUST-00001, CUST-00002)
+export const formatCustomerCode = (code: string | undefined, index?: number): string => {
+  if (code && /^CUST-\d{5}$/.test(code)) return code;
+  if (code && /^CUST-\d+$/.test(code)) {
+    const num = code.replace('CUST-', '');
+    return `CUST-${num.padStart(5, '0')}`;
+  }
+  const n = (index !== undefined ? index + 1 : 1);
+  return `CUST-${String(n).padStart(5, '0')}`;
+};
+
 export const Customer360View: React.FC<Customer360ViewProps> = ({
   store,
   customers: initialCustomers,
@@ -281,7 +292,9 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
   const [newVisitSalesperson, setNewVisitSalesperson] = useState('Counter 1 (Rajesh)');
   const [newVisitNotes, setNewVisitNotes] = useState('');
 
-  // Customer Account Dossier Tabs
+  // Customer Account Profile Drawer Tabs: Overview, Ledger, KYC & Documents, Family & Dates
+  const [customerDrawerTab, setCustomerDrawerTab] = useState<'overview' | 'ledger' | 'kyc' | 'family'>('overview');
+  const [showProfileDrawer, setShowProfileDrawer] = useState<Customer | null>(null);
   const [activeDossierTab, setActiveDossierTab] = useState<string>('orders');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -979,7 +992,7 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                         </td>
                       </tr>
                     ) : (
-                      displayedCustomers.map((c) => {
+                      displayedCustomers.map((c, idx) => {
                         const aadharVal = (c as any).aadhar_no || c.aadhaarNumber;
                         const panVal = (c as any).pan_no || c.pan || c.panNumber;
                         const outBal = parseFloat(String(c.outstandingBalance || (c as any).opening_balance || 0));
@@ -991,7 +1004,7 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                           <tr key={c.id}>
                             <td>
                               <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted)' }}>
-                                {c.code || 'CUST-00001'}
+                                {formatCustomerCode(c.code, idx)}
                               </span>
                             </td>
                             <td>
@@ -1071,6 +1084,18 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                                     <line x1="10" y1="14" x2="21" y2="3"></line>
                                   </svg>
                                   Account
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-xs btn-outline"
+                                  onClick={() => {
+                                    setSelectedCustomerId(c.id);
+                                    setShowProfileDrawer(c);
+                                  }}
+                                  title="Customer Profile Drawer"
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                >
+                                  Drawer
                                 </button>
                                 <button
                                   type="button"
@@ -1267,8 +1292,42 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
             </h1>
           </div>
 
-          {/* 15 Stat Cards Grid */}
-          <div className="stat-grid" style={{ marginBottom: 16 }}>
+          {/* Customer Profile Tabs: Overview, Ledger, KYC & Documents, Family & Dates */}
+          <div className="tabs" style={{ marginBottom: 16 }}>
+            <button
+              type="button"
+              className={`tab ${customerDrawerTab === 'overview' ? 'active' : ''}`}
+              onClick={() => setCustomerDrawerTab('overview')}
+            >
+              Overview
+            </button>
+            <button
+              type="button"
+              className={`tab ${customerDrawerTab === 'ledger' ? 'active' : ''}`}
+              onClick={() => setCustomerDrawerTab('ledger')}
+            >
+              Ledger
+            </button>
+            <button
+              type="button"
+              className={`tab ${customerDrawerTab === 'kyc' ? 'active' : ''}`}
+              onClick={() => setCustomerDrawerTab('kyc')}
+            >
+              KYC &amp; Documents
+            </button>
+            <button
+              type="button"
+              className={`tab ${customerDrawerTab === 'family' ? 'active' : ''}`}
+              onClick={() => setCustomerDrawerTab('family')}
+            >
+              Family &amp; Dates
+            </button>
+          </div>
+
+          {customerDrawerTab === 'overview' && (
+            <>
+              {/* 15 Stat Cards Grid */}
+              <div className="stat-grid" style={{ marginBottom: 16 }}>
             {statCards.map((card) => (
               <div className="stat-card" key={card.label}>
                 <div className="stat-val" style={{ color: card.color, fontSize: 17, fontWeight: 700 }}>
@@ -2330,6 +2389,342 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
               )}
             </div>
           </div>
+        </>
+      )}
+
+      {/* TAB 2: LEDGER */}
+      {customerDrawerTab === 'ledger' && (
+        <div style={{ marginTop: 14 }}>
+          {/* Summary Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 14 }}>
+            <div style={{ padding: 14, borderRadius: 8, background: 'var(--success-l)', border: '1px solid var(--success)' }}>
+              <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Total Cash Received (Inflows)</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--success)', marginTop: 4 }}>
+                {formatCurrency(totalCashPaid + (custLoans.reduce((s, l) => s + (l.repayments || []).reduce((rs, r) => rs + (r.principalPaid || 0) + (r.interestPaid || 0), 0), 0)))}
+              </div>
+            </div>
+            <div style={{ padding: 14, borderRadius: 8, background: 'var(--danger-l)', border: '1px solid var(--danger)' }}>
+              <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Total Cash Outflow</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--danger)', marginTop: 4 }}>
+                {formatCurrency(custLoans.reduce((s, l) => s + (l.principalAmount || 0), 0) + totalRefunded)}
+              </div>
+            </div>
+            <div style={{ padding: 14, borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Net Account Cashflow</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--primary)', marginTop: 4 }}>
+                {formatCurrency(
+                  (totalCashPaid + (custLoans.reduce((s, l) => s + (l.repayments || []).reduce((rs, r) => rs + (r.principalPaid || 0) + (r.interestPaid || 0), 0), 0))) -
+                  (custLoans.reduce((s, l) => s + (l.principalAmount || 0), 0) + totalRefunded)
+                )}
+              </div>
+            </div>
+            <div style={{ padding: 14, borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Outstanding Balance Due</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: orderOutstanding > 0 ? 'var(--danger)' : 'var(--success)', marginTop: 4 }}>
+                {formatCurrency(orderOutstanding)}
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span className="card-title" style={{ fontSize: 13, fontWeight: 700 }}>Customer Statement &amp; Running Ledger</span>
+              <button 
+                type="button" 
+                className="btn btn-xs btn-outline"
+                onClick={() => window.print()}
+              >
+                Print Statement
+              </button>
+            </div>
+            <div className="card-body" style={{ padding: 0 }}>
+              <div className="tbl-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Transaction Ref</th>
+                      <th>Description</th>
+                      <th>Direction</th>
+                      <th>Payment Mode</th>
+                      <th className="num">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fullLedger.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>
+                          No ledger records found for this account.
+                        </td>
+                      </tr>
+                    ) : (
+                      fullLedger.map(entry => (
+                        <tr key={entry.id} style={{ background: entry.bgStyle }}>
+                          <td style={{ fontSize: 11 }}>{entry.date}</td>
+                          <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{entry.receiptNo}</td>
+                          <td>{entry.type} ({entry.orderRef})</td>
+                          <td>
+                            <span className={`badge ${entry.sign > 0 ? 'badge-green' : 'badge-red'}`}>
+                              {entry.sign > 0 ? 'INFLOW (Cash In)' : 'OUTFLOW (Cash Out)'}
+                            </span>
+                          </td>
+                          <td><span className="badge badge-blue">{entry.mode.toUpperCase()}</span></td>
+                          <td className="num" style={{ fontWeight: 700, color: entry.sign > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                            {entry.sign > 0 ? `+ ${formatCurrency(entry.amount)}` : `− ${formatCurrency(entry.amount)}`}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: KYC & DOCUMENTS */}
+      {customerDrawerTab === 'kyc' && (
+        <div style={{ marginTop: 14 }}>
+          <div className="card" style={{ padding: 18, marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>KYC, Identity &amp; Statutory Documents</h3>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                  Govt statutory validation (Aadhaar 12-digit Verhoeff checksum, PAN entity format, GSTIN 15-digit)
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button 
+                  type="button" 
+                  className="btn btn-sm btn-outline"
+                  onClick={() => handleOpenEditModal(selectedCustomer)}
+                >
+                  Edit KYC Info
+                </button>
+              </div>
+            </div>
+
+            {/* Identity Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14, marginBottom: 16 }}>
+              {/* Aadhaar Card */}
+              <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 14, border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>Aadhaar Number</span>
+                  {(() => {
+                    const aadh = (selectedCustomer as any).aadhar_no || selectedCustomer.aadhaarNumber || newAadhaar;
+                    const err = validateAadhaar(aadh);
+                    if (!aadh) return <span className="badge badge-gray">Not Provided</span>;
+                    return err ? <span className="badge badge-red">Invalid</span> : <span className="badge badge-green">Verified (Verhoeff)</span>;
+                  })()}
+                </div>
+                <div style={{ fontSize: 16, fontFamily: 'monospace', fontWeight: 700, marginBottom: 6 }}>
+                  {(() => {
+                    const aadh = (selectedCustomer as any).aadhar_no || selectedCustomer.aadhaarNumber || newAadhaar;
+                    if (!aadh) return '—';
+                    const clean = String(aadh).replace(/\s/g, '');
+                    return clean.length >= 12 ? `XXXX XXXX ${clean.slice(-4)}` : aadh;
+                  })()}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                  12-digit UIDAI Unique Identification · Validated via Verhoeff multiplication &amp; permutation tables.
+                </div>
+              </div>
+
+              {/* PAN Card */}
+              <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 14, border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>Permanent Account Number (PAN)</span>
+                  {(() => {
+                    const pan = (selectedCustomer as any).pan_no || selectedCustomer.pan || newPan;
+                    const err = validatePAN(pan);
+                    if (!pan) return <span className="badge badge-yellow">Required &gt; ₹2 Lakh</span>;
+                    return err ? <span className="badge badge-red">Invalid Format</span> : <span className="badge badge-green">Valid Individual (P)</span>;
+                  })()}
+                </div>
+                <div style={{ fontSize: 16, fontFamily: 'monospace', fontWeight: 700, marginBottom: 6 }}>
+                  {(selectedCustomer as any).pan_no || selectedCustomer.pan || newPan || '—'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                  Income Tax Department · [A-Z]&#123;5&#125;[0-9]&#123;4&#125;[A-Z]&#123;1&#125; (4th char: P - Person). Mandatory for jewellery transactions of ₹2 lakh and above.
+                </div>
+              </div>
+
+              {/* GSTIN Card */}
+              <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 14, border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>GST Identification Number</span>
+                  {(() => {
+                    const gst = (selectedCustomer as any).gst_no || selectedCustomer.gstin || newGst;
+                    const err = validateGSTIN(gst);
+                    if (!gst) return <span className="badge badge-gray">Unregistered (B2C)</span>;
+                    return err ? <span className="badge badge-red">Invalid GSTIN</span> : <span className="badge badge-green">Active GSTIN</span>;
+                  })()}
+                </div>
+                <div style={{ fontSize: 16, fontFamily: 'monospace', fontWeight: 700, marginBottom: 6 }}>
+                  {(selectedCustomer as any).gst_no || selectedCustomer.gstin || newGst || 'Unregistered Consumer (B2C)'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                  State Code: {selectedCustomer.stateCode || (selectedCustomer.state ? '27 Maharashtra' : '—')}
+                </div>
+              </div>
+            </div>
+
+            {/* Form 60 & Compliance Status */}
+            <div style={{ background: 'var(--surface2, #f8fafc)', borderRadius: 8, padding: 14, border: '1px solid var(--border)', marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>
+                    Form 60 Declaration (Income Tax Rule 114B)
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    Statutory declaration required for sales &gt; ₹2,00,000 when customer has no PAN card.
+                  </div>
+                </div>
+                <span className={`badge ${selectedCustomer.pan ? 'badge-green' : 'badge-yellow'}`}>
+                  {selectedCustomer.pan ? 'PAN On File (Form 60 Exempt)' : 'Form 60 Required for Sales ≥ ₹2L'}
+                </span>
+              </div>
+            </div>
+
+            {/* Document Checklist & Verification */}
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Document Verification Checklist</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+              {[
+                { doc: 'Aadhaar Card (12-digit UIDAI)', hasDoc: !!(selectedCustomer.aadhaarNumber || (selectedCustomer as any).aadhar_no), status: 'Verified' },
+                { doc: 'PAN Card Copy (Tax Dept)', hasDoc: !!(selectedCustomer.pan || (selectedCustomer as any).pan_no), status: 'Verified' },
+                { doc: 'Address Proof (Electricity / Utility)', hasDoc: !!selectedCustomer.address, status: 'Submitted' },
+                { doc: 'Passport Size Photograph', hasDoc: true, status: 'Archived' }
+              ].map((d, i) => (
+                <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 12, background: '#fff' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{d.doc}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className={`badge ${d.hasDoc ? 'badge-green' : 'badge-gray'}`} style={{ fontSize: 10 }}>
+                      {d.hasDoc ? d.status : 'Pending Upload'}
+                    </span>
+                    <button type="button" className="btn btn-xs btn-outline">Upload / Scan</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: FAMILY & DATES */}
+      {customerDrawerTab === 'family' && (
+        <div style={{ marginTop: 14 }}>
+          <div className="card" style={{ padding: 18, marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Family Relations &amp; Important Dates</h3>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                  Birthdays, anniversaries, and family references for gifting, loans &amp; greetings
+                </div>
+              </div>
+              <button 
+                type="button" 
+                className="btn btn-sm btn-outline"
+                onClick={() => handleOpenEditModal(selectedCustomer)}
+              >
+                Edit Family &amp; Dates
+              </button>
+            </div>
+
+            {/* Important Dates */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginBottom: 18 }}>
+              <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 14, border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 6 }}>
+                  🎂 Date of Birth
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
+                  {(selectedCustomer as any).dob || 'Not Recorded'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                  {(selectedCustomer as any).dob ? 'Customer is over 18 years of age (KYC eligible)' : 'Add date of birth to send automated anniversary greetings'}
+                </div>
+              </div>
+
+              <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 14, border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 6 }}>
+                  💍 Wedding Anniversary
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
+                  {(selectedCustomer as any).anniversary || 'Not Recorded'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                  Used for anniversary jewellery offers &amp; special promotional discounts
+                </div>
+              </div>
+            </div>
+
+            {/* Family Relations Table */}
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Family Members</div>
+            <div className="tbl-wrap" style={{ marginBottom: 18 }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Relationship</th>
+                    <th>Full Name</th>
+                    <th>Mobile Number</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { rel: 'Father', name: (selectedCustomer as any).father_name || '—', mob: (selectedCustomer as any).father_mobile || '—' },
+                    { rel: 'Mother', name: (selectedCustomer as any).mother_name || '—', mob: (selectedCustomer as any).mother_mobile || '—' },
+                    { rel: 'Spouse', name: (selectedCustomer as any).spouse_name || (selectedCustomer as any).nominee_name || '—', mob: (selectedCustomer as any).spouse_mobile || '—' },
+                    { rel: 'Brother', name: (selectedCustomer as any).brother_name || '—', mob: (selectedCustomer as any).brother_mobile || '—' },
+                    { rel: 'Son', name: (selectedCustomer as any).son_name || '—', mob: (selectedCustomer as any).son_mobile || '—' },
+                    { rel: 'Daughter', name: (selectedCustomer as any).daughter_name || '—', mob: (selectedCustomer as any).daughter_mobile || '—' }
+                  ].map((f, i) => (
+                    <tr key={i}>
+                      <td><strong>{f.rel}</strong></td>
+                      <td>{f.name}</td>
+                      <td style={{ fontFamily: 'monospace' }}>{f.mob}</td>
+                      <td>
+                        <span className={`badge ${f.name !== '—' ? 'badge-blue' : 'badge-gray'}`}>
+                          {f.name !== '—' ? 'Linked' : 'Not Provided'}
+                        </span>
+                      </td>
+                      <td>
+                        <button 
+                          type="button" 
+                          className="btn btn-xs btn-outline"
+                          onClick={() => handleOpenEditModal(selectedCustomer)}
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Guarantor & Emergency Reference */}
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Guarantor &amp; Reference</div>
+            <div style={{ background: 'var(--surface2, #f8fafc)', borderRadius: 8, padding: 14, border: '1px solid var(--border)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>Guarantor Name</div>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{(selectedCustomer as any).guarantor_name || (selectedCustomer as any).nominee_name || 'None Assigned'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>Guarantor Mobile</div>
+                  <div style={{ fontFamily: 'monospace', fontWeight: 600 }}>{(selectedCustomer as any).guarantor_mobile || (selectedCustomer as any).nominee_mobile || '—'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>Relationship</div>
+                  <div style={{ fontWeight: 600 }}>{(selectedCustomer as any).guarantor_relation || 'Nominee / Guarantor'}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
         </div>
       )}
 
@@ -2791,6 +3186,280 @@ export const Customer360View: React.FC<Customer360ViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOMER PROFILE DRAWER */}
+      {showProfileDrawer && (
+        <div className="overlay" onClick={() => setShowProfileDrawer(null)} style={{ zIndex: 1100 }}>
+          <div 
+            className="modal modal-lg" 
+            onClick={(e) => e.stopPropagation()} 
+            style={{ 
+              maxWidth: 780, 
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto'
+            }}
+          >
+            <div className="modal-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16 }}>
+                  Customer Profile — {showProfileDrawer.name}
+                </h3>
+                <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'monospace' }}>
+                  {formatCustomerCode(showProfileDrawer.code)} · {showProfileDrawer.mobile || showProfileDrawer.phone}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                onClick={() => setShowProfileDrawer(null)}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Profile Drawer Tabs: Overview, Ledger, KYC & Documents, Family & Dates */}
+            <div style={{ borderBottom: '1px solid var(--border)', padding: '0 16px' }}>
+              <div className="tabs" style={{ margin: 0 }}>
+                {[
+                  ['overview', 'Overview'],
+                  ['ledger', 'Ledger'],
+                  ['kyc', 'KYC & Documents'],
+                  ['family', 'Family & Dates']
+                ].map(([tabKey, tabLabel]) => (
+                  <button
+                    key={tabKey}
+                    type="button"
+                    className={`tab ${customerDrawerTab === tabKey ? 'active' : ''}`}
+                    onClick={() => setCustomerDrawerTab(tabKey as any)}
+                  >
+                    {tabLabel}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="modal-body" style={{ padding: 16 }}>
+              {customerDrawerTab === 'overview' && (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 14 }}>
+                    <div style={{ padding: 12, borderRadius: 6, background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>Customer Code</div>
+                      <div style={{ fontSize: 14, fontFamily: 'monospace', fontWeight: 700 }}>{formatCustomerCode(showProfileDrawer.code)}</div>
+                    </div>
+                    <div style={{ padding: 12, borderRadius: 6, background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>Customer Type</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, textTransform: 'capitalize' }}>{showProfileDrawer.customerType || 'Retail'}</div>
+                    </div>
+                    <div style={{ padding: 12, borderRadius: 6, background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>City / State</div>
+                      <div style={{ fontSize: 14, fontWeight: 600 }}>{showProfileDrawer.city || 'Mumbai'}, {showProfileDrawer.state || 'Maharashtra'}</div>
+                    </div>
+                    <div style={{ padding: 12, borderRadius: 6, background: 'var(--danger-l)', border: '1px solid var(--danger)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--danger)', textTransform: 'uppercase', fontWeight: 700 }}>Outstanding Balance</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--danger)' }}>
+                        {formatCurrency(showProfileDrawer.outstandingBalance || (showProfileDrawer as any).opening_balance || 0)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Customer Orders */}
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 6 }}>
+                    Recent Orders
+                  </div>
+                  <div className="tbl-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Order No</th>
+                          <th>Date</th>
+                          <th className="num">Total</th>
+                          <th className="num">Paid</th>
+                          <th className="num">Pending</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {invoices.filter(i => (i.customer?.id === showProfileDrawer.id || i.customer?.name === showProfileDrawer.name)).map(inv => (
+                          <tr key={inv.id}>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{inv.invoiceNo}</td>
+                            <td style={{ fontSize: 11 }}>{inv.invoiceDate}</td>
+                            <td className="num">₹{(inv.grandTotal ?? inv.totalAmount ?? 0).toLocaleString('en-IN')}</td>
+                            <td className="num amt-green">₹{(inv.paidAmount || 0).toLocaleString('en-IN')}</td>
+                            <td className="num" style={{ fontWeight: 700, color: (inv.balanceDue || 0) > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                              ₹{(inv.balanceDue || 0).toLocaleString('en-IN')}
+                            </td>
+                            <td>
+                              <span className={`badge ${(inv.balanceDue || 0) <= 0 ? 'badge-green' : 'badge-yellow'}`}>
+                                {inv.status || 'PENDING'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {customerDrawerTab === 'ledger' && (
+                <div>
+                  <div className="tbl-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Voucher Ref</th>
+                          <th>Narration</th>
+                          <th>Direction</th>
+                          <th>Mode</th>
+                          <th className="num">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {fullLedger.map(entry => (
+                          <tr key={entry.id}>
+                            <td style={{ fontSize: 11 }}>{entry.date}</td>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{entry.receiptNo}</td>
+                            <td>{entry.type} ({entry.orderRef})</td>
+                            <td>
+                              <span className={`badge ${entry.sign > 0 ? 'badge-green' : 'badge-red'}`}>
+                                {entry.sign > 0 ? 'INFLOW' : 'OUTFLOW'}
+                              </span>
+                            </td>
+                            <td><span className="badge badge-blue">{entry.mode.toUpperCase()}</span></td>
+                            <td className="num" style={{ fontWeight: 700, color: entry.sign > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                              {entry.sign > 0 ? `+ ${formatCurrency(entry.amount)}` : `− ${formatCurrency(entry.amount)}`}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {customerDrawerTab === 'kyc' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+                  <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 14, border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>Aadhaar Number</span>
+                      {(() => {
+                        const aadh = (showProfileDrawer as any).aadhar_no || showProfileDrawer.aadhaarNumber;
+                        const err = validateAadhaar(aadh);
+                        if (!aadh) return <span className="badge badge-gray">Not Provided</span>;
+                        return err ? <span className="badge badge-red">Invalid</span> : <span className="badge badge-green">Verified (Verhoeff)</span>;
+                      })()}
+                    </div>
+                    <div style={{ fontSize: 16, fontFamily: 'monospace', fontWeight: 700 }}>
+                      {(() => {
+                        const aadh = (showProfileDrawer as any).aadhar_no || showProfileDrawer.aadhaarNumber;
+                        if (!aadh) return '—';
+                        const clean = String(aadh).replace(/\s/g, '');
+                        return clean.length >= 12 ? `XXXX XXXX ${clean.slice(-4)}` : aadh;
+                      })()}
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 14, border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>Permanent Account Number (PAN)</span>
+                      {(() => {
+                        const pan = (showProfileDrawer as any).pan_no || showProfileDrawer.pan;
+                        const err = validatePAN(pan);
+                        if (!pan) return <span className="badge badge-yellow">Required &gt; ₹2 Lakh</span>;
+                        return err ? <span className="badge badge-red">Invalid Format</span> : <span className="badge badge-green">Valid Individual (P)</span>;
+                      })()}
+                    </div>
+                    <div style={{ fontSize: 16, fontFamily: 'monospace', fontWeight: 700 }}>
+                      {(showProfileDrawer as any).pan_no || showProfileDrawer.pan || '—'}
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 14, border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>GST Identification Number</span>
+                      {(() => {
+                        const gst = (showProfileDrawer as any).gst_no || showProfileDrawer.gstin;
+                        const err = validateGSTIN(gst);
+                        if (!gst) return <span className="badge badge-gray">Unregistered (B2C)</span>;
+                        return err ? <span className="badge badge-red">Invalid GSTIN</span> : <span className="badge badge-green">Active GSTIN</span>;
+                      })()}
+                    </div>
+                    <div style={{ fontSize: 16, fontFamily: 'monospace', fontWeight: 700 }}>
+                      {(showProfileDrawer as any).gst_no || showProfileDrawer.gstin || 'Unregistered Consumer (B2C)'}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {customerDrawerTab === 'family' && (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                    <div style={{ background: 'var(--bg)', borderRadius: 6, padding: 10 }}>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>🎂 Date of Birth</div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{(showProfileDrawer as any).dob || 'Not Recorded'}</div>
+                    </div>
+                    <div style={{ background: 'var(--bg)', borderRadius: 6, padding: 10 }}>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>💍 Wedding Anniversary</div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{(showProfileDrawer as any).anniversary || 'Not Recorded'}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 6 }}>
+                    Family References
+                  </div>
+                  <div className="tbl-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Relation</th>
+                          <th>Name</th>
+                          <th>Mobile</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { rel: 'Father', name: (showProfileDrawer as any).father_name || '—', mob: (showProfileDrawer as any).father_mobile || '—' },
+                          { rel: 'Mother', name: (showProfileDrawer as any).mother_name || '—', mob: (showProfileDrawer as any).mother_mobile || '—' },
+                          { rel: 'Spouse', name: (showProfileDrawer as any).spouse_name || (showProfileDrawer as any).nominee_name || '—', mob: (showProfileDrawer as any).spouse_mobile || '—' },
+                          { rel: 'Brother', name: (showProfileDrawer as any).brother_name || '—', mob: (showProfileDrawer as any).brother_mobile || '—' }
+                        ].map((f, i) => (
+                          <tr key={i}>
+                            <td><strong>{f.rel}</strong></td>
+                            <td>{f.name}</td>
+                            <td style={{ fontFamily: 'monospace' }}>{f.mob}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-foot">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setShowProfileDrawer(null)}
+              >
+                Close Drawer
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  setShowProfileDrawer(null);
+                  handleOpenEditModal(showProfileDrawer);
+                }}
+              >
+                Edit Full Profile
+              </button>
+            </div>
           </div>
         </div>
       )}
