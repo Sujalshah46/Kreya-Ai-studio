@@ -496,7 +496,15 @@ export function App() {
   };
 
   const handleSaveRepair = (repair: RepairOrder) => {
-    setRepairs([repair, ...repairs]);
+    setRepairs(current => {
+      const idx = current.findIndex(r => r.id === repair.id || r.repairNo === repair.repairNo);
+      if (idx >= 0) {
+        const copy = [...current];
+        copy[idx] = repair;
+        return copy;
+      }
+      return [repair, ...current];
+    });
   };
 
   const handleUpdateRepairStatus = (repairId: string, status: RepairStatus, payment?: PaymentTransaction) => {

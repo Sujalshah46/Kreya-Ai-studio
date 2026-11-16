@@ -356,6 +356,10 @@ export interface RepairItem {
   quantity: number;
   estimatedCost: number;
   conditionNotes?: string;
+  accessories?: string;
+  specialNotes?: string;
+  itemStatus?: 'pending' | 'delivered' | 'cancelled';
+  deliveryDate?: string;
 }
 
 export interface RepairOrder {
@@ -374,6 +378,7 @@ export interface RepairOrder {
   balanceDue: number;
   hsnSacCode: '998722';
   payments: PaymentTransaction[];
+  notes?: string;
 }
 
 export interface SavingScheme {
